@@ -1010,7 +1010,7 @@ export function PublicMenu() {
               </div>
             )}
             <p className="mt-4 text-[10px] uppercase tracking-widest text-slate-400">
-              Powered by Tablo
+              Powered by Swixo
             </p>
           </footer>
         </main>

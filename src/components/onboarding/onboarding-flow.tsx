@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * Tablo — 5-step onboarding wizard
+ * Swixo — 5-step onboarding wizard
  * Task ID: OB-1
  *
  * Steps:
@@ -409,7 +409,7 @@ export function OnboardingFlow() {
 
       {/* footer hint */}
       <footer className="px-4 py-4 text-center text-[11px] text-muted-foreground/70">
-        Tablo Onboarding · auto-saved locally
+        Swixo Onboarding · auto-saved locally
       </footer>
     </div>
   )
@@ -431,7 +431,7 @@ function ProgressHeader({ step, progress }: { step: number; progress: number }) 
               <span className="absolute -inset-0.5 rounded-lg pulse-ring opacity-50" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs text-muted-foreground leading-none mb-1">Tablo Onboarding</p>
+              <p className="text-xs text-muted-foreground leading-none mb-1">Swixo Onboarding</p>
               <h2 className="text-sm sm:text-base font-semibold truncate">
                 {meta.title}{' '}
                 <span className="text-muted-foreground font-normal">· {meta.subtitle}</span>
@@ -1817,7 +1817,7 @@ function QrPlaceholder({
         </div>
       </div>
       <p className="text-[11px] font-semibold text-black truncate">{tableName}</p>
-      <p className="text-[9px] text-black/60 truncate">{restaurantName || 'Tablo'}</p>
+      <p className="text-[9px] text-black/60 truncate">{restaurantName || 'Swixo'}</p>
       <p className="text-[8px] text-black/40 truncate font-mono">{token}</p>
     </div>
   )
@@ -2025,7 +2025,7 @@ function StepGoLive({
 
         <div className="mt-6 flex items-center justify-center gap-3 text-xs text-muted-foreground">
           <Rocket className="w-3.5 h-3.5 text-primary" />
-          <span>Welcome aboard Tablo.</span>
+          <span>Welcome aboard Swixo.</span>
           <button
             type="button"
             onClick={onRestart}

@@ -123,10 +123,10 @@ export function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-6">
           <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-hover items-center justify-center shadow-glow-primary mb-3">
-            <span className="text-white font-bold text-2xl">T</span>
+            <span className="text-white font-bold text-2xl">S</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight">
-            {mode === 'register' ? 'Create your Tablo Account' : 'Welcome to Tablo'}
+            {mode === 'register' ? 'Create your Swixo Account' : 'Welcome to Swixo'}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {mode === 'register'
@@ -292,7 +292,7 @@ export function LoginPage() {
         {/* Footer */}
         <div className="text-center mt-6 space-y-2">
           <p className="text-xs text-muted-foreground">
-            {mode === 'register' ? 'Already have an account? ' : 'New to Tablo? '}
+            {mode === 'register' ? 'Already have an account? ' : 'New to Swixo? '}
             <button
               onClick={() => {
                 setMode(mode === 'register' ? 'login' : 'register')

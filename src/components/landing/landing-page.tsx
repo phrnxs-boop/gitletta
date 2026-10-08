@@ -279,14 +279,14 @@ function PhoneMockup() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[11px] font-semibold text-foreground">
-                    Tonkotsu Ramen
+                    Paneer Tikka
                   </p>
                   <p className="mt-0.5 line-clamp-2 text-[9px] leading-tight text-muted-foreground">
-                    Rich pork broth, slow-cooked 18 hours
+                    Char-grilled paneer, mint chutney
                   </p>
                   <div className="mt-1 flex items-center justify-between">
                     <span className="text-[11px] font-bold text-primary">
-                      $14.50
+                      ₹289
                     </span>
                     <button
                       className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white shadow-glow-primary"
@@ -311,14 +311,14 @@ function PhoneMockup() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[11px] font-semibold text-foreground">
-                    Buddha Bowl
+                    Butter Chicken
                   </p>
                   <p className="mt-0.5 line-clamp-2 text-[9px] leading-tight text-muted-foreground">
-                    Quinoa, avocado, chickpea, tahini
+                    Creamy tomato gravy, charcoal tandoor
                   </p>
                   <div className="mt-1 flex items-center justify-between">
                     <span className="text-[11px] font-bold text-primary">
-                      $11.00
+                      ₹360
                     </span>
                     <button
                       className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white shadow-glow-primary"
@@ -335,7 +335,7 @@ function PhoneMockup() {
           {/* Cart bar */}
           <div className="absolute bottom-3 left-3 right-3">
             <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-primary to-[#ea580c] px-3 py-2.5 text-white shadow-glow-primary">
-              <span className="text-[10px] font-medium">2 items · $25.50</span>
+              <span className="text-[10px] font-medium">2 items · ₹649</span>
               <span className="flex items-center gap-1 text-[10px] font-semibold">
                 View cart
                 <ArrowRight className="size-3" />
@@ -413,7 +413,7 @@ function AiFlow() {
           <span className="text-gradient-primary">4 simple steps</span>
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-balance text-sm text-muted-foreground sm:text-base">
-          No more manual data entry. Upload once and Tablo handles the rest —
+          No more manual data entry. Upload once and Swixo handles the rest —
           from extraction to QR codes.
         </p>
       </div>
@@ -639,9 +639,9 @@ function AiMenuCreation() {
 
                 {/* Extracted items */}
                 {[
-                  { n: 'Tonkotsu Ramen', p: '$14.50', v: true, d: 'Rich pork broth, slow-cooked 18 hours' },
-                  { n: 'Spicy Miso Ramen', p: '$15.00', v: false, d: 'Fiery miso, ground pork, scallions' },
-                  { n: 'Chicken Katsu Curry', p: '$13.75', v: false, d: 'Crispy katsu, house curry, rice' },
+                  { n: 'Paneer Tikka', p: '₹289', v: true, d: 'Char-grilled paneer, mint chutney' },
+                  { n: 'Dal Makhani', p: '₹265', v: false, d: 'Black lentils, simmered overnight' },
+                  { n: 'Hyderabadi Biryani', p: '₹340', v: false, d: 'Dum-cooked basmati, saffron, raita' },
                 ].map((it) => (
                   <div
                     key={it.n}
@@ -720,12 +720,12 @@ function AiMenuCreation() {
 /* -------------------------------------------------------------------------- */
 
 const DASH_ITEMS = [
-  { emoji: '🍔', name: 'Classic Burger', price: '$12.50' },
-  { emoji: '🍕', name: 'Margherita', price: '$14.00' },
-  { emoji: '🍣', name: 'Salmon Nigiri', price: '$16.00' },
-  { emoji: '🥗', name: 'Caesar Salad', price: '$9.50' },
-  { emoji: '🍝', name: 'Truffle Pasta', price: '$18.00' },
-  { emoji: '🍰', name: 'Cheesecake', price: '$7.50' },
+  { emoji: '🧀', name: 'Paneer Tikka', price: '₹289' },
+  { emoji: '🍛', name: 'Butter Chicken', price: '₹360' },
+  { emoji: '🍚', name: 'Hyderabadi Biryani', price: '₹340' },
+  { emoji: '🥘', name: 'Dal Makhani', price: '₹265' },
+  { emoji: '🫓', name: 'Garlic Naan', price: '₹75' },
+  { emoji: '🍮', name: 'Gulab Jamun', price: '₹120' },
 ]
 
 function DashboardPreview() {
@@ -836,19 +836,19 @@ function DashboardPreview() {
             <div className="space-y-1.5 text-xs">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span>$58.00</span>
+                <span>₹1,240</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Service (10%)</span>
-                <span>$5.80</span>
+                <span>₹124</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Tax</span>
-                <span>$4.64</span>
+                <span>₹62</span>
               </div>
               <div className="flex justify-between pt-1 text-sm font-bold text-foreground">
                 <span>Total</span>
-                <span className="text-primary">$68.44</span>
+                <span className="text-primary">₹1,426</span>
               </div>
             </div>
 
@@ -1089,11 +1089,11 @@ const FAQS = [
   },
   {
     q: 'Do I need to install any hardware?',
-    a: 'No. Tablo runs entirely in the browser. Customers scan a QR code with their phone camera — no app download needed. You can print the QR codes yourself or order premium table stands from us.',
+    a: 'No. Swixo runs entirely in the browser. Customers scan a QR code with their phone camera — no app download needed. You can print the QR codes yourself or order premium table stands from us.',
   },
   {
     q: 'Can I use my own payment gateway?',
-    a: 'Yes. Pro and Enterprise plans support Stripe, Razorpay, Square, and direct bank-transfer integrations. You can also accept cash and card at the counter — Tablo tracks every payment method.',
+    a: 'Yes. Pro and Enterprise plans support Stripe, Razorpay, Square, and direct bank-transfer integrations. You can also accept cash and card at the counter — Swixo tracks every payment method.',
   },
   {
     q: 'Is my restaurant data secure?',
@@ -1167,7 +1167,7 @@ function FinalCta() {
           <span className="text-gradient-primary">restaurant?</span>
         </h2>
         <p className="mx-auto mt-4 max-w-md text-balance text-sm text-muted-foreground sm:text-base">
-          Join thousands of restaurants already using Tablo to serve more
+          Join thousands of restaurants already using Swixo to serve more
           customers, faster.
         </p>
 
@@ -1202,9 +1202,9 @@ function Footer() {
           <div className="text-center sm:text-left">
             <div className="flex items-center justify-center gap-2 sm:justify-start">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-[#ea580c] text-sm font-bold text-white shadow-glow-primary">
-                T
+                S
               </div>
-              <span className="text-base font-semibold">Tablo</span>
+              <span className="text-base font-semibold">Swixo</span>
             </div>
             <p className="mt-2 max-w-xs text-xs text-muted-foreground">
               The all-in-one digital ordering platform for modern restaurants.
@@ -1225,7 +1225,7 @@ function Footer() {
 
         <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} Tablo. All rights reserved.
+            © {new Date().getFullYear()} Swixo. All rights reserved.
           </p>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="relative flex h-1.5 w-1.5">
@@ -1252,9 +1252,9 @@ export function LandingPage() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-[#ea580c] text-sm font-bold text-white shadow-glow-primary">
-              T
+              S
             </div>
-            <span className="text-base font-semibold">Tablo</span>
+            <span className="text-base font-semibold">Swixo</span>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
             <a href="#how" className="transition-premium hover:text-foreground">How it works</a>

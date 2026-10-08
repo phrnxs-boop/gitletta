@@ -36,7 +36,7 @@ export function Sidebar() {
         {/* Logo */}
         <div className="mb-4 flex flex-col items-center gap-1">
           <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shadow-glow-primary">
-            <span className="text-white font-bold text-xl">T</span>
+            <span className="text-white font-bold text-xl">S</span>
             <span className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/20" />
           </div>
         </div>
@@ -100,10 +100,10 @@ export function MobileMoreSheet() {
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-border">
           <SheetTitle className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/20">
-              <span className="text-white font-bold text-lg">T</span>
+              <span className="text-white font-bold text-lg">S</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold truncate">{data?.tenant.name || 'Tablo'}</p>
+              <p className="text-sm font-bold truncate">{data?.tenant.name || 'Swixo'}</p>
               <p className="text-xs text-muted-foreground font-normal truncate">{data?.tenant.tagline || 'Restaurant SaaS'}</p>
             </div>
           </SheetTitle>

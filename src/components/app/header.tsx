@@ -62,7 +62,7 @@ export function Header() {
           <MenuIcon className="h-5 w-5 text-foreground" />
         </button>
         <div className="min-w-0">
-          <h1 className="text-base md:text-lg font-semibold truncate tracking-tight">{titles[view] || 'Tablo'}</h1>
+          <h1 className="text-base md:text-lg font-semibold truncate tracking-tight">{titles[view] || 'Swixo'}</h1>
           <p className="text-xs text-muted-foreground hidden sm:block truncate">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>

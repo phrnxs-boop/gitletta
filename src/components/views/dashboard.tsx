@@ -460,7 +460,11 @@ function MenuCard({ item, inCart, onAdd, currencySymbol = '₹' }: { item: any; 
         {item.image ? (
           <img src={item.image} alt={item.name} className="w-full h-full rounded-full object-cover ring-1 ring-white/5 transition-transform duration-500 group-hover:scale-105" />
         ) : (
-          <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center text-3xl">🍽️</div>
+          // No photo on file: fall back to the category's icon so the grid
+          // reads as varied rather than 22 identical plates.
+          <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center text-3xl">
+            {item.category?.icon || '🍽️'}
+          </div>
         )}
         <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/5 pointer-events-none" />
         {/* rating overlay */}
