@@ -144,6 +144,107 @@ function tagMeta(tag: string): { label: string; icon?: React.ReactNode; cls: str
 }
 
 // ---------- Main Component ----------
+// ----- Diner session durability -----
+//
+// The guarantee this enforces: once a table session ends, reloading the page,
+// refreshing the tab, or walking browser history must NOT bring the menu back.
+// Only scanning the physical QR code opens it again.
+//
+// How: `?table=<qrToken>` is treated as a one-time scan event. It is consumed
+// and stripped from the address bar immediately, so nothing that re-runs a URL
+// can re-activate a session. From then on the session token in sessionStorage
+// is the only key, and it is re-validated by the server on every load.
+
+const DINER_SESSION_KEY = 'swixo-diner-session'
+
+type CachedDinerSession = { token: string; tenantId: string; tableId: string }
+
+function stripScanParam() {
+  try {
+    const url = new URL(window.location.href)
+    url.searchParams.delete('table')
+    // Keep the view param: without it the router falls through to the landing
+    // page on the next navigation.
+    url.searchParams.set('view', 'public-menu')
+    window.history.replaceState({}, '', `${url.pathname}?${url.searchParams.toString()}`)
+  } catch {
+    /* history is unavailable — the in-memory state still governs */
+  }
+}
+
+function readCachedSession(): CachedDinerSession | null {
+  try {
+    const raw = sessionStorage.getItem(DINER_SESSION_KEY)
+    return raw ? (JSON.parse(raw) as CachedDinerSession) : null
+  } catch {
+    return null
+  }
+}
+
+function writeCachedSession(session: CachedDinerSession) {
+  try {
+    sessionStorage.setItem(DINER_SESSION_KEY, JSON.stringify(session))
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearCachedSession() {
+  try {
+    sessionStorage.removeItem(DINER_SESSION_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+// A scan token survives a remount (React StrictMode double-invokes effects in
+// development, and anything can remount the tree). Without this the stripping
+// below would run on the first pass and the second pass would see no scan token
+// at all — locking the diner out of a session that had just been created.
+let pendingScanToken: string | null = null
+let mintInFlight: Promise<CachedDinerSession | null> | null = null
+
+/**
+ * Exchange a scanned QR token for a session. Concurrent callers share one
+ * request, so a remount can never mint two sessions for a single scan.
+ */
+function mintDinerSession(qrToken: string): Promise<CachedDinerSession | null> {
+  if (!mintInFlight) {
+    mintInFlight = (async () => {
+      try {
+        const res = await edgeFetch('/api/table-session', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ qrToken }),
+        })
+        if (!res.ok) return null
+        const data = await res.json()
+        const session: CachedDinerSession = {
+          token: data.sessionToken,
+          tenantId: data.tenant.id,
+          tableId: data.table.id,
+        }
+        writeCachedSession(session)
+        // Consumed: a later load must be authorised by the session alone.
+        pendingScanToken = null
+        return session
+      } catch {
+        return null
+      } finally {
+        mintInFlight = null
+      }
+    })()
+  }
+  return mintInFlight
+}
+
+/** End the diner session for this tab, permanently. Never re-activates. */
+function lockDinerSession(setState: (v: 'ended') => void) {
+  clearCachedSession()
+  pendingScanToken = null
+  setState('ended')
+}
+
 export function PublicMenu() {
   const searchParams = useSearchParams()
   const [tenant, setTenant] = useState<Tenant | null>(null)
@@ -171,129 +272,109 @@ export function PublicMenu() {
   const [billOrderId, setBillOrderId] = useState<string | null>(null)
   const [billOpen, setBillOpen] = useState(false)
 
+  // Bumping this re-runs the session check. Used when the browser restores the
+  // page from the back/forward cache: that restores the rendered menu DOM
+  // without re-running effects, so an ended session could otherwise reappear.
+  const [revalidateNonce, setRevalidateNonce] = useState(0)
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setRevalidateNonce((n) => n + 1)
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
+
   const pillsRef = useRef<HTMLDivElement>(null)
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({})
 
   // ----- Session-gated menu access -----
-  // The backend is the source of truth. We NEVER show the menu based on the URL
-  // alone. The customer must scan the QR (qrToken in URL) to activate a session,
-  // and we re-validate the session on every load (including refresh).
   useEffect(() => {
     let cancelled = false
+
+    async function validateSession(session: CachedDinerSession) {
+      const res = await edgeFetch(
+        `/api/table-session/validate?tenantId=${encodeURIComponent(session.tenantId)}` +
+          `&tableId=${encodeURIComponent(session.tableId)}` +
+          `&sessionToken=${encodeURIComponent(session.token)}`,
+      )
+      if (!res.ok) return null
+      const data = await res.json()
+      return data?.sessionStatus === 'ACTIVE' ? data : null
+    }
+
+    function adopt(session: CachedDinerSession, data: any) {
+      setSessionToken(session.token)
+      setSessionTenantId(session.tenantId)
+      setSessionTableId(session.tableId)
+      setTenant(data.tenant)
+      setTable(data.table)
+      setCategories(data.categories || [])
+      setMenuItems(data.menuItems || [])
+      setSocial(data.social || {})
+    }
+
     async function activateAndLoad() {
       try {
         setLoading(true)
         setError(null)
         setSessionState('activating')
 
-        const params = new URLSearchParams(window.location.search)
-        const qrToken = params.get('table') // this is the table's physical qrToken
+        // A `table=` param means a scan just happened. Remember it at module
+        // scope so a remount still sees it, and strip it from the address bar
+        // before anything else so a refresh can never replay it.
+        const urlScanToken = new URLSearchParams(window.location.search).get('table')
+        if (urlScanToken) {
+          pendingScanToken = urlScanToken
+          stripScanParam()
+        }
+        const qrToken = pendingScanToken
+        const scanned = Boolean(qrToken)
 
-        if (!qrToken) {
-          // No QR token in URL → cannot activate a session → locked
-          if (!cancelled) setSessionState('invalid')
+        if (!scanned) {
+          // Not a scan. The only way in is a session this tab already holds.
+          const cached = readCachedSession()
+          if (!cached) {
+            if (!cancelled) {
+              setSessionState('invalid')
+              setLoading(false)
+            }
+            return
+          }
+
+          const data = await validateSession(cached)
+          if (cancelled) return
+          if (!data) {
+            lockDinerSession(setSessionState)
+            setLoading(false)
+            return
+          }
+
+          adopt(cached, data)
+          setSessionState('active')
+          setLoading(false)
           return
         }
 
-        // 1. Activate a session by POSTing the qrToken to the backend.
-        //    The backend validates the QR against the DB and creates a NEW session.
-        //    We cache the session token in sessionStorage (UX only — NOT for security;
-        //    the backend re-validates on every request).
-        const storageKey = `table-session-${qrToken}`
-        let cachedToken: string | null = null
-        let cachedTenantId: string | null = null
-        let cachedTableId: string | null = null
-        try {
-          const raw = sessionStorage.getItem(storageKey)
-          if (raw) {
-            const parsed = JSON.parse(raw)
-            cachedToken = parsed.token
-            cachedTenantId = parsed.tenantId
-            cachedTableId = parsed.tableId
-          }
-        } catch { /* ignore */ }
-
-        let token = cachedToken
-        let tenantId = cachedTenantId
-        let tableId = cachedTableId
-
-        // If we have a cached session token, validate it first (handles refresh).
-        // If it's ended/invalid, we'll activate a new one using the qrToken.
-        if (token && tenantId && tableId) {
-          const vRes = await edgeFetch(`/api/table-session/validate?tenantId=${encodeURIComponent(tenantId)}&tableId=${encodeURIComponent(tableId)}&sessionToken=${encodeURIComponent(token)}`)
-          if (vRes.ok) {
-            const data = await vRes.json()
-            if (cancelled) return
-            if (data.sessionStatus === 'ACTIVE') {
-              setSessionToken(token)
-              setSessionTenantId(tenantId)
-              setSessionTableId(tableId)
-              setTenant(data.tenant)
-              setTable(data.table)
-              setCategories(data.categories || [])
-              setMenuItems(data.menuItems || [])
-              setSocial(data.social || {})
-              setSessionState('active')
-              setLoading(false)
-              return
-            }
-          }
-          // session invalid/ended — clear cache and fall through to activate new
-          sessionStorage.removeItem(storageKey)
-          token = null
-        }
-
-        // 2. No valid cached session — activate a new one using the QR token.
-        //    This is the "scan the QR" step. Only a valid qrToken works.
-        const actRes = await edgeFetch('/api/table-session', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ qrToken }),
-        })
-        if (!actRes.ok) {
-          const err = await actRes.json().catch(() => ({}))
-          if (cancelled) return
-          setError(err.error || 'Failed to activate table session')
+        // A scan always opens a brand new session for that table.
+        const session = await mintDinerSession(qrToken as string)
+        if (cancelled) return
+        if (!session) {
+          setError('Failed to activate table session')
           setSessionState('invalid')
           setLoading(false)
           return
         }
-        const actData = await actRes.json()
+
+        const data = await validateSession(session)
         if (cancelled) return
-
-        token = actData.sessionToken
-        tenantId = actData.tenant.id
-        tableId = actData.table.id
-
-        // cache (UX only)
-        try {
-          sessionStorage.setItem(storageKey, JSON.stringify({ token, tenantId, tableId }))
-        } catch { /* ignore */ }
-
-        setSessionToken(token)
-        setSessionTenantId(tenantId)
-        setSessionTableId(tableId)
-        setTenant(actData.tenant)
-        setTable(actData.table)
-        setSessionState('active')
-        const mRes = await edgeFetch(`/api/table-session/validate?tenantId=${encodeURIComponent(tenantId || '')}&tableId=${encodeURIComponent(tableId || '')}&sessionToken=${encodeURIComponent(token || '')}`)
-        if (!mRes.ok) {
-          const err = await mRes.json().catch(() => ({}))
-          if (cancelled) return
-          if (err.sessionStatus === 'INVALID' || mRes.status === 403) {
-            setSessionState('ended')
-          } else {
-            setError(err.error || 'Failed to load menu')
-            setSessionState('invalid')
-          }
+        if (!data) {
+          lockDinerSession(setSessionState)
           setLoading(false)
           return
         }
-        const mData = await mRes.json()
-        if (cancelled) return
-        setCategories(mData.categories || [])
-        setMenuItems(mData.menuItems || [])
-        setSocial(mData.social || {})
+
+        adopt(session, data)
+        setSessionState('active')
         setLoading(false)
       } catch (e: any) {
         if (!cancelled) {
@@ -303,11 +384,12 @@ export function PublicMenu() {
         }
       }
     }
+
     activateAndLoad()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [revalidateNonce])
 
   // ----- Cart persistence (keyed by SESSION, not just table) -----
   // Switching tables / re-scanning creates a new session → fresh cart.
@@ -412,14 +494,14 @@ export function PublicMenu() {
           msg.type === 'SESSION_ENDED' &&
           (!msg.tableId || !targetTableId || msg.tableId === targetTableId)
         ) {
-          setSessionState('ended')
+          lockDinerSession(setSessionState)
           setCartOpen(false)
         } else if (
           msg.type === 'ORDER_UPDATED' &&
           msg.order?.status === 'COMPLETED' &&
           (!msg.order?.tableId || !targetTableId || msg.order.tableId === targetTableId)
         ) {
-          setSessionState('ended')
+          lockDinerSession(setSessionState)
           setCartOpen(false)
         }
       }
@@ -437,13 +519,13 @@ export function PublicMenu() {
           )}&sessionToken=${encodeURIComponent(sessionToken)}`
         )
         if (res.status === 401 || res.status === 403 || !res.ok) {
-          setSessionState('ended')
+          lockDinerSession(setSessionState)
           setCartOpen(false)
           return
         }
         const data = await res.json()
         if (data.sessionStatus !== 'ACTIVE') {
-          setSessionState('ended')
+          lockDinerSession(setSessionState)
           setCartOpen(false)
         }
       } catch {}
@@ -527,7 +609,7 @@ export function PublicMenu() {
   async function placeOrder() {
     if (!cart.length) return
     if (!sessionToken) {
-      setSessionState('ended')
+      lockDinerSession(setSessionState)
       return
     }
     setPlacing(true)
@@ -548,7 +630,7 @@ export function PublicMenu() {
       if (res.status === 401 || res.status === 403) {
         // session ended/invalid → lock the menu
         const err = await res.json().catch(() => ({}))
-        setSessionState('ended')
+        lockDinerSession(setSessionState)
         setCartOpen(false)
         throw new Error(err.error || 'Session ended')
       }
@@ -700,6 +782,7 @@ export function PublicMenu() {
           orderId={billOrderId}
           open={billOpen}
           onOpenChange={setBillOpen}
+          sessionToken={sessionToken}
         />
       </div>
     )
@@ -1172,6 +1255,7 @@ export function PublicMenu() {
           orderId={billOrderId}
           open={billOpen}
           onOpenChange={setBillOpen}
+          sessionToken={sessionToken}
         />
       </div>
     </div>
@@ -1620,31 +1704,17 @@ function SessionReviewCard({
     }
   }
 
-  const handleViewBill = async () => {
+  const handleViewBill = () => {
+    // The parent always supplies onViewBill, which opens the in-app BillDialog
+    // with the session token attached. The old fallback used window.open on
+    // /api/bill/<id>, which could not carry auth and opened raw JSON in a tab.
     if (onViewBill) {
       onViewBill()
       return
     }
-    try {
-      const q = new URLSearchParams()
-      if (sessionToken) q.set('sessionToken', sessionToken)
-      if (sessionTableId || tableId) q.set('tableId', sessionTableId || tableId || '')
-      if (sessionTenantId || tenantId) q.set('tenantId', sessionTenantId || tenantId || '')
-      if (typeof window !== 'undefined') {
-        const qr = new URLSearchParams(window.location.search).get('table')
-        if (qr) q.set('qrToken', qr)
-      }
-      const res = await edgeFetch(`/api/table-session/bill?${q.toString()}`)
-      const d = await res.json()
-      if (d.ok && d.orderId) {
-        window.open('/api/bill/' + d.orderId, '_blank')
-      } else {
-        toast.info('No bill found for this session')
-      }
-    } catch {
-      toast.error('Could not load bill')
-    }
+    toast.info('Open the bill from the session screen')
   }
+
 
   if (submitted) {
     return (

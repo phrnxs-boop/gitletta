@@ -47,7 +47,22 @@ interface BillData {
   terms: string[]
 }
 
-export function BillDialog({ orderId, open, onOpenChange }: { orderId: string | null; open: boolean; onOpenChange: (v: boolean) => void }) {
+export function BillDialog({
+  orderId,
+  open,
+  onOpenChange,
+  sessionToken,
+}: {
+  orderId: string | null
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  /**
+   * Diner path only. Owners and staff authenticate with their session cookie /
+   * bearer token; a diner has neither, so they pass their table-session token
+   * and the API pins the lookup to that session.
+   */
+  sessionToken?: string | null
+}) {
   const [bill, setBill] = useState<BillData | null>(null)
   const [loading, setLoading] = useState(false)
   const printRef = useRef<HTMLDivElement>(null)
@@ -56,7 +71,8 @@ export function BillDialog({ orderId, open, onOpenChange }: { orderId: string | 
     setLoading(true)
     setBill(null)
     try {
-      const res = await edgeFetch(`/api/bill/${id}`)
+      const qs = sessionToken ? `?sessionToken=${encodeURIComponent(sessionToken)}` : ''
+      const res = await edgeFetch(`/api/bill/${id}${qs}`)
       const data = await res.json()
       if (data.restaurant) {
         setBill(data)
@@ -72,7 +88,7 @@ export function BillDialog({ orderId, open, onOpenChange }: { orderId: string | 
     if (open && orderId) {
       loadBill(orderId)
     }
-  }, [open, orderId])
+  }, [open, orderId, sessionToken])
 
   const handlePrint = () => {
     if (!bill) return

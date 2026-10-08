@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { guard } from "../_shared/auth.ts";
+import { guard, tableSession } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
 import { body, json, preflight, subPath } from "../_shared/http.ts";
 
@@ -448,15 +448,28 @@ async function listSessions(req: Request): Promise<Response> {
 
 /** GET /table-session/bill — resolve the latest order for a session (orders.view). */
 async function bill(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const sessionToken = url.searchParams.get("sessionToken");
+
+  // Dual auth. Owners and staff need `orders.view`; a diner has no account at
+  // all, so they present their table-session token instead — `window.open`
+  // cannot attach an auth header, which is why the token travels in the query.
   const g = await guard(req, { permission: "orders.view" });
-  if (!g.ok) return g.response;
-  const tenantId = g.session.tenantId;
+  let tenantId: string;
+  let dinerSessionId: string | null = null;
+
+  if (g.ok) {
+    tenantId = g.session.tenantId;
+  } else {
+    const session = sessionToken ? await tableSession(sessionToken) : null;
+    if (!session) return g.response; // 401 — neither an owner nor a live session
+    tenantId = session.tenantId;
+    dinerSessionId = session.id;
+  }
 
   try {
     const db = admin();
-    const url = new URL(req.url);
     const orderIdParam = url.searchParams.get("orderId");
-    const sessionToken = url.searchParams.get("sessionToken");
     const tableIdParam = url.searchParams.get("tableId");
     const qrTokenParam =
       url.searchParams.get("qrToken") || url.searchParams.get("qr") || url.searchParams.get("table");
@@ -474,6 +487,17 @@ async function bill(req: Request): Promise<Response> {
       const { data } = await q.maybeSingle();
       return data;
     };
+
+    // A diner is pinned to their own session and gets exactly one lookup. They
+    // must not be able to resolve an arbitrary order id or table, even within
+    // the same restaurant.
+    if (dinerSessionId) {
+      const order = await latestFor({ table_session_id: dinerSessionId });
+      if (order) {
+        return json(req, { ok: true, orderId: order.id, orderNumber: order.order_number });
+      }
+      return json(req, { ok: false, error: "No bill found" }, 404);
+    }
 
     // 1. Direct orderId lookup
     if (orderIdParam) {

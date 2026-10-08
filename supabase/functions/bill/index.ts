@@ -1,15 +1,22 @@
 // deno-lint-ignore-file no-explicit-any
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { guard } from "../_shared/auth.ts";
+import { guard, tableSession } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
 import { json, preflight, subPath } from "../_shared/http.ts";
 
 /**
  * /functions/v1/bill/:orderId
- *   GET   finalized bill data for an order (orders.view)
+ *   GET   finalized bill data for an order
  *
  * Ported from src/app/api/bill/[orderId]/route.ts. The Next version looked the
  * order up by `id` alone — every read here is scoped to the caller's tenant.
+ *
+ * Two callers are legitimate:
+ *   * an owner or staff member with `orders.view` — the POS Bill button
+ *   * the diner whose table session produced the order — the "View Bill" link
+ *     on the session-ended screen. `window.open` cannot attach an auth header,
+ *     so that path passes `?sessionToken=` instead, and the lookup is pinned to
+ *     that session so a diner can only ever read their own bill.
  */
 
 Deno.serve(async (req: Request) => {
@@ -29,17 +36,34 @@ Deno.serve(async (req: Request) => {
 });
 
 async function get(req: Request, orderId: string | null): Promise<Response> {
-  const g = await guard(req, { permission: "orders.view" });
-  if (!g.ok) return g.response;
   if (!orderId) return json(req, { error: "Order not found" }, 404);
 
   const db = admin();
-  const { data: order, error } = await db
+
+  const g = await guard(req, { permission: "orders.view" });
+  let tenantId: string;
+  let sessionId: string | null = null;
+
+  if (g.ok) {
+    tenantId = g.session.tenantId;
+  } else {
+    const token = new URL(req.url).searchParams.get("sessionToken");
+    const session = token ? await tableSession(token) : null;
+    if (!session) return g.response; // 401 — neither an owner nor a live session
+    tenantId = session.tenantId;
+    sessionId = session.id;
+  }
+
+  let query = db
     .from("orders")
     .select("*, items:order_items(*), table:tables(*), tenant:tenants(*), servedBy:profiles(id,name)")
     .eq("id", orderId)
-    .eq("tenant_id", g.session.tenantId) // tenant scoping — see header
-    .maybeSingle();
+    .eq("tenant_id", tenantId); // tenant scoping — see header
+
+  // A diner may only read the order their own session created.
+  if (sessionId) query = query.eq("table_session_id", sessionId);
+
+  const { data: order, error } = await query.maybeSingle();
 
   if (error) return json(req, { error: error.message }, 500);
   if (!order) return json(req, { error: "Order not found" }, 404);
