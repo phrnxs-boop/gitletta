@@ -171,7 +171,9 @@ export async function validateStaffSession(token: string): Promise<
     .update({ last_active: new Date().toISOString() })
     .eq('id', session.id)
 
-  const isOwner = staff.role?.name === 'Owner' || staff.role?.is_system
+  // `is_system` marks a built-in role, not the owner — see the note in
+  // supabase/functions/_shared/auth.ts.
+  const isOwner = staff.role?.is_system === true && staff.role?.name === 'Owner'
   let permissions: string[] = String(staff.role?.permissions || '')
     .split(',')
     .filter(Boolean)

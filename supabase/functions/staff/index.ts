@@ -425,8 +425,9 @@ async function meGet(req: Request): Promise<Response> {
   const orders = toCamel(ordersRes.data ?? []);
   const roles = toCamel(rolesRes.data ?? []);
 
-  const isOwnerOrSystem = staff.role?.is_system || staff.role?.name === "Owner";
-  const hasPerm = (p: string) => Boolean(isOwnerOrSystem) || permissions.includes(p);
+  // Only the built-in Owner role gets everything — see _shared/auth.ts.
+  const isOwner = staff.role?.is_system === true && staff.role?.name === "Owner";
+  const hasPerm = (p: string) => isOwner || permissions.includes(p);
 
   const modules = {
     dashboard: hasPerm("dashboard.view"),

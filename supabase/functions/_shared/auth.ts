@@ -139,7 +139,10 @@ async function staffSession(req: Request): Promise<Session | null> {
     .update({ last_active: new Date().toISOString() })
     .eq("id", session.id);
 
-  const isOwner = staff.role?.name === "Owner" || staff.role?.is_system;
+  // `is_system` marks a built-in role, NOT the owner: the seeded Owner,
+  // Manager, Waiter, Cashier and Kitchen roles are all `is_system: true`.
+  // Treating it as "owner" escalated every PIN login to full tenant access.
+  const isOwner = staff.role?.is_system === true && staff.role?.name === "Owner";
   let permissions = splitPermissions(staff.role?.permissions);
   if (isOwner) permissions = Array.from(new Set([...permissions, ...PERMISSION_KEYS]));
 
