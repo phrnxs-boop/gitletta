@@ -722,7 +722,7 @@ export function PublicMenu() {
   if (sessionState === 'ended' || sessionState === 'invalid') {
     const ended = sessionState === 'ended'
     return (
-      <div className="min-h-screen bg-[#fafaf7] text-[#1a1d29] flex items-center justify-center p-4 sm:p-6">
+      <div className="light min-h-screen bg-[#fafaf7] text-[#1a1d29] flex items-center justify-center p-4 sm:p-6">
         <div className="max-w-[440px] w-full text-center rounded-3xl bg-white p-6 sm:p-8 shadow-sm border border-slate-100">
           <div className="mx-auto size-16 rounded-2xl flex items-center justify-center shadow-xs" style={{ background: ended ? '#fef3c7' : '#fee2e2' }}>
             {ended ? (
@@ -791,7 +791,7 @@ export function PublicMenu() {
   // ---------- Activating session → loading skeleton ----------
   if (loading || sessionState === 'activating') {
     return (
-      <div className="min-h-screen bg-[#fafaf7] text-[#1a1d29]">
+      <div className="light min-h-screen bg-[#fafaf7] text-[#1a1d29]">
         <div className="max-w-md mx-auto px-4 pt-6">
           <Skeleton className="h-16 w-16 rounded-2xl bg-[#eeeae3]" />
           <Skeleton className="mt-4 h-7 w-3/4 bg-[#eeeae3]" />
@@ -825,7 +825,7 @@ export function PublicMenu() {
   // ---------- Error state ----------
   if (error || !tenant) {
     return (
-      <div className="min-h-screen bg-[#fafaf7] text-[#1a1d29] flex items-center justify-center p-6">
+      <div className="light min-h-screen bg-[#fafaf7] text-[#1a1d29] flex items-center justify-center p-6">
         <div className="max-w-sm w-full text-center rounded-3xl bg-white p-8 shadow-sm">
           <div className="mx-auto size-14 rounded-2xl bg-red-50 flex items-center justify-center">
             <X className="size-7 text-red-500" />
@@ -849,7 +849,7 @@ export function PublicMenu() {
   // ---------- Main render ----------
   return (
     <div
-      className="min-h-screen bg-[#fafaf7] text-[#1a1d29]"
+      className="light min-h-screen bg-[#fafaf7] text-[#1a1d29]"
       style={{ paddingBottom: cart.length ? 96 : 0 }}
     >
       <div className="max-w-md mx-auto relative">
@@ -1127,7 +1127,7 @@ export function PublicMenu() {
           <SheetContent
             side="bottom"
             hideCloseButton
-            className="max-w-md mx-auto rounded-t-3xl p-0 border-0 bg-[#fafaf7] max-h-[92vh] flex flex-col"
+            className="light max-w-md mx-auto rounded-t-3xl p-0 border-0 bg-[#fafaf7] max-h-[92vh] flex flex-col"
           >
             {placedOrder ? (
               <SuccessView

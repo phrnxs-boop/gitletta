@@ -45,8 +45,12 @@
   --radius-2xl: calc(var(--radius) + 8px);
 }
 
-/* Light theme (default) — warm off-white with coral accent */
-:root {
+/* Light theme (default) — warm off-white with coral accent.
+   Also bound to `.light` so a subtree rendered inside the dark app can
+   opt back into light tokens — the diner menu does exactly that, and
+   Radix portals (the cart sheet) render outside its wrapper. */
+:root,
+.light {
   --radius: 0.875rem;
   --background: #fafaf7;
   --foreground: #1a1d29;
@@ -85,6 +89,17 @@
   --sidebar-accent-foreground: #f97316;
   --sidebar-border: rgba(0, 0, 0, 0.06);
   --sidebar-ring: #f97316;
+}
+
+/* Re-resolve the inherited colour inside a light subtree.
+   `color` is an inherited property, and `body` resolves it once against the
+   dark tokens (@apply text-foreground). Descendants then inherit that already
+   computed near-white value — re-declaring --foreground alone does nothing for
+   any element that does not set its own colour. That is why the diner menu's
+   light surfaces showed near-white text on white. Declaring `color` here forces
+   the subtree to resolve it against the light tokens above. */
+.light {
+  color: var(--foreground);
 }
 
 /* Dark theme — deep slate with coral accent */
