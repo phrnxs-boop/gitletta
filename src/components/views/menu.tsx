@@ -59,6 +59,7 @@ interface MenuFormState {
   categoryId: string
   prepTime: string
   calories: string
+  rating: string
   tags: string
   image: string
   available: boolean
@@ -71,6 +72,8 @@ const EMPTY_FORM: MenuFormState = {
   categoryId: '',
   prepTime: '15',
   calories: '',
+  // Matches the column default, so a new item starts with the star it will show.
+  rating: '4.5',
   tags: '',
   image: '',
   available: true,
@@ -179,6 +182,7 @@ export function MenuView() {
       categoryId: item.categoryId,
       prepTime: String(item.prepTime ?? 15),
       calories: item.calories != null ? String(item.calories) : '',
+      rating: item.rating != null ? String(item.rating) : '',
       tags: item.tags || '',
       image: item.image || '',
       available: item.available,
@@ -211,6 +215,7 @@ export function MenuView() {
       categoryId: form.categoryId,
       prepTime: parseInt(form.prepTime || '15', 10) || 15,
       calories: form.calories ? parseInt(form.calories, 10) : null,
+      rating: form.rating ? Number(form.rating) : null,
       tags: form.tags.trim() || null,
       image: form.image.trim() || null,
       available: form.available,
@@ -534,6 +539,25 @@ export function MenuView() {
                 placeholder="—"
                 className="bg-secondary/50 border-0"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="m-rating">Rating (0–5)</Label>
+              <div className="relative">
+                <Input
+                  id="m-rating"
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  value={form.rating}
+                  onChange={(e) => setField('rating', e.target.value)}
+                  placeholder="4.5"
+                  className="bg-secondary/50 border-0 pl-8"
+                />
+                <Star className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-amber-400 fill-amber-400" />
+              </div>
+              <p className="text-[11px] text-muted-foreground">Shown as the star on the menu card.</p>
             </div>
 
             <div className="sm:col-span-2 space-y-2">

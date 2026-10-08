@@ -479,12 +479,23 @@ function MenuCard({ item, inCart, onAdd, currencySymbol = '₹' }: { item: any; 
       <div className="space-y-1">
         <h4 className="font-semibold text-sm leading-tight line-clamp-2 min-h-[2.5rem]">{item.name}</h4>
         <p className="text-[11px] text-muted-foreground line-clamp-1">{item.description}</p>
-        <div className="flex items-center justify-between pt-1">
+        {/* flex-wrap so a long badge (BESTSELLER) drops to a second line
+            instead of spilling outside the card. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1">
           <span className="font-bold text-base text-gradient-primary">{currencySymbol}{item.price.toFixed(2)}</span>
           {tags[0] && <Tag label={tags[0]} />}
         </div>
         <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-          <span className="opacity-60">⏱</span>{item.prepTime} min · <span className="opacity-60">🔥</span>{item.calories} cal
+          <span className="opacity-60">⏱</span>
+          <span>{item.prepTime} min</span>
+          {/* Only shown when the item actually has a calorie value. */}
+          {item.calories ? (
+            <>
+              <span className="opacity-40">·</span>
+              <span className="opacity-60">🔥</span>
+              <span>{item.calories} cal</span>
+            </>
+          ) : null}
         </p>
       </div>
     </button>

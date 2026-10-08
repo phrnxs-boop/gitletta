@@ -46,6 +46,17 @@ Deno.serve(async (req: Request) => {
   }
 });
 
+/**
+ * Ratings are shown as a star on the menu cards. Accept 0–5 and ignore anything
+ * that is not a number, so an empty field in the form does not write NaN.
+ */
+function ratingInput(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.min(5, Math.max(0, Math.round(n * 10) / 10));
+}
+
 async function list(req: Request): Promise<Response> {
   const g = await guard(req, { permission: "menu.view" });
   if (!g.ok) return g.response;
@@ -82,6 +93,8 @@ async function create(req: Request): Promise<Response> {
       available: b.available !== false,
       prep_time: Number(b.prepTime) || 15,
       calories: b.calories != null ? Number(b.calories) : null,
+      // Optional; the column defaults to 4.5 when omitted.
+      ...(typeof ratingInput(b.rating) === "number" ? { rating: ratingInput(b.rating) } : {}),
       tags: b.tags ?? null,
     })
     .select(SELECT)
@@ -109,6 +122,7 @@ async function update(req: Request, id: string | null): Promise<Response> {
   if (b.categoryId !== undefined) patch.category_id = b.categoryId;
   if (b.prepTime !== undefined) patch.prep_time = Number(b.prepTime);
   if (b.calories !== undefined) patch.calories = b.calories;
+  if (b.rating !== undefined) patch.rating = ratingInput(b.rating);
 
   const { data, error } = await admin()
     .from("menu_items")
