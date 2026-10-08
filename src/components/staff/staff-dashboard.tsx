@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { AppDataProvider, useApp } from '@/components/app/data-context'
 import { useStore, type ViewKey } from '@/lib/store'
-import { edgeFetch, setStaffToken } from '@/lib/edge'
+import { edgeFetch, setStaffToken, staffFetch } from '@/lib/edge'
 import { DashboardView } from '@/components/views/dashboard'
 import { OrdersView } from '@/components/views/orders'
 import { MenuView } from '@/components/views/menu'
@@ -81,7 +81,7 @@ function StaffDashboardInner() {
   const { data: appData } = useApp()
 
   useEffect(() => {
-    edgeFetch('/api/staff/me')
+    staffFetch('/api/staff/me')
       .then(async (res) => {
         if (!res.ok) {
           window.location.href = '/?view=staff-login'
@@ -103,7 +103,7 @@ function StaffDashboardInner() {
 
   const handleLogout = async () => {
     try {
-      await edgeFetch('/api/staff/logout', { method: 'POST' })
+      await staffFetch('/api/staff/logout', { method: 'POST' })
     } finally {
       setStaffToken(null)
       window.location.href = '/?view=staff-login'

@@ -68,6 +68,27 @@ export async function edgeFetch(path: string, init: RequestInit = {}): Promise<R
   return fetch(toEdgeUrl(path), { ...init, headers, credentials: 'include' })
 }
 
+/**
+ * Staff-scoped request. Sends ONLY the staff session token.
+ *
+ * `edgeFetch` prefers the owner's bearer token when one exists, and the server's
+ * `guard()` resolves an owner session before a staff one. So on a browser where
+ * an owner is also signed in — which is the normal case when an owner tests
+ * their own staff login — every staff call would be authenticated as the owner
+ * and the staff endpoints, which require a staff session, would return 401.
+ * Staff pages must therefore opt out of the owner bearer entirely.
+ */
+export async function staffFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers)
+  headers.set('apikey', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '')
+  if (init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  const staff = getStaffToken()
+  if (staff) headers.set('x-staff-session', staff)
+  return fetch(toEdgeUrl(path), { ...init, headers, credentials: 'include' })
+}
+
 /** Convenience wrapper that parses JSON and never throws on a non-JSON body. */
 export async function edgeJson<T = unknown>(
   path: string,
