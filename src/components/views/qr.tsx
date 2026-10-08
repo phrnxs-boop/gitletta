@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useApp } from '@/components/app/data-context'
 import { cn } from '@/lib/utils'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
+import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -90,7 +91,7 @@ export function QrView() {
     if (!tenantId) return
     setLoading(true)
     try {
-      const res = await fetch('/api/qr?all=true', {
+      const res = await edgeFetch('/api/qr?all=true', {
         headers: { 'x-tenant-id': tenantId },
       })
       if (!res.ok) throw new Error()
@@ -108,7 +109,7 @@ export function QrView() {
   const loadActiveSessions = useCallback(async () => {
     if (!tenantId) return
     try {
-      const res = await fetch('/api/table-session/active', { headers: { 'x-tenant-id': tenantId } })
+      const res = await edgeFetch('/api/table-session/active', { headers: { 'x-tenant-id': tenantId } })
       if (!res.ok) return
       const json = await res.json()
       setActiveSessions(Array.isArray(json) ? json : [])
@@ -123,7 +124,7 @@ export function QrView() {
   const handleEndSession = async (tableId: string, tableName: string) => {
     setEndingTable(tableId)
     try {
-      const res = await fetch('/api/table-session/end', {
+      const res = await edgeFetch('/api/table-session/end', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-tenant-id': tenantId },
         body: JSON.stringify({ tableId }),
@@ -154,7 +155,7 @@ export function QrView() {
     if (!createForm.name.trim()) return
     setSaving(true)
     try {
-      const res = await fetch('/api/tables', {
+      const res = await edgeFetch('/api/tables', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -196,7 +197,7 @@ export function QrView() {
     if (!editTable || !editForm.name.trim()) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/tables/${editTable.id}`, {
+      const res = await edgeFetch(`/api/tables/${editTable.id}`, {
         method: 'PATCH',
         headers: {
           'content-type': 'application/json',
@@ -228,7 +229,7 @@ export function QrView() {
     if (!editTable) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/tables/${editTable.id}`, {
+      const res = await edgeFetch(`/api/tables/${editTable.id}`, {
         method: 'PATCH',
         headers: {
           'content-type': 'application/json',
@@ -255,7 +256,7 @@ export function QrView() {
     if (!window.confirm(`Delete ${editTable.name} and remove its QR code?`)) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/tables/${editTable.id}`, {
+      const res = await edgeFetch(`/api/tables/${editTable.id}`, {
         method: 'DELETE',
         headers: { 'x-tenant-id': tenantId },
       })

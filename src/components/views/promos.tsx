@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useApp, type PromoCode } from '@/components/app/data-context'
 import { cn } from '@/lib/utils'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
+import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -160,13 +161,13 @@ export function PromosView() {
       const headers = { 'content-type': 'application/json', 'x-tenant-id': tenant.id }
       let res: Response
       if (editing) {
-        res = await fetch(`/api/promos/${editing.id}`, {
+        res = await edgeFetch(`/api/promos/${editing.id}`, {
           method: 'PATCH',
           headers,
           body: JSON.stringify(body),
         })
       } else {
-        res = await fetch('/api/promos', {
+        res = await edgeFetch('/api/promos', {
           method: 'POST',
           headers,
           body: JSON.stringify(body),
@@ -186,7 +187,7 @@ export function PromosView() {
   const handleToggleActive = async (p: PromoCode) => {
     setTogglingId(p.id)
     try {
-      const res = await fetch(`/api/promos/${p.id}`, {
+      const res = await edgeFetch(`/api/promos/${p.id}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json', 'x-tenant-id': tenant.id },
         body: JSON.stringify({ active: !p.active }),
@@ -205,7 +206,7 @@ export function PromosView() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/promos/${deleteTarget.id}`, {
+      const res = await edgeFetch(`/api/promos/${deleteTarget.id}`, {
         method: 'DELETE',
         headers: { 'x-tenant-id': tenant.id },
       })

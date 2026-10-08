@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { useApp, type MenuItem } from '@/components/app/data-context'
 import { cn } from '@/lib/utils'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
+import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -219,13 +220,13 @@ export function MenuView() {
       const headers = { 'content-type': 'application/json', 'x-tenant-id': tenant.id }
       let res: Response
       if (editingItem) {
-        res = await fetch('/api/menu', {
+        res = await edgeFetch('/api/menu', {
           method: 'PATCH',
           headers,
           body: JSON.stringify({ id: editingItem.id, ...body }),
         })
       } else {
-        res = await fetch('/api/menu', {
+        res = await edgeFetch('/api/menu', {
           method: 'POST',
           headers,
           body: JSON.stringify(body),
@@ -245,7 +246,7 @@ export function MenuView() {
   const handleToggleAvailable = async (item: MenuItem) => {
     setTogglingId(item.id)
     try {
-      const res = await fetch('/api/menu', {
+      const res = await edgeFetch('/api/menu', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json', 'x-tenant-id': tenant.id },
         body: JSON.stringify({ id: item.id, available: !item.available }),
@@ -266,7 +267,7 @@ export function MenuView() {
     try {
       // Menu API has no DELETE; we hide the item by toggling available=false as a soft delete fallback.
       // But spec says "Delete (alert dialog confirm)" — we still attempt a DELETE on the menu endpoint for parity.
-      const res = await fetch(`/api/menu?id=${deleteTarget.id}`, {
+      const res = await edgeFetch(`/api/menu?id=${deleteTarget.id}`, {
         method: 'DELETE',
         headers: { 'x-tenant-id': tenant.id },
       })
@@ -288,7 +289,7 @@ export function MenuView() {
     }
     setCatSaving(true)
     try {
-      const res = await fetch('/api/categories', {
+      const res = await edgeFetch('/api/categories', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-tenant-id': tenant.id },
         body: JSON.stringify({

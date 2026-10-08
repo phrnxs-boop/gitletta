@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { BillDialog } from '@/components/shared/bill-dialog'
@@ -219,7 +220,7 @@ export function PublicMenu() {
         // If we have a cached session token, validate it first (handles refresh).
         // If it's ended/invalid, we'll activate a new one using the qrToken.
         if (token && tenantId && tableId) {
-          const vRes = await fetch(`/api/table-session/validate?tenantId=${encodeURIComponent(tenantId)}&tableId=${encodeURIComponent(tableId)}&sessionToken=${encodeURIComponent(token)}`)
+          const vRes = await edgeFetch(`/api/table-session/validate?tenantId=${encodeURIComponent(tenantId)}&tableId=${encodeURIComponent(tableId)}&sessionToken=${encodeURIComponent(token)}`)
           if (vRes.ok) {
             const data = await vRes.json()
             if (cancelled) return
@@ -244,7 +245,7 @@ export function PublicMenu() {
 
         // 2. No valid cached session — activate a new one using the QR token.
         //    This is the "scan the QR" step. Only a valid qrToken works.
-        const actRes = await fetch('/api/table-session', {
+        const actRes = await edgeFetch('/api/table-session', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ qrToken }),
@@ -275,7 +276,7 @@ export function PublicMenu() {
         setTenant(actData.tenant)
         setTable(actData.table)
         setSessionState('active')
-        const mRes = await fetch(`/api/table-session/validate?tenantId=${encodeURIComponent(tenantId || '')}&tableId=${encodeURIComponent(tableId || '')}&sessionToken=${encodeURIComponent(token || '')}`)
+        const mRes = await edgeFetch(`/api/table-session/validate?tenantId=${encodeURIComponent(tenantId || '')}&tableId=${encodeURIComponent(tableId || '')}&sessionToken=${encodeURIComponent(token || '')}`)
         if (!mRes.ok) {
           const err = await mRes.json().catch(() => ({}))
           if (cancelled) return
@@ -424,40 +425,13 @@ export function PublicMenu() {
       }
     }
 
-    // 2. Server-Sent Events (instant push across different phones/devices)
-    let sse: EventSource | null = null
-    if (targetTenantId && typeof window !== 'undefined' && 'EventSource' in window) {
-      try {
-        sse = new EventSource(`/api/orders/stream?tenantId=${encodeURIComponent(targetTenantId)}`)
-        sse.addEventListener('order', (e) => {
-          try {
-            const data = JSON.parse(e.data)
-            if (
-              data.type === 'SESSION_ENDED' &&
-              (!data.order?.tableId || !targetTableId || data.order.tableId === targetTableId)
-            ) {
-              setSessionState('ended')
-              setCartOpen(false)
-            } else if (
-              data.type === 'ORDER_UPDATED' &&
-              data.order?.status === 'COMPLETED' &&
-              (!data.order?.tableId || !targetTableId || data.order.tableId === targetTableId)
-            ) {
-              setSessionState('ended')
-              setCartOpen(false)
-            }
-          } catch {}
-        })
-      } catch {}
-    }
-
-    // 3. Fast Heartbeat Poll (1.5s fallback safety net)
+    // 2. Fast Heartbeat Poll (1.5s fallback safety net)
     const interval = setInterval(async () => {
       if (!sessionToken) return
       try {
         const tId = targetTenantId || ''
         const tblId = targetTableId || ''
-        const res = await fetch(
+        const res = await edgeFetch(
           `/api/table-session/validate?tenantId=${encodeURIComponent(tId)}&tableId=${encodeURIComponent(
             tblId
           )}&sessionToken=${encodeURIComponent(sessionToken)}`
@@ -477,7 +451,6 @@ export function PublicMenu() {
 
     return () => {
       if (bc) bc.close()
-      if (sse) sse.close()
       clearInterval(interval)
     }
   }, [sessionState, sessionToken, sessionTenantId, sessionTableId, tenant?.id, table?.id])
@@ -559,7 +532,7 @@ export function PublicMenu() {
     }
     setPlacing(true)
     try {
-      const res = await fetch('/api/orders', {
+      const res = await edgeFetch('/api/orders', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -649,7 +622,7 @@ export function PublicMenu() {
         if (qr) q.set('qrToken', qr)
       }
 
-      const res = await fetch(`/api/table-session/bill?${q.toString()}`)
+      const res = await edgeFetch(`/api/table-session/bill?${q.toString()}`)
       const data = await res.json()
       if (data.ok && data.orderId) {
         setBillOrderId(data.orderId)
@@ -1625,7 +1598,7 @@ function SessionReviewCard({
     e.preventDefault()
     setSubmitting(true)
     try {
-      const res = await fetch('/api/reviews', {
+      const res = await edgeFetch('/api/reviews', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -1661,7 +1634,7 @@ function SessionReviewCard({
         const qr = new URLSearchParams(window.location.search).get('table')
         if (qr) q.set('qrToken', qr)
       }
-      const res = await fetch(`/api/table-session/bill?${q.toString()}`)
+      const res = await edgeFetch(`/api/table-session/bill?${q.toString()}`)
       const d = await res.json()
       if (d.ok && d.orderId) {
         window.open('/api/bill/' + d.orderId, '_blank')

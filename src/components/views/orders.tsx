@@ -5,6 +5,7 @@ import { useApp, type Order } from '@/components/app/data-context'
 import { cn } from '@/lib/utils'
 import { BillDialog } from '@/components/shared/bill-dialog'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
+import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -107,7 +108,7 @@ export function OrdersView() {
   const updateStatus = async (order: Order, status: string, method?: string) => {
     setBusy(order.id + status)
     try {
-      const res = await fetch(`/api/orders/${order.id}`, {
+      const res = await edgeFetch(`/api/orders/${order.id}`, {
         method: 'PATCH',
         headers: {
           'content-type': 'application/json',
@@ -138,7 +139,7 @@ export function OrdersView() {
 
         // 2. Persist end table session in backend
         try {
-          await fetch('/api/table-session/end', {
+          await edgeFetch('/api/table-session/end', {
             method: 'POST',
             headers: { 'content-type': 'application/json', 'x-tenant-id': tenant.id },
             body: JSON.stringify({ tableId: order.tableId }),

@@ -49,6 +49,7 @@ import {
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -923,7 +924,7 @@ function MenuAiUploader({
     }
     onProcessing()
     try {
-      const res = await fetch('/api/ai-extract-menu', {
+      const res = await edgeFetch('/api/ai-extract-menu', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ images }),
@@ -1851,7 +1852,7 @@ function StepGoLive({
           })),
         )
 
-        await fetch('/api/onboarding/complete', {
+        await edgeFetch('/api/onboarding/complete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1891,7 +1892,7 @@ function StepGoLive({
           })),
         )
 
-        const res = await fetch('/api/onboarding/complete', {
+        const res = await edgeFetch('/api/onboarding/complete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

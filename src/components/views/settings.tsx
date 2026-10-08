@@ -8,6 +8,7 @@ import { useScrollCollapse } from '@/lib/use-scroll-collapse'
 import { ImageUpload } from '@/components/shared/image-upload'
 import { PhoneInput } from '@/components/shared/phone-input'
 import { applyTheme } from '@/lib/theme'
+import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -239,7 +240,7 @@ export function SettingsView() {
           ...Object.fromEntries(Object.entries(opToggles).map(([k, v]) => [k, String(v)])),
         },
       }
-      const res = await fetch('/api/settings', {
+      const res = await edgeFetch('/api/settings', {
         method: 'PUT',
         headers,
         body: JSON.stringify(body),
@@ -1074,7 +1075,7 @@ function GoogleReviewsTab({ tenantId }: { tenantId: string }) {
     if (!tenantId) return
     setLoading(true)
     try {
-      const res = await fetch('/api/google-reviews/settings', { headers: { 'x-tenant-id': tenantId } })
+      const res = await edgeFetch('/api/google-reviews/settings', { headers: { 'x-tenant-id': tenantId } })
       const data = await res.json()
       setConnected(data.connected)
       setConnection(data.connection)
@@ -1099,7 +1100,7 @@ function GoogleReviewsTab({ tenantId }: { tenantId: string }) {
 
   const handleConnect = async () => {
     try {
-      const res = await fetch('/api/google-reviews/connect', { headers: { 'x-tenant-id': tenantId } })
+      const res = await edgeFetch('/api/google-reviews/connect', { headers: { 'x-tenant-id': tenantId } })
       const data = await res.json()
       if (data.demoMode) {
         setDemoMode(true)
@@ -1117,7 +1118,7 @@ function GoogleReviewsTab({ tenantId }: { tenantId: string }) {
   const handleDisconnect = async () => {
     if (!confirm('Disconnect Google Business Profile? This removes all synced reviews. Historical orders are NOT affected.')) return
     try {
-      await fetch('/api/google-reviews/connect', { method: 'DELETE', headers: { 'x-tenant-id': tenantId } })
+      await edgeFetch('/api/google-reviews/connect', { method: 'DELETE', headers: { 'x-tenant-id': tenantId } })
       setConnected(false)
       setReviews([])
       setConnection(null)
@@ -1130,7 +1131,7 @@ function GoogleReviewsTab({ tenantId }: { tenantId: string }) {
   const handleSync = async () => {
     setSyncing(true)
     try {
-      const res = await fetch('/api/google-reviews/sync', { method: 'POST', headers: { 'x-tenant-id': tenantId } })
+      const res = await edgeFetch('/api/google-reviews/sync', { method: 'POST', headers: { 'x-tenant-id': tenantId } })
       const data = await res.json()
       if (data.error) {
         toast.error(data.error)
@@ -1147,7 +1148,7 @@ function GoogleReviewsTab({ tenantId }: { tenantId: string }) {
 
   const handleSaveSettings = async () => {
     try {
-      await fetch('/api/google-reviews/settings', {
+      await edgeFetch('/api/google-reviews/settings', {
         method: 'PUT',
         headers,
         body: JSON.stringify(settings),
@@ -1163,7 +1164,7 @@ function GoogleReviewsTab({ tenantId }: { tenantId: string }) {
     if (!replyText.trim()) return
     setReplyingTo(reviewId)
     try {
-      const res = await fetch('/api/google-reviews/respond', {
+      const res = await edgeFetch('/api/google-reviews/respond', {
         method: 'POST',
         headers,
         body: JSON.stringify({ reviewId, reply: replyText.trim() }),

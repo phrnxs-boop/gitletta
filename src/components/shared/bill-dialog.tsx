@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogTitle,
@@ -55,7 +56,7 @@ export function BillDialog({ orderId, open, onOpenChange }: { orderId: string | 
     setLoading(true)
     setBill(null)
     try {
-      const res = await fetch(`/api/bill/${id}`)
+      const res = await edgeFetch(`/api/bill/${id}`)
       const data = await res.json()
       if (data.restaurant) {
         setBill(data)

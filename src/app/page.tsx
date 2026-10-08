@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { edgeFetch } from '@/lib/edge'
 import { AppShell } from '@/components/app/app-shell'
 import { PublicMenu } from '@/components/public/public-menu'
 import { LandingPage } from '@/components/landing/landing-page'
@@ -18,7 +19,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState(false)
 
   useEffect(() => {
-    fetch('/api/auth/me').then(res => {
+    edgeFetch('/api/auth/me').then(res => {
       if (!res.ok) {
         router.replace('/?view=login')
       } else {

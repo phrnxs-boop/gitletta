@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useApp, type Session, type SecurityLog } from '@/components/app/data-context'
 import { cn } from '@/lib/utils'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
+import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -82,7 +83,7 @@ export function SecurityView() {
   const revokeSession = async (sessionId: string) => {
     setRevoking(sessionId)
     try {
-      const res = await fetch('/api/security', {
+      const res = await edgeFetch('/api/security', {
         method: 'DELETE',
         headers,
         body: JSON.stringify({ sessionId }),
@@ -101,7 +102,7 @@ export function SecurityView() {
     setRevokeAllOpen(false)
     setRevoking('all')
     try {
-      const res = await fetch('/api/security', {
+      const res = await edgeFetch('/api/security', {
         method: 'PATCH',
         headers,
         body: JSON.stringify({ action: 'revoke_all' }),

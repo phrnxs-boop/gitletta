@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useCallback, useState, useEffect, useRef, ReactNode } from 'react'
+import { edgeFetch } from '@/lib/edge'
 
 export interface Tenant {
   id: string
@@ -274,7 +275,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setLoading(true)
       const headers: Record<string, string> = {}
       if (tenantId) headers['x-tenant-id'] = tenantId
-      const res = await fetch('/api/bootstrap', { headers })
+      const res = await edgeFetch('/api/bootstrap', { headers })
       if (res.status === 404) {
         setError('NO_TENANT')
         setLoading(false)
@@ -397,7 +398,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       if (isCancelled) return
       try {
         const since = lastSyncTimeRef.current
-        const res = await fetch(`/api/orders/sync?tenantId=${encodeURIComponent(activeTenantId)}&since=${encodeURIComponent(since)}`)
+        const res = await edgeFetch(`/api/orders/sync?tenantId=${encodeURIComponent(activeTenantId)}&since=${encodeURIComponent(since)}`)
         if (res.ok) {
           const json = await res.json()
           if (json.orders && Array.isArray(json.orders)) {

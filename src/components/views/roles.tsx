@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useApp, type Role, type User } from '@/components/app/data-context'
 import { PERMISSION_GROUPS } from '@/lib/constants'
+import { edgeFetch } from '@/lib/edge'
 import { cn } from '@/lib/utils'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
 import { Button } from '@/components/ui/button'
@@ -422,7 +423,7 @@ function RoleDetail({
   const save = async () => {
     setSaving(true)
     try {
-      const res = await fetch(`/api/roles/${role.id}`, {
+      const res = await edgeFetch(`/api/roles/${role.id}`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({ name, description, permissions: permState, color }),
@@ -444,7 +445,7 @@ function RoleDetail({
     }
     setSaving(true)
     try {
-      const res = await fetch(`/api/roles/${role.id}`, {
+      const res = await edgeFetch(`/api/roles/${role.id}`, {
         method: 'DELETE',
         headers,
       })
@@ -466,7 +467,7 @@ function RoleDetail({
   const assignRole = async (member: RoleMember, newRoleId: string) => {
     try {
       if (member.type === 'staff') {
-        await fetch(`/api/staff/manage/${member.id}`, {
+        await edgeFetch(`/api/staff/manage/${member.id}`, {
           method: 'PATCH',
           headers,
           body: JSON.stringify({ roleId: newRoleId }),
@@ -778,7 +779,7 @@ function CreateRoleDialog({
     }
     setSaving(true)
     try {
-      const res = await fetch('/api/roles', {
+      const res = await edgeFetch('/api/roles', {
         method: 'POST',
         headers,
         body: JSON.stringify({ name: name.trim(), description: description.trim(), permissions: perms, color }),
@@ -936,7 +937,7 @@ function StaffAccountsSection({ headers, roles, tenantId, refresh, createOpen, s
   const load = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/staff/manage', { headers })
+      const res = await edgeFetch('/api/staff/manage', { headers })
       const data = await res.json()
       setStaff(Array.isArray(data) ? data : [])
     } catch {
@@ -954,7 +955,7 @@ function StaffAccountsSection({ headers, roles, tenantId, refresh, createOpen, s
       return
     }
     try {
-      const res = await fetch('/api/staff/manage', {
+      const res = await edgeFetch('/api/staff/manage', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -979,7 +980,7 @@ function StaffAccountsSection({ headers, roles, tenantId, refresh, createOpen, s
 
   const handleToggleActive = async (s: any) => {
     try {
-      await fetch(`/api/staff/manage/${s.id}`, {
+      await edgeFetch(`/api/staff/manage/${s.id}`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({ active: !s.active }),
@@ -994,7 +995,7 @@ function StaffAccountsSection({ headers, roles, tenantId, refresh, createOpen, s
 
   const handleChangeRole = async (s: any, roleId: string) => {
     try {
-      await fetch(`/api/staff/manage/${s.id}`, {
+      await edgeFetch(`/api/staff/manage/${s.id}`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({ roleId: roleId || null }),
@@ -1011,7 +1012,7 @@ function StaffAccountsSection({ headers, roles, tenantId, refresh, createOpen, s
     if (!resetStaff || !newPin) return
     if (!/^\d{4}$/.test(newPin)) { toast.error('PIN must be 4 digits'); return }
     try {
-      const res = await fetch(`/api/staff/manage/${resetStaff.id}/reset-pin`, {
+      const res = await edgeFetch(`/api/staff/manage/${resetStaff.id}/reset-pin`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ pin: newPin }),
@@ -1030,7 +1031,7 @@ function StaffAccountsSection({ headers, roles, tenantId, refresh, createOpen, s
   const handleDelete = async () => {
     if (!deleteStaff) return
     try {
-      await fetch(`/api/staff/manage/${deleteStaff.id}`, { method: 'DELETE', headers })
+      await edgeFetch(`/api/staff/manage/${deleteStaff.id}`, { method: 'DELETE', headers })
       toast.success(`${deleteStaff.name} deleted`)
       setDeleteStaff(null)
       await load()

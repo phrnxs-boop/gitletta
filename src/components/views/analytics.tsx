@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { useApp } from '@/components/app/data-context'
+import { edgeFetch } from '@/lib/edge'
 import { cn } from '@/lib/utils'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
 import { Card } from '@/components/ui/card'
@@ -87,7 +88,7 @@ export function AnalyticsView() {
     if (!data) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/analytics?days=${period}`, { headers: { 'x-tenant-id': data.tenant.id } })
+      const res = await edgeFetch(`/api/analytics?days=${period}`, { headers: { 'x-tenant-id': data.tenant.id } })
       if (!res.ok) throw new Error('Failed')
       setAnalytics(await res.json())
     } catch {

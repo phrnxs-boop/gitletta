@@ -9,6 +9,29 @@ import { Separator } from '@/components/ui/separator'
 import { Eye, EyeOff, ArrowRight, Loader2, Shield, Mail, Lock, User, Store } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSearchParams } from 'next/navigation'
+import { edgeFetch } from '@/lib/edge'
+import { createClient } from '@/lib/supabase/client'
+
+/**
+ * Owner auth moved to a stateless edge function: it returns the Supabase
+ * `session` (access + refresh tokens) instead of setting cookies. We hand that
+ * straight to the browser Supabase client so `edgeFetch` can read
+ * `access_token` on every subsequent request. If the edge function didn't
+ * include a session (older deployments / password-only fallback), we sign in
+ * with the password directly against Supabase Auth.
+ */
+async function establishBrowserSession(
+  session: { access_token: string; refresh_token: string } | null,
+  email: string,
+  password: string,
+): Promise<void> {
+  const supabase = createClient()
+  if (session?.access_token && session?.refresh_token) {
+    await supabase.auth.setSession(session)
+    return
+  }
+  await supabase.auth.signInWithPassword({ email, password })
+}
 
 export function LoginPage() {
   const searchParams = useSearchParams()
@@ -25,7 +48,7 @@ export function LoginPage() {
 
   // Check if already logged in
   useEffect(() => {
-    fetch('/api/auth/me').then(res => {
+    edgeFetch('/api/auth/me').then(res => {
       if (res.ok) {
         window.location.href = '/?view=dashboard'
       }
@@ -36,7 +59,7 @@ export function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await edgeFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email: em.trim(), password: pw }),
@@ -46,6 +69,7 @@ export function LoginPage() {
         setError(data.error || 'Login failed')
         return
       }
+      await establishBrowserSession(data.session, em.trim(), pw)
       toast.success(`Welcome back, ${data.user.name.split(' ')[0]}!`)
       setTimeout(() => {
         window.location.href = '/?view=dashboard'
@@ -68,7 +92,7 @@ export function LoginPage() {
       }
       setLoading(true)
       try {
-        const res = await fetch('/api/auth/register', {
+        const res = await edgeFetch('/api/auth/register', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -83,6 +107,7 @@ export function LoginPage() {
           setError(data.error || 'Registration failed')
           return
         }
+        await establishBrowserSession(data.session, email.trim(), password)
         toast.success(`Account created! Starting restaurant setup…`)
         setTimeout(() => {
           window.location.href = '/?view=onboarding'

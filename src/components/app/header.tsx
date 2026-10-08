@@ -10,6 +10,8 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Search, Bell, ChevronDown, Building2, Check, Plus, Menu as MenuIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { edgeFetch } from '@/lib/edge'
+import { createClient } from '@/lib/supabase/client'
 
 export function Header() {
   const { data, setTenantId, refresh } = useApp()
@@ -23,7 +25,7 @@ export function Header() {
   }
 
   const loadTenants = async () => {
-    const res = await fetch('/api/tenants')
+    const res = await edgeFetch('/api/tenants')
     const json = await res.json()
     setTenants(json)
   }
@@ -33,6 +35,21 @@ export function Header() {
     setOpenTenants(false)
     toast.success(`Switched to ${name}`)
     setTimeout(() => refresh(), 50)
+  }
+
+  const handleLogout = async () => {
+    try {
+      await edgeFetch('/api/auth/logout', { method: 'POST' })
+    } catch {
+      /* best-effort — clear the local session regardless */
+    } finally {
+      try {
+        await createClient().auth.signOut()
+      } catch {
+        /* ignore */
+      }
+      window.location.href = '/?view=login'
+    }
   }
 
   if (!data) return null
@@ -147,11 +164,7 @@ export function Header() {
               Preferences
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive cursor-pointer" onClick={() => {
-              fetch('/api/auth/logout', { method: 'POST' }).then(() => {
-                window.location.href = '/?view=login'
-              })
-            }}>Sign out</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive cursor-pointer" onClick={handleLogout}>Sign out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

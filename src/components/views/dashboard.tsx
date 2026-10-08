@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { useApp } from '@/components/app/data-context'
 import { useStore } from '@/lib/store'
+import { edgeFetch } from '@/lib/edge'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -153,7 +154,7 @@ export function DashboardView() {
     }
     setSubmitting(true)
     try {
-      const res = await fetch('/api/orders', {
+      const res = await edgeFetch('/api/orders', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-tenant-id': tenant.id },
         body: JSON.stringify({
