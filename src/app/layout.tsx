@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -14,11 +14,46 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const DESCRIPTION =
+  "Swixo runs the floor for Indian restaurants: point-of-sale, live order flow, " +
+  "QR table ordering, staff PIN sessions, reservations, analytics and GST-compliant bills.";
+
 export const metadata: Metadata = {
-  title: "Tablo — Restaurant SaaS Platform",
-  description: "Multitenant restaurant management: POS, orders, analytics, reservations, QR ordering, promo codes, and more.",
-  keywords: ["restaurant", "POS", "SaaS", "orders", "analytics", "QR"],
-  icons: { icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff7e6b'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3ET%3C/text%3E%3C/svg%3E" },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  title: {
+    default: "Swixo — Restaurant POS & QR Ordering",
+    template: "%s · Swixo",
+  },
+  description: DESCRIPTION,
+  applicationName: "Swixo",
+  keywords: [
+    "restaurant POS",
+    "QR ordering",
+    "restaurant software India",
+    "GST billing",
+    "table ordering",
+  ],
+  openGraph: {
+    type: "website",
+    siteName: "Swixo",
+    title: "Swixo — Restaurant POS & QR Ordering",
+    description: DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Swixo — Restaurant POS & QR Ordering",
+    description: DESCRIPTION,
+  },
+  robots: { index: true, follow: true },
+  icons: {
+    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff7e6b'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3ES%3C/text%3E%3C/svg%3E",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#ff7e6b",
 };
 
 export default function RootLayout({
