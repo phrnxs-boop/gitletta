@@ -37,6 +37,11 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "supabase/functions",
+    "examples",
+    ".letta",
+    "upload",
+    "tool-results"
   ]
 }

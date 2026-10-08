@@ -115,8 +115,10 @@ export async function POST(req: Request) {
         name: cleanRestName,
         slug,
         plan: 'pro',
-        currency: 'USD',
-        currency_symbol: '$',
+        // India-first defaults. The onboarding flow can change these, but a new
+        // restaurant must not start out priced in dollars.
+        currency: 'INR',
+        currency_symbol: '₹',
         active: true,
       })
       .select()

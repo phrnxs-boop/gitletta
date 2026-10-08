@@ -24,8 +24,43 @@ There is **no Prisma at runtime**. The original Prisma schema is kept at
 Browser ──┬─ anon key ──► Postgres (RLS-enforced, public menu reads)
           └─ Realtime ──► orders / order_items / table_sessions
 
-Next route handlers ──► service role ──► Postgres (bypasses RLS)
+Supabase Edge Functions ──► service role ──► Postgres (bypasses RLS)
 ```
+
+### The API lives in Supabase Edge Functions
+
+`supabase/functions/` holds the API — Deno functions, deployed to the same
+Supabase project as the database:
+
+```
+supabase/functions/
+  _shared/          http (CORS + JSON), db, auth (guard), case, permissions
+  auth/  bootstrap/  onboarding/  tenants/  settings/  security/
+  menu/  categories/ orders/  table-session/  tables/  qr/  bill/
+  staff/  roles/  promos/  reservations/  reviews/  analytics/
+  google-reviews/  ai-extract-menu/  health/
+```
+
+Deploy them with:
+
+```bash
+node scripts/deploy-all-fns.mjs     # or: node scripts/deploy-fn.mjs menu
+```
+
+`_shared/` is bundled into every function, so the repo layout and the deployed
+layout match and the relative imports resolve the same way in both.
+
+`verify_jwt` is **false** at the platform level, because staff sessions and the
+diner QR flow carry no Supabase JWT. Each function authenticates itself with
+`guard()`, so this is not a hole — but it is why the platform-level check is
+off, and it is worth knowing before adding a function.
+
+Because the browser app and the functions are on different origins, CORS
+echoes the caller's origin and allows credentials. Set `ALLOWED_ORIGINS` (or
+`SITE_URL`) on the project, or the browser will block every response.
+
+The old `src/app/api/**` handler files are retained unchanged as a reference
+and a rollback path.
 
 Two distinct audiences, two distinct auth paths:
 

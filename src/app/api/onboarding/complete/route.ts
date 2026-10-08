@@ -108,7 +108,7 @@ export async function POST(req: Request) {
           slug,
           plan: 'pro',
           currency: 'USD',
-          currency_symbol: '$',
+          currency_symbol: '₹',
           active: true,
         })
         .select()
