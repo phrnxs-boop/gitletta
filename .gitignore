@@ -1,0 +1,81 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+local-*
+.claude
+.z-ai-config
+*.log
+dev.log
+dev.out.log
+test
+prompt
+
+server.log
+# Skills directory
+/skills/
+
+# ── Scratch / agent artefacts ───────────────────────────────────────────────
+# These were committed by the original scaffolding tool. They are not part of
+# the application and must not ship to the production repository.
+#
+# /upload/ holds personal screenshots used as design references.
+/upload/
+/tool-results/
+/agent-ctx/
+/.zscripts/
+/mini-services/
+/examples/
+/worklog.md
+
+# Not used on Vercel.
+/Caddyfile
+
+# ── Dead Prisma/SQLite era ──────────────────────────────────────────────────
+/db/
+/prisma/
+
+# ── Lockfiles ───────────────────────────────────────────────────────────────
+# This project installs with npm; bun.lock is a stale leftover.
+/bun.lock
+
+# ── Local agent state ───────────────────────────────────────────────────────
+/.letta/
