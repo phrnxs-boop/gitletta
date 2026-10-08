@@ -59,8 +59,13 @@ Because the browser app and the functions are on different origins, CORS
 echoes the caller's origin and allows credentials. Set `ALLOWED_ORIGINS` (or
 `SITE_URL`) on the project, or the browser will block every response.
 
-The old `src/app/api/**` handler files are retained unchanged as a reference
-and a rollback path.
+The old `src/app/api/**` handlers have been **deleted**. Leaving them mounted
+meant two live, independent authorization implementations: the legacy
+`GET /api/staff/login` still resolved "the newest tenant", publishing a
+restaurant's name and full staff roster to anonymous callers, and the legacy
+write routes still filtered by `id` alone. Nothing called them any more, so
+they were removed rather than left as a second API. They remain in git history
+(commit `5bb7655`) if a rollback is ever needed.
 
 Two distinct audiences, two distinct auth paths:
 

@@ -8,6 +8,8 @@ import {
   QrCode, Ticket, ShieldCheck, Users, Settings,
   LogOut, UtensilsCrossed,
 } from 'lucide-react'
+import { edgeFetch } from '@/lib/edge'
+import { createClient } from '@/lib/supabase/client'
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip'
@@ -78,7 +80,25 @@ export function Sidebar() {
           <div className="h-px w-8 bg-gradient-to-r from-transparent via-border to-transparent" />
           <Tooltip>
             <TooltipTrigger asChild>
-              <button aria-label="Sign out" className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-premium">
+              <button
+                aria-label="Sign out"
+                onClick={async () => {
+                  // Same sequence as the header menu: clear the server session,
+                  // then the browser Supabase session, then leave.
+                  try {
+                    await edgeFetch('/api/auth/logout', { method: 'POST' })
+                  } catch {
+                    /* best-effort */
+                  }
+                  try {
+                    await createClient().auth.signOut()
+                  } catch {
+                    /* ignore */
+                  }
+                  window.location.href = '/?view=login'
+                }}
+                className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-premium"
+              >
                 <LogOut className="h-[22px] w-[22px]" />
               </button>
             </TooltipTrigger>

@@ -81,7 +81,8 @@ through the API.
 
 1. Visit `/` and sign up. The first account creates its own tenant and the five
    default roles.
-2. Confirm `https://<domain>/api/health` returns `{"status":"ok"}`.
+2. Confirm `https://<ref>.supabase.co/functions/v1/health` returns
+   `{"status":"ok","database":"ok"}`.
 3. Open one table's QR code and place a test order from a phone, so the diner
    path is exercised in production.
 
@@ -92,5 +93,5 @@ through the API.
 - [ ] Leaked password protection enabled
 - [ ] Auth redirect URLs include the production origin
 - [ ] Supabase advisors re-checked (Database → Advisors) with no new warnings
-- [ ] `/api/health` returns 200
+- [ ] the `health` edge function returns 200
 - [ ] One end-to-end diner order placed from a real phone

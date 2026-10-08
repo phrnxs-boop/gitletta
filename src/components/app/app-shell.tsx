@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { AppDataProvider, useApp } from './data-context'
 import { Sidebar, MobileMoreSheet } from './sidebar'
 import { Header } from './header'
@@ -33,9 +33,28 @@ function ViewRouter() {
   }
 }
 
+const VIEW_KEYS = new Set<string>([
+  'dashboard', 'orders', 'analytics', 'promos', 'qr',
+  'menu', 'settings', 'security', 'roles',
+])
+
 function ShellContent() {
   const { data, loading, error } = useApp()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const setView = useStore((s) => s.setView)
+
+  // Deep links: /?view=orders used to always render the dashboard, because the
+  // view lives in the zustand store and nothing ever seeded it from the URL.
+  // Applied once per distinct param value — re-applying on every render would
+  // fight the sidebar, which changes the store without touching the URL.
+  const appliedViewRef = useRef<string | null>(null)
+  useEffect(() => {
+    const requested = searchParams.get('view')
+    if (!requested || requested === appliedViewRef.current) return
+    appliedViewRef.current = requested
+    if (VIEW_KEYS.has(requested)) setView(requested as Parameters<typeof setView>[0])
+  }, [searchParams, setView])
 
   // Initialize theme from localStorage on mount
   useEffect(() => {
