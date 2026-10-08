@@ -296,22 +296,6 @@ export function LoginPage() {
             </Button>
           </form>
 
-          {/* Quick Demo Login Option */}
-          <div className="flex items-center gap-3 my-5">
-            <Separator className="flex-1" />
-            <span className="text-xs text-muted-foreground">Or demo preview</span>
-            <Separator className="flex-1" />
-          </div>
-
-          <div className="space-y-2">
-            <div className="grid grid-cols-1 gap-2">
-              <QuickLoginBtn
-                label="👑 1-Click Demo (Jaegar Resto Owner)"
-                email={DEMO_EMAIL}
-                onClick={() => quickLogin(DEMO_EMAIL)}
-              />
-            </div>
-          </div>
         </div>
 
         {/* Footer */}

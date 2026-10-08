@@ -8,13 +8,29 @@
 
 const LOCAL_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"];
 
+/**
+ * Normalise an allowlist entry.
+ *
+ * A browser always sends an Origin in the form `https://example.com`, and the
+ * match below is exact. Setting `ALLOWED_ORIGINS` to a bare host
+ * (`example.com`) or to a value with a trailing slash (`https://example.com/`)
+ * therefore never matches — every preflight fails with a confusing "Network
+ * error" in the client and nothing ever reaches the function. A bare host is
+ * assumed to be https, and trailing slashes are dropped.
+ */
+function normalizeOrigin(entry: string): string {
+  const trimmed = entry.trim().replace(/\/+$/, "");
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 function allowedOrigins(): string[] {
   const extra = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
     .split(",")
-    .map((o) => o.trim())
+    .map(normalizeOrigin)
     .filter(Boolean);
   const site = Deno.env.get("SITE_URL");
-  return [...LOCAL_ORIGINS, ...(site ? [site] : []), ...extra];
+  return [...LOCAL_ORIGINS, ...(site ? [normalizeOrigin(site)] : []), ...extra];
 }
 
 export function corsHeaders(req: Request): Record<string, string> {
