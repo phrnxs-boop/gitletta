@@ -651,33 +651,17 @@ function RoleDetail({
                       <p className="text-sm font-medium truncate">{u.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="text-xs shrink-0 max-w-[45%] h-9">
-                          <span
-                            className="w-2 h-2 rounded-full mr-1.5 shrink-0"
-                            style={{ backgroundColor: role.color }}
-                          />
-                          <span className="truncate">{role.name}</span>
-                          <ChevronDown className="h-3 w-3 ml-1 shrink-0" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-52">
-                        <DropdownMenuLabel>Reassign to</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {allRoles.map((r) => (
-                          <DropdownMenuItem
-                            key={r.id}
-                            disabled={r.id === role.id}
-                            onClick={() => assignRole(u, r.id)}
-                          >
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: r.color }} />
-                            <span className="flex-1">{r.name}</span>
-                            {r.id === role.id && <Check className="h-3.5 w-3.5" />}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {/* Static: a member is the account that registered the
+                        restaurant, and the Owner role is exclusive to it. The
+                        dropdown this replaces never sent a request for members,
+                        so it only claimed the role had changed. */}
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs">
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: role.color }}
+                      />
+                      <span className="truncate">{role.name}</span>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1113,7 +1097,7 @@ function StaffAccountsSection({ headers, roles, tenantId, refresh, createOpen, s
                       <SelectValue placeholder="Role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {roles.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                      {roles.filter(r => !(r.isSystem && r.name === 'Owner')).map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
 
@@ -1190,7 +1174,7 @@ function StaffAccountsSection({ headers, roles, tenantId, refresh, createOpen, s
               <Select value={form.roleId} onValueChange={v => setForm(f => ({ ...f, roleId: v }))}>
                 <SelectTrigger className="bg-secondary/50 border-border"><SelectValue placeholder="Select role" /></SelectTrigger>
                 <SelectContent>
-                  {roles.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                  {roles.filter(r => !(r.isSystem && r.name === 'Owner')).map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

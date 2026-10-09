@@ -369,6 +369,29 @@ async function logoutPost(req: Request): Promise<Response> {
   return jsonWithCookie(req, { success: true }, clearCookie());
 }
 
+/**
+ * The Owner role is not assignable to staff.
+ *
+ * A staff member holding it would satisfy guard()'s owner test — the same
+ * `is_system && name === 'Owner'` check that grants the full permission set —
+ * so a four-digit PIN would buy full access to the restaurant. The owner is the
+ * person who registered the tenant; nobody is promoted to that by role
+ * assignment.
+ */
+async function ownerRoleError(tenantId: string, roleId: unknown): Promise<string | null> {
+  if (!roleId) return null;
+  const { data } = await admin()
+    .from("roles")
+    .select("name, is_system")
+    .eq("id", String(roleId))
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (data?.is_system === true && data?.name === "Owner") {
+    return "The Owner role cannot be assigned to staff. Create a separate role instead.";
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // me
 // ---------------------------------------------------------------------------
@@ -546,6 +569,9 @@ async function manageCreate(req: Request): Promise<Response> {
     return json(req, { error: "Employee ID already exists" }, 400);
   }
 
+  const roleError = await ownerRoleError(tenantId, roleId);
+  if (roleError) return json(req, { error: roleError }, 400);
+
   const { hash, salt } = hashPin(pin);
 
   const { data: staff, error } = await db
@@ -596,7 +622,11 @@ async function manageUpdate(req: Request, id: string | null): Promise<Response> 
 
   const data: Record<string, unknown> = {};
   if (b.name !== undefined) data.name = String(b.name).trim();
-  if (b.roleId !== undefined) data.role_id = b.roleId || null;
+  if (b.roleId !== undefined) {
+    const roleError = await ownerRoleError(tenantId, b.roleId);
+    if (roleError) return json(req, { error: roleError }, 400);
+    data.role_id = b.roleId || null;
+  }
   if (b.active !== undefined) {
     data.active = b.active;
     if (b.active) {
