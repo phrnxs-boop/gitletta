@@ -68,7 +68,7 @@ export function Header() {
   }
 
   return (
-    <header className="flex items-center justify-between gap-2 md:gap-3 px-4 md:px-6 h-16 border-b border-border glass-strong sticky top-0 z-30">
+    <header className="flex items-center justify-between gap-2 md:gap-3 px-3.5 md:px-6 h-14 md:h-16 border-b border-border glass-strong sticky top-0 z-30">
       <div className="flex items-center gap-2 min-w-0">
         {/* Hamburger — opens main menu side panel (mobile only) */}
         <button

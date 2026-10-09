@@ -174,7 +174,7 @@ function StaffDashboardInner() {
       {/* Main container */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
-        <header className="flex items-center justify-between gap-3 px-4 md:px-6 h-16 border-b border-border glass-strong sticky top-0 z-30 shrink-0">
+        <header className="flex items-center justify-between gap-3 px-3.5 md:px-6 h-16 border-b border-border glass-strong sticky top-0 z-30 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             {/* Mobile hamburger menu toggle */}
             <button
@@ -302,8 +302,8 @@ function StaffDashboardInner() {
           {activeModule === 'settings' && modules.settings && <SettingsView />}
 
           {!modules[activeModule] && (
-            <div className="h-full flex items-center justify-center p-6">
-              <Card className="max-w-md p-6 text-center rounded-2xl border-border bg-card">
+            <div className="h-full flex items-center justify-center p-4 md:p-6">
+              <Card className="max-w-md p-4 md:p-6 text-center rounded-2xl border-border bg-card">
                 <ShieldAlert className="h-12 w-12 text-amber-500 mx-auto mb-3" />
                 <h3 className="text-lg font-semibold">Access Restricted</h3>
                 <p className="text-sm text-muted-foreground mt-1">

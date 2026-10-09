@@ -109,19 +109,19 @@ export function RolesView() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className={cn(
-        'px-4 md:px-6 flex items-center justify-between gap-3 flex-wrap transition-all duration-300 ease-out',
-        collapsed ? 'pt-2 pb-2' : 'pt-4 md:pt-6 pb-3',
+        'px-3.5 md:px-6 flex items-center justify-between gap-3 flex-wrap transition-all duration-200 ease-out',
+        collapsed ? 'pt-1.5 pb-1.5' : 'pt-3 md:pt-6 pb-2.5',
       )}>
         <div>
           <h2 className={cn(
-            'font-bold tracking-tight flex items-center gap-2 transition-all duration-300 ease-out',
-            collapsed ? 'text-base md:text-lg' : 'text-xl md:text-2xl',
+            'font-bold tracking-tight flex items-center gap-2 transition-all duration-200 ease-out',
+            collapsed ? 'text-base md:text-lg' : 'text-lg md:text-2xl',
           )}>
-            <Shield className={cn('text-primary transition-all duration-300 ease-out', collapsed ? 'h-4 w-4 md:h-5 md:w-5' : 'h-5 w-5 md:h-6 md:w-6')} />
+            <Shield className={cn('text-primary transition-all duration-200 ease-out', collapsed ? 'h-4 w-4 md:h-5 md:w-5' : 'h-5 w-5 md:h-6 md:w-6')} />
             Role Access
           </h2>
           <div className={cn(
-            'overflow-hidden transition-all duration-300 ease-out',
+            'overflow-hidden transition-all duration-200 ease-out',
             collapsed ? 'max-h-0 opacity-0' : 'max-h-8 opacity-100',
           )}>
             <p className="text-sm text-muted-foreground mt-0.5">Manage staff roles and granular permissions</p>
@@ -165,7 +165,7 @@ export function RolesView() {
 
       {/* Top stats — collapse away to free up vertical room when scrolled */}
       <div className={cn(
-        'overflow-hidden transition-all duration-300 ease-out px-4 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3',
+        'overflow-hidden transition-all duration-200 ease-out px-3.5 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3',
         collapsed ? 'max-h-0 opacity-0 pb-0' : 'max-h-32 opacity-100 pb-3',
       )}>
         <StatCard icon={<Shield className="h-4 w-4" />} label="Total Roles" value={roles.length} tint="#f97316" />
@@ -176,7 +176,7 @@ export function RolesView() {
 
       {/* Two-column layout (desktop) + horizontal pills (mobile) */}
       {activeTab === 'roles' && (
-      <div className="flex-1 min-h-0 overflow-hidden px-4 md:px-6 pb-6">
+      <div className="flex-1 min-h-0 overflow-hidden px-3.5 md:px-6 pb-4 md:pb-6">
         {/* Mobile: horizontal scrollable role pills + detail below */}
         <div className="lg:hidden flex flex-col gap-3 h-full min-h-0">
           <div className="shrink-0 -mx-1 px-1 overflow-x-auto scrollbar-thin">
@@ -634,7 +634,7 @@ function RoleDetail({
               </h4>
             </div>
             {members.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border p-6 text-center">
+              <div className="rounded-xl border border-dashed border-border p-4 md:p-6 text-center">
                 <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-50" />
                 <p className="text-sm text-muted-foreground">No staff assigned to this role yet</p>
               </div>
@@ -1026,7 +1026,7 @@ function StaffAccountsSection({ headers, roles, tenantId, refresh, createOpen, s
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-4 md:px-6 pb-6">
+    <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pb-4 md:pb-6">
       <div className="max-w-4xl space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between gap-3">

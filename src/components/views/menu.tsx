@@ -337,17 +337,17 @@ export function MenuView() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className={cn(
-        'px-4 md:px-6 space-y-3 transition-all duration-300 ease-out',
-        collapsed ? 'pt-2 pb-2' : 'pt-4 md:pt-6 pb-3',
+        'px-3.5 md:px-6 space-y-3 transition-all duration-200 ease-out',
+        collapsed ? 'pt-1.5 pb-1.5' : 'pt-3 md:pt-6 pb-2.5',
       )}>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className={cn(
-              'font-bold tracking-tight transition-all duration-300 ease-out',
-              collapsed ? 'text-base md:text-lg' : 'text-xl md:text-2xl',
+              'font-bold tracking-tight transition-all duration-200 ease-out',
+              collapsed ? 'text-base md:text-lg' : 'text-lg md:text-2xl',
             )}>Menu</h1>
             <div className={cn(
-              'overflow-hidden transition-all duration-300 ease-out',
+              'overflow-hidden transition-all duration-200 ease-out',
               collapsed ? 'max-h-0 opacity-0' : 'max-h-8 opacity-100',
             )}>
               <p className="text-sm text-muted-foreground">
@@ -400,7 +400,7 @@ export function MenuView() {
 
       {/* Stats strip — hides when header is collapsed to free up vertical room */}
       <div className={cn(
-        'overflow-hidden transition-all duration-300 ease-out px-4 md:px-6',
+        'overflow-hidden transition-all duration-200 ease-out px-3.5 md:px-6',
         collapsed ? 'max-h-0 opacity-0 pb-0' : 'max-h-40 opacity-100 pb-3',
       )}>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -421,7 +421,7 @@ export function MenuView() {
       </div>
 
       {/* Category pills (horizontal scroll) */}
-      <div className="px-4 md:px-6 pb-3">
+      <div className="px-3.5 md:px-6 pb-3">
         <div className="overflow-x-auto scrollbar-thin -mx-1 px-1 pb-1">
           <div className="flex gap-1.5 whitespace-nowrap">
             <CatPill active={activeCat === 'all'} onClick={() => setActiveCat('all')}>
@@ -441,7 +441,7 @@ export function MenuView() {
       </div>
 
       {/* Grid */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-4 md:px-6 pb-6 min-h-0">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pb-4 md:pb-6 min-h-0">
         {filtered.length === 0 ? (
           <EmptyMenu hasItems={menuItems.length > 0} onAdd={openAdd} />
         ) : (

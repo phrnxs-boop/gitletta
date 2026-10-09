@@ -173,23 +173,23 @@ export function OrdersView() {
       {/* Header — collapses on scroll to give order cards more room */}
       <div
         className={cn(
-          'px-4 md:px-6 transition-all duration-300 ease-out',
-          collapsed ? 'pt-2 pb-2' : 'pt-4 md:pt-6 pb-3',
+          'px-3.5 md:px-6 transition-all duration-200 ease-out',
+          collapsed ? 'pt-1.5 pb-1.5' : 'pt-3 md:pt-6 pb-2.5',
         )}
       >
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <h2
               className={cn(
-                'font-bold tracking-tight transition-all duration-300 ease-out',
-                collapsed ? 'text-base md:text-lg' : 'text-xl md:text-2xl',
+                'font-bold tracking-tight transition-all duration-200 ease-out',
+                collapsed ? 'text-base md:text-lg' : 'text-lg md:text-2xl',
               )}
             >
               Orders
             </h2>
             <p
               className={cn(
-                'text-sm text-muted-foreground transition-all duration-300 ease-out',
+                'text-sm text-muted-foreground transition-all duration-200 ease-out',
                 collapsed
                   ? 'max-h-0 opacity-0 overflow-hidden'
                   : 'max-h-8 opacity-100',
@@ -200,7 +200,7 @@ export function OrdersView() {
           </div>
           <div
             className={cn(
-              'flex flex-wrap gap-2 transition-all duration-300 ease-out',
+              'flex flex-wrap gap-2 transition-all duration-200 ease-out',
               collapsed
                 ? 'max-h-0 opacity-0 overflow-hidden'
                 : 'max-h-20 opacity-100',
@@ -224,7 +224,7 @@ export function OrdersView() {
       {/* Filter bar — collapses away when header is collapsed */}
       <div
         className={cn(
-          'px-4 md:px-6 transition-all duration-300 ease-out',
+          'px-3.5 md:px-6 transition-all duration-200 ease-out',
           collapsed
             ? 'max-h-0 pb-0 opacity-0 overflow-hidden'
             : 'max-h-72 pb-3 opacity-100',
@@ -294,7 +294,7 @@ export function OrdersView() {
       </div>
 
       {/* Cards grid */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-4 md:px-6 pb-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pb-4 md:pb-6">
         {filtered.length === 0 ? (
           <EmptyState
             icon={Inbox}

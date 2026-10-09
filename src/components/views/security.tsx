@@ -126,15 +126,15 @@ export function SecurityView() {
       {/* Header — collapses on scroll to give content cards more room */}
       <div
         className={cn(
-          'shrink-0 px-4 md:px-6 flex items-center justify-between gap-3 flex-wrap transition-all duration-300 ease-out',
-          collapsed ? 'pt-2 pb-2' : 'pt-4 md:pt-6 pb-3',
+          'shrink-0 px-3.5 md:px-6 flex items-center justify-between gap-3 flex-wrap transition-all duration-200 ease-out',
+          collapsed ? 'pt-1.5 pb-1.5' : 'pt-3 md:pt-6 pb-2.5',
         )}
       >
         <div className="min-w-0">
           <h2
             className={cn(
-              'font-bold tracking-tight flex items-center gap-2 transition-all duration-300 ease-out',
-              collapsed ? 'text-base md:text-lg' : 'text-xl md:text-2xl',
+              'font-bold tracking-tight flex items-center gap-2 transition-all duration-200 ease-out',
+              collapsed ? 'text-base md:text-lg' : 'text-lg md:text-2xl',
             )}
           >
             <Shield className="h-5 w-5 md:h-6 md:w-6 text-primary" />
@@ -142,7 +142,7 @@ export function SecurityView() {
           </h2>
           <p
             className={cn(
-              'text-sm text-muted-foreground transition-all duration-300 ease-out',
+              'text-sm text-muted-foreground transition-all duration-200 ease-out',
               collapsed
                 ? 'max-h-0 opacity-0 overflow-hidden mt-0'
                 : 'max-h-8 opacity-100 mt-0.5',
@@ -160,7 +160,7 @@ export function SecurityView() {
       {/* Top stats — collapse away when header is collapsed */}
       <div
         className={cn(
-          'shrink-0 px-4 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 transition-all duration-300 ease-out',
+          'shrink-0 px-3.5 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 transition-all duration-200 ease-out',
           collapsed
             ? 'max-h-0 pb-0 opacity-0 overflow-hidden'
             : 'max-h-48 pb-3 opacity-100',
@@ -172,7 +172,7 @@ export function SecurityView() {
       </div>
 
       {/* Main scroll area: two-column grid + activity log */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-4 md:px-6 pb-6 space-y-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pb-4 md:pb-6 space-y-4">
         <div className="grid lg:grid-cols-2 gap-4">
           {/* Sessions */}
           <Card className="rounded-2xl bg-card border-border flex flex-col overflow-hidden">

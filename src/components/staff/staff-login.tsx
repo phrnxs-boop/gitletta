@@ -232,7 +232,7 @@ export function StaffLoginPage() {
           </Card>
         ) : (
           /* PIN entry */
-          <Card className="rounded-3xl border border-border bg-card p-6 shadow-elevated">
+          <Card className="rounded-3xl border border-border bg-card p-4 md:p-6 shadow-elevated">
             {/* Selected staff */}
             <div className="flex items-center gap-3 mb-6">
               <button onClick={() => { setSelectedStaff(null); setError(''); setPin('') }} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary">

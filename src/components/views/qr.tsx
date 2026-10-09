@@ -323,7 +323,7 @@ export function QrView() {
       {/* Header (collapsible on scroll) */}
       <header
         className={cn(
-          'px-4 md:px-6 border-b border-border transition-all duration-300 ease-out',
+          'px-3.5 md:px-6 border-b border-border transition-all duration-200 ease-out',
           collapsed ? 'pt-2 pb-2' : 'pt-4 md:pt-6 pb-4',
         )}
       >
@@ -332,8 +332,8 @@ export function QrView() {
             <div className="flex items-center gap-2">
               <h1
                 className={cn(
-                  'font-bold tracking-tight transition-all duration-300 ease-out truncate',
-                  collapsed ? 'text-base md:text-lg' : 'text-xl md:text-2xl',
+                  'font-bold tracking-tight transition-all duration-200 ease-out truncate',
+                  collapsed ? 'text-base md:text-lg' : 'text-lg md:text-2xl',
                 )}
               >
                 QR Codes
@@ -346,7 +346,7 @@ export function QrView() {
             </div>
             <p
               className={cn(
-                'text-sm text-muted-foreground transition-all duration-300 ease-out',
+                'text-sm text-muted-foreground transition-all duration-200 ease-out',
                 collapsed ? 'max-h-0 opacity-0 overflow-hidden mt-0' : 'max-h-8 opacity-100 mt-0.5',
               )}
             >
@@ -374,7 +374,7 @@ export function QrView() {
             an operator to watch or clear. */}
         <div
           className={cn(
-            'transition-all duration-300 ease-out',
+            'transition-all duration-200 ease-out',
             collapsed ? 'max-h-0 opacity-0 overflow-hidden mt-0' : 'max-h-[600px] opacity-100',
           )}
         >
@@ -396,7 +396,7 @@ export function QrView() {
 
       {/* Main content with tabs */}
       <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col min-h-0">
-        <div className="px-4 md:px-6 pt-3 shrink-0 flex items-center justify-between">
+        <div className="px-3.5 md:px-6 pt-3 shrink-0 flex items-center justify-between">
           <TabsList className="bg-secondary/50">
             <TabsTrigger value="grid" className="gap-1.5 text-xs">
               <LayoutGrid className="h-3.5 w-3.5" />
@@ -442,7 +442,7 @@ export function QrView() {
 
         {/* List tab */}
         <TabsContent value="list" className="flex-1 overflow-hidden mt-0">
-          <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-thin p-4 md:p-6 pt-3 pb-8">
+          <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-thin p-4 md:p-4 md:p-6 pt-3 pb-8">
           {loading ? (
             <div className="space-y-2">
               {Array.from({ length: 6 }).map((_, i) => (

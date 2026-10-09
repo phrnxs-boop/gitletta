@@ -246,7 +246,7 @@ export function DashboardView() {
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Restaurant header — collapses on scroll to give menu cards more room */}
         <div className={cn(
-          'relative px-4 md:px-6 overflow-hidden transition-all duration-300 ease-out',
+          'relative px-3.5 md:px-6 overflow-hidden transition-all duration-200 ease-out',
           collapsed ? 'pt-2 pb-2' : 'pt-5 md:pt-6 pb-4'
         )}>
           <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
@@ -302,7 +302,7 @@ export function DashboardView() {
         </div>
 
         {/* Category pills — horizontal scrollable row */}
-        <div className="px-4 md:px-6 pb-3">
+        <div className="px-3.5 md:px-6 pb-3">
           <div className="w-full overflow-x-auto scrollbar-thin -mx-1 px-1">
             <div className="flex gap-2 w-max pb-1">
               <CategoryPill active={activeCat === 'all'} onClick={() => setActiveCat('all')} icon="🍴" label="All" count={menuItems.length} />
@@ -321,7 +321,7 @@ export function DashboardView() {
         </div>
 
         {/* Menu grid */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-4 md:px-6 pb-6 min-h-0">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pb-4 md:pb-6 min-h-0">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 pt-2">
             {filtered.map((item) => (
               <MenuCard

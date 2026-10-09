@@ -207,23 +207,23 @@ export function AnalyticsView() {
       {/* Header (collapsible on scroll) */}
       <header
         className={cn(
-          'px-4 md:px-6 border-b border-border/60 transition-all duration-300 ease-out',
-          collapsed ? 'pt-2 pb-2' : 'pt-4 md:pt-6 pb-3',
+          'px-3.5 md:px-6 border-b border-border/60 transition-all duration-200 ease-out',
+          collapsed ? 'pt-1.5 pb-1.5' : 'pt-3 md:pt-6 pb-2.5',
         )}
       >
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <h2
               className={cn(
-                'font-bold tracking-tight transition-all duration-300 ease-out truncate',
-                collapsed ? 'text-base md:text-lg' : 'text-xl md:text-2xl',
+                'font-bold tracking-tight transition-all duration-200 ease-out truncate',
+                collapsed ? 'text-base md:text-lg' : 'text-lg md:text-2xl',
               )}
             >
               Analytics
             </h2>
             <p
               className={cn(
-                'text-sm text-muted-foreground transition-all duration-300 ease-out',
+                'text-sm text-muted-foreground transition-all duration-200 ease-out',
                 collapsed ? 'max-h-0 opacity-0 overflow-hidden mt-0' : 'max-h-8 opacity-100 mt-0.5',
               )}
             >
@@ -281,7 +281,7 @@ export function AnalyticsView() {
       </header>
 
       {/* Scrollable content */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-4 md:px-6 pt-1 pb-4 md:pb-6 space-y-5">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pt-1 pb-4 md:pb-6 space-y-5">
         {/* KPI cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard icon={IndianRupee} label="Total Revenue" value={loading ? '—' : `${sym}${(analytics?.totalRevenue ?? 0).toFixed(2)}`} sub={`${analytics?.range?.days ?? 0} days`} tint="coral" />
@@ -291,7 +291,7 @@ export function AnalyticsView() {
         </div>
 
         {/* Revenue trend */}
-        <Card className="rounded-2xl border border-border bg-card p-4 md:p-6">
+        <Card className="rounded-2xl border border-border bg-card p-4 md:p-4 md:p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-semibold">Revenue Trend</h3>
@@ -326,7 +326,7 @@ export function AnalyticsView() {
 
         {/* Top items + Order types */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="rounded-2xl border border-border bg-card p-4 md:p-6 lg:col-span-2">
+          <Card className="rounded-2xl border border-border bg-card p-4 md:p-4 md:p-6 lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-semibold">Top Selling Items</h3>
@@ -351,7 +351,7 @@ export function AnalyticsView() {
             )}
           </Card>
 
-          <Card className="rounded-2xl border border-border bg-card p-4 md:p-6">
+          <Card className="rounded-2xl border border-border bg-card p-4 md:p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-semibold">Order Types</h3>
@@ -396,7 +396,7 @@ export function AnalyticsView() {
 
         {/* Hourly + Category */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="rounded-2xl border border-border bg-card p-4 md:p-6">
+          <Card className="rounded-2xl border border-border bg-card p-4 md:p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-semibold">Sales by Hour</h3>
@@ -421,7 +421,7 @@ export function AnalyticsView() {
             )}
           </Card>
 
-          <Card className="rounded-2xl border border-border bg-card p-4 md:p-6">
+          <Card className="rounded-2xl border border-border bg-card p-4 md:p-4 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-semibold">Revenue by Category</h3>
@@ -452,7 +452,7 @@ export function AnalyticsView() {
         </div>
 
         {/* Top tables */}
-        <Card className="rounded-2xl border border-border bg-card p-4 md:p-6">
+        <Card className="rounded-2xl border border-border bg-card p-4 md:p-4 md:p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-semibold">Top Tables</h3>
@@ -519,7 +519,7 @@ function KpiCard({ icon: Icon, label, value, sub, change, tint }: { icon: any; l
         )}
       </div>
       <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
-      <p className="text-xl md:text-2xl font-bold tabular-nums truncate">{value}</p>
+      <p className="text-lg md:text-2xl font-bold tabular-nums truncate">{value}</p>
       {sub && <p className="text-xs text-muted-foreground mt-1 truncate">{sub}</p>}
     </Card>
   )
