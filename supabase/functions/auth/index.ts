@@ -49,7 +49,7 @@ const DEFAULT_ROLES = [
   {
     name: "Cashier",
     description: "Handles billing and payments",
-    permissions: "orders.view,orders.manage,orders.refund,menu.view,tables.view",
+    permissions: "orders.view,orders.manage,menu.view,tables.view",
     is_system: true,
     color: "#fbbf24",
   },

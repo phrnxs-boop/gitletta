@@ -45,7 +45,7 @@ export const ORDER_TYPE = {
 } as const
 
 export const PERMISSION_KEYS = [
-  'dashboard.view', 'orders.view', 'orders.manage', 'orders.refund',
+  'dashboard.view', 'orders.view', 'orders.manage',
   'menu.view', 'menu.manage', 'tables.view', 'tables.manage',
   'promos.view', 'promos.manage', 'analytics.view', 'qr.manage',
   'settings.view', 'settings.manage', 'security.view', 'security.manage',
@@ -54,7 +54,7 @@ export const PERMISSION_KEYS = [
 
 export const PERMISSION_GROUPS = [
   { label: 'Dashboard', perms: ['dashboard.view'] },
-  { label: 'Orders', perms: ['orders.view', 'orders.manage', 'orders.refund'] },
+  { label: 'Orders', perms: ['orders.view', 'orders.manage'] },
   { label: 'Menu', perms: ['menu.view', 'menu.manage'] },
   { label: 'Tables & QR', perms: ['tables.view', 'tables.manage', 'qr.manage'] },
   { label: 'Promo Codes', perms: ['promos.view', 'promos.manage'] },
