@@ -35,7 +35,7 @@ const PLANS = [
   {
     id: 'STARTER',
     name: 'Starter',
-    price: '$29',
+    price: '₹999',
     period: '/mo',
     color: '#9aa3b2',
     features: ['1 location', 'Up to 5 staff', 'Basic analytics', 'Email support'],
@@ -43,7 +43,7 @@ const PLANS = [
   {
     id: 'PRO',
     name: 'Pro',
-    price: '$89',
+    price: '₹2,499',
     period: '/mo',
     color: '#f97316',
     features: ['3 locations', 'Unlimited staff', 'Advanced analytics', 'Priority support', 'QR ordering', 'Kitchen display'],
@@ -59,9 +59,39 @@ const PLANS = [
   },
 ]
 
+/**
+ * Timezone options, India first.
+ *
+ * Two things this list must keep doing:
+ *  - 'Asia/Calcutta' is a deprecated alias of 'Asia/Kolkata' that older rows may
+ *    still hold, so it stays selectable rather than silently unselectable.
+ *  - 'UTC' must remain, because it is the fallback for a restaurant that has
+ *    never saved a timezone. A Radix Select whose value matches no item renders
+ *    its placeholder, so omitting the default made the field look empty — which
+ *    reads as "my setting was lost" even when nothing had been saved yet.
+ */
 const TIMEZONES = [
   'Asia/Kolkata',
   'Asia/Calcutta',
+  'Asia/Colombo',
+  'Asia/Kathmandu',
+  'Asia/Dhaka',
+  'Asia/Karachi',
+  'Asia/Dubai',
+  'Asia/Singapore',
+  'Asia/Bangkok',
+  'Asia/Jakarta',
+  'Asia/Hong_Kong',
+  'Asia/Tokyo',
+  'Australia/Sydney',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'UTC',
 ]
 
 const OPS_TOGGLES = [
@@ -89,8 +119,8 @@ export function SettingsView() {
     email: '',
     phone: '',
     address: '',
-    currency: 'USD',
-    currencySymbol: '$',
+    currency: 'INR',
+    currencySymbol: '₹',
     logo: '',
     gstin: '',
     fssai: '',
@@ -141,7 +171,7 @@ export function SettingsView() {
       email: t.email || '',
       phone: t.phone || '',
       address: t.address || '',
-      currency: t.currency || 'USD',
+      currency: t.currency || 'INR',
       currencySymbol: t.currencySymbol || '$',
       logo: t.logo || '',
       gstin: data.settings.gstin || '',
@@ -153,7 +183,7 @@ export function SettingsView() {
     setTaxRate(t.taxRate ?? 0)
     setServiceCharge(t.serviceCharge ?? 0)
     setOpeningHours(data.settings.opening_hours || 'Mon–Fri 9:00 AM – 10:00 PM')
-    setTimezone(data.settings.timezone || 'UTC')
+    setTimezone(data.settings.timezone || 'Asia/Kolkata')
     const toggles: Record<string, boolean> = {}
     for (const t of OPS_TOGGLES) {
       toggles[t.key] = data.settings[t.key] === 'true'
@@ -189,7 +219,7 @@ export function SettingsView() {
     if (tenantForm.email !== (t.email || '')) return true
     if (tenantForm.phone !== (t.phone || '')) return true
     if (tenantForm.address !== (t.address || '')) return true
-    if (tenantForm.currency !== (t.currency || 'USD')) return true
+    if (tenantForm.currency !== (t.currency || 'INR')) return true
     if (tenantForm.currencySymbol !== (t.currencySymbol || '$')) return true
     if (tenantForm.logo !== (t.logo || '')) return true
     if (tenantForm.gstin !== (data.settings.gstin || '')) return true
@@ -200,7 +230,7 @@ export function SettingsView() {
     if (taxRate !== (t.taxRate ?? 0)) return true
     if (serviceCharge !== (t.serviceCharge ?? 0)) return true
     if (openingHours !== (data.settings.opening_hours || 'Mon–Fri 9:00 AM – 10:00 PM')) return true
-    if (timezone !== (data.settings.timezone || 'UTC')) return true
+    if (timezone !== (data.settings.timezone || 'Asia/Kolkata')) return true
     for (const t of OPS_TOGGLES) {
       if (opToggles[t.key] !== (data.settings[t.key] === 'true')) return true
     }
@@ -263,7 +293,7 @@ export function SettingsView() {
       email: t.email || '',
       phone: t.phone || '',
       address: t.address || '',
-      currency: t.currency || 'USD',
+      currency: t.currency || 'INR',
       currencySymbol: t.currencySymbol || '$',
       logo: t.logo || '',
       gstin: data.settings.gstin || '',
@@ -275,7 +305,7 @@ export function SettingsView() {
     setTaxRate(t.taxRate ?? 0)
     setServiceCharge(t.serviceCharge ?? 0)
     setOpeningHours(data.settings.opening_hours || 'Mon–Fri 9:00 AM – 10:00 PM')
-    setTimezone(data.settings.timezone || 'UTC')
+    setTimezone(data.settings.timezone || 'Asia/Kolkata')
     const toggles: Record<string, boolean> = {}
     for (const t of OPS_TOGGLES) {
       toggles[t.key] = data.settings[t.key] === 'true'
