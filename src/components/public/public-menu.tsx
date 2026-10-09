@@ -32,7 +32,6 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Sheet,
   SheetContent,
@@ -1141,7 +1140,7 @@ export function PublicMenu() {
               <EmptyCart onClose={closeSheet} />
             ) : (
               <>
-                <SheetHeader className="px-5 pt-5 pb-3 border-b border-[#eeeae3]">
+                <SheetHeader className="shrink-0 px-5 pt-5 pb-3 border-b border-[#eeeae3]">
                   <div className="flex items-center justify-between">
                     <SheetTitle className="text-lg font-bold flex items-center gap-2">
                       <ShoppingBag className="size-5" style={{ color: CORAL }} />
@@ -1166,7 +1165,7 @@ export function PublicMenu() {
                   </SheetDescription>
                 </SheetHeader>
 
-                <ScrollArea className="flex-1 min-h-0">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                   <div className="px-5 py-4 space-y-4">
                     {cart.map((c) => (
                       <CartLine
@@ -1195,10 +1194,10 @@ export function PublicMenu() {
                       </span>
                     </div>
                   </div>
-                </ScrollArea>
+                </div>
 
                 {/* Totals + place order */}
-                <div className="border-t border-[#eeeae3] bg-white px-5 pt-4 pb-5 space-y-3 rounded-b-3xl">
+                <div className="shrink-0 border-t border-[#eeeae3] bg-white px-5 pt-4 pb-5 space-y-3 rounded-b-3xl">
                   <div className="space-y-1.5 text-sm">
                     <Row label="Subtotal" value={formatPrice(itemsTotal, currency)} />
                     {service > 0 && (
