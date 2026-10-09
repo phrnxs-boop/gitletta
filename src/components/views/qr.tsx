@@ -70,8 +70,6 @@ export function QrView() {
   const [items, setItems] = useState<QrTableItem[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<string>('grid')
-  const [activeSessions, setActiveSessions] = useState<any[]>([])
-  const [endingTable, setEndingTable] = useState<string | null>(null)
   const { scrollRef, collapsed } = useScrollCollapse()
 
   // Modal dialog states
@@ -105,41 +103,9 @@ export function QrView() {
     }
   }, [tenantId])
 
-  // fetch active table sessions
-  const loadActiveSessions = useCallback(async () => {
-    if (!tenantId) return
-    try {
-      const res = await edgeFetch('/api/table-session/active', { headers: { 'x-tenant-id': tenantId } })
-      if (!res.ok) return
-      const json = await res.json()
-      setActiveSessions(Array.isArray(json) ? json : [])
-    } catch { /* ignore */ }
-  }, [tenantId])
-
   useEffect(() => {
     loadQr()
-    loadActiveSessions()
-  }, [loadQr, loadActiveSessions, tables])
-
-  const handleEndSession = async (tableId: string, tableName: string) => {
-    setEndingTable(tableId)
-    try {
-      const res = await edgeFetch('/api/table-session/end', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-tenant-id': tenantId },
-        body: JSON.stringify({ tableId }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success(`Session ended for ${tableName}`, {
-        description: 'Customers must scan the QR again to access the menu.',
-      })
-      await loadActiveSessions()
-    } catch {
-      toast.error('Failed to end session')
-    } finally {
-      setEndingTable(null)
-    }
-  }
+  }, [loadQr, tables])
 
   const handleOpenCreate = () => {
     setCreateForm({
@@ -402,65 +368,29 @@ export function QrView() {
           </div>
         </div>
 
-        {/* Collapsible section: info banner + active sessions */}
+        {/* Collapsible info banner. Session state deliberately does NOT appear
+            here: this page exists to print QR codes, and sessions now expire on
+            their own in the database (migration 0008), so there is nothing for
+            an operator to watch or clear. */}
         <div
           className={cn(
             'transition-all duration-300 ease-out',
             collapsed ? 'max-h-0 opacity-0 overflow-hidden mt-0' : 'max-h-[600px] opacity-100',
           )}
         >
-          {/* Info banner */}
           <div className="mt-4 rounded-2xl border border-primary/30 bg-primary/10 p-4 flex items-start gap-3">
             <div className="w-9 h-9 shrink-0 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
               <Sparkles className="h-5 w-5" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-foreground">
-                Scan to order — contactless & instant
+                Scan to order — contactless &amp; instant
               </p>
               <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                 Customers scan a table&apos;s QR code to open the digital menu and place orders directly from their phone. Each table has a unique, tokenized URL.
               </p>
             </div>
           </div>
-
-          {/* Active sessions bar */}
-          {activeSessions.length > 0 && (
-            <div className="mt-3 rounded-2xl border border-border bg-card p-3 flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                </span>
-                <span className="text-xs font-semibold text-foreground">
-                  {activeSessions.length} active {activeSessions.length === 1 ? 'session' : 'sessions'}
-                </span>
-                <span className="text-xs text-muted-foreground hidden sm:inline">
-                  (customers currently ordering)
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {activeSessions.slice(0, 4).map((s, idx) => {
-                  const tableId = s.tableId || s.table?.id || s.id || `session-${idx}`
-                  const tableName = s.table?.name || 'Table'
-                  const itemKey = s.id || tableId || `active-session-${idx}`
-                  return (
-                    <Badge key={itemKey} variant="secondary" className="gap-1 text-xs">
-                      <span>{tableName}</span>
-                      <button
-                        onClick={() => handleEndSession(tableId, tableName)}
-                        disabled={endingTable === tableId}
-                        className="ml-1 text-muted-foreground hover:text-destructive"
-                        title="End session"
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </div>
       </header>
 
