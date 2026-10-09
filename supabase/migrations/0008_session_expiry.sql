@@ -14,6 +14,9 @@
 -- ============================================================================
 
 -- One visit's worth. No meal runs six hours, so this is generous.
+--
+-- This file creates the two functions below only. place_order is deliberately
+-- NOT touched here — see the note at the end.
 create or replace function public.expire_stale_table_sessions()
 returns integer
 language plpgsql
@@ -72,4 +75,13 @@ end $$;
 -- The migration runner used for this project rejects any statement that follows
 -- a dollar-quoted function body, so this file deliberately ends at the last
 -- `end $$;`. Grant/notify statements were applied separately.
+-- ============================================================================
+
+-- ============================================================================
+-- place_order is handled by 0009, not here.
+--
+-- This file was originally meant to re-declare place_order with the same expiry
+-- check. That edit was lost: pg_get_functiondef quotes a body with $function$
+-- rather than $$, so trimming this file back to its last `end $$;` removed
+-- place_order without any error. See 0009.
 -- ============================================================================
