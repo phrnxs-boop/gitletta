@@ -473,8 +473,8 @@ export function AnalyticsView() {
               <div className="grid grid-cols-12 gap-3 px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                 <span className="col-span-1">#</span>
                 <span className="col-span-5 sm:col-span-6">Table</span>
-                <span className="col-span-3 text-right">Orders</span>
-                <span className="col-span-3 text-right">Revenue</span>
+                <span className="col-span-2 text-right">Orders</span>
+                <span className="col-span-4 whitespace-nowrap text-right sm:col-span-3">Revenue</span>
               </div>
               <Separator />
               <div className="max-h-96 overflow-y-auto scrollbar-thin">
@@ -484,8 +484,8 @@ export function AnalyticsView() {
                       {i + 1}
                     </span>
                     <span className="col-span-5 sm:col-span-6 font-medium text-sm truncate">{t.name}</span>
-                    <span className="col-span-3 text-right text-sm text-muted-foreground">{t.orders}</span>
-                    <span className="col-span-3 text-right text-sm font-semibold">{sym}{t.revenue.toFixed(2)}</span>
+                    <span className="col-span-2 text-right text-sm text-muted-foreground">{t.orders}</span>
+                    <span className="col-span-4 whitespace-nowrap text-right text-sm font-semibold sm:col-span-3">{sym}{t.revenue.toFixed(2)}</span>
                   </div>
                 ))}
               </div>
