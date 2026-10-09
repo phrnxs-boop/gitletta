@@ -258,23 +258,31 @@ function fileToDataUrl(file: File): Promise<string> {
   })
 }
 
+/**
+ * Guess a category icon from its name.
+ *
+ * Indian menu vocabulary is matched first, so "Biryani", "Tandoori" and "Naan"
+ * are recognised before a generic term can claim them. The Western terms are
+ * kept as a fallback — a restaurant is free to have a pizza section.
+ */
 function categoryIconFor(name: string): string {
   const n = name.toLowerCase()
-  if (n.includes('dessert') || n.includes('sweet')) return '🍰'
-  if (n.includes('drink') || n.includes('beverage') || n.includes('beverages')) return '🍹'
+  if (n.includes('biryani') || n.includes('pulao') || n.includes('rice')) return '🍚'
+  if (n.includes('tandoor') || n.includes('kebab') || n.includes('tikka') || n.includes('grill') || n.includes('bbq')) return '🍢'
+  if (n.includes('bread') || n.includes('naan') || n.includes('roti') || n.includes('paratha')) return '🫓'
+  if (n.includes('dessert') || n.includes('sweet') || n.includes('mithai')) return '🍮'
+  if (n.includes('beverage') || n.includes('drink') || n.includes('chai') || n.includes('lassi') || n.includes('juice')) return '🫖'
+  if (n.includes('starter') || n.includes('appet') || n.includes('salad') || n.includes('chaat')) return '🥗'
+  if (n.includes('thali') || n.includes('main') || n.includes('curry') || n.includes('masala') || n.includes('dal')) return '🍛'
+  if (n.includes('soup') || n.includes('shorba')) return '🍲'
+  if (n.includes('paneer') || n.includes('cheese')) return '🧀'
+  if (n.includes('seafood') || n.includes('fish') || n.includes('prawn')) return '🍤'
+  if (n.includes('chicken') || n.includes('mutton') || n.includes('meat')) return '🍗'
+  if (n.includes('dosa') || n.includes('idli') || n.includes('south indian')) return '🥘'
+  if (n.includes('chinese') || n.includes('noodle') || n.includes('manchurian')) return '🍜'
   if (n.includes('pizza')) return '🍕'
   if (n.includes('burger')) return '🍔'
-  if (n.includes('sushi')) return '🍣'
-  if (n.includes('curry') || n.includes('main')) return '🍛'
-  if (n.includes('pasta') || n.includes('noodle')) return '🍝'
-  if (n.includes('salad') || n.includes('starter') || n.includes('appet')) return '🥗'
-  if (n.includes('soup')) return '🍜'
-  if (n.includes('rice')) return '🍚'
-  if (n.includes('bread') || n.includes('bakery')) return '🍞'
-  if (n.includes('mexican') || n.includes('taco')) return '🌮'
-  if (n.includes('dumpling')) return '🥟'
-  if (n.includes('grill') || n.includes('bbq')) return '🍢'
-  if (n.includes('cold')) return '🧊'
+  if (n.includes('grill')) return '🍢'
   return '🍽️'
 }
 

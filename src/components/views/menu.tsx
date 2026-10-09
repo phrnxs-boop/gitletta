@@ -79,6 +79,24 @@ const EMPTY_FORM: MenuFormState = {
   available: true,
 }
 
+/**
+ * Category icons, grouped by course.
+ *
+ * Curated for Indian restaurants: the previous flat list leaned Western
+ * (burger, pizza, sushi, taco), which read oddly next to a menu of biryani and
+ * naan. Grouping also means the picker scans like a menu instead of a wall of
+ * emoji, and the set is larger — the input beside it still accepts anything.
+ */
+const CATEGORY_ICONS: { group: string; icons: string[] }[] = [
+  { group: 'Starters', icons: ['🥗', '🧀', '🍢', '🍗', '🥟', '🍤', '🌶️', '🧅', '🥜'] },
+  { group: 'Mains', icons: ['🍛', '🥘', '🍲', '🫘', '🥩', '🐟', '🍅', '🥔', '🧄'] },
+  { group: 'Rice', icons: ['🍚', '🍛', '🍱', '🌾', '🥣'] },
+  { group: 'Breads', icons: ['🫓', '🥖', '🍞', '🥨', '🧈'] },
+  { group: 'Desserts', icons: ['🍮', '🍨', '🍧', '🍰', '🧁', '🍯', '🍫', '🥮'] },
+  { group: 'Drinks', icons: ['🫖', '☕', '🧋', '🥤', '🍹', '🥛', '🥭', '🥥', '🍋'] },
+  { group: 'Other', icons: ['🍽️', '🥄', '🔥', '⭐', '👑', '🥡', '🎁'] },
+]
+
 const PRESET_TAGS = [
   { id: 'VEG', label: 'Veg', icon: '🌱', activeClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 ring-1 ring-emerald-500/40 shadow-xs' },
   { id: 'NON-VEG', label: 'Non-Veg', icon: '🍗', activeClass: 'bg-rose-500/20 text-rose-400 border-rose-500/50 ring-1 ring-rose-500/40 shadow-xs' },
@@ -647,31 +665,45 @@ export function MenuView() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="c-icon">Icon (emoji)</Label>
+              <Label htmlFor="c-icon">Icon</Label>
               <div className="flex items-center gap-2">
                 <Input
                   id="c-icon"
                   value={catForm.icon}
                   onChange={(e) => setCatForm((f) => ({ ...f, icon: e.target.value }))}
-                  placeholder="🍰"
+                  placeholder="🍛"
                   maxLength={4}
                   className="bg-secondary/50 border-0 w-20 text-center text-xl"
                 />
-                <div className="flex flex-wrap gap-1">
-                  {['🍔', '🍣', '🍕', '🍰', '☕', '🥗', '🥩', '🍹', '🍜', '🍛', '🍢', '🍚', '🥘', '🍝', '🌮', '🥟', '🍞', '🧊', '🔥', '🥤'].map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setCatForm((f) => ({ ...f, icon: emoji }))}
-                      className={cn(
-                        'h-9 w-9 rounded-lg text-lg transition-colors',
-                        catForm.icon === emoji ? 'bg-primary/20 ring-1 ring-primary' : 'bg-secondary/60 hover:bg-secondary',
-                      )}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Pick one, or type any emoji you like.
+                </p>
+              </div>
+              <div className="max-h-56 space-y-3 overflow-y-auto pr-1 scrollbar-thin">
+                {CATEGORY_ICONS.map((g) => (
+                  <div key={g.group}>
+                    <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {g.group}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {g.icons.map((emoji) => (
+                        <button
+                          key={`${g.group}-${emoji}`}
+                          type="button"
+                          onClick={() => setCatForm((f) => ({ ...f, icon: emoji }))}
+                          className={cn(
+                            'h-9 w-9 rounded-lg text-lg transition-colors',
+                            catForm.icon === emoji
+                              ? 'bg-primary/20 ring-1 ring-primary'
+                              : 'bg-secondary/60 hover:bg-secondary',
+                          )}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
