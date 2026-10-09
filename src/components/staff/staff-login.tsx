@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Delete, ArrowLeft, Loader2, Lock, Shield, ChevronDown, Check, Store } from 'lucide-react'
 import { toast } from 'sonner'
-import { edgeFetch, setStaffToken } from '@/lib/edge'
+import { edgeFetch, staffFetch } from '@/lib/edge'
 
 export function StaffLoginPage() {
   const searchParams = useSearchParams()
@@ -64,7 +64,7 @@ export function StaffLoginPage() {
     setSubmitting(true)
     setError('')
     try {
-      const res = await edgeFetch('/api/staff/login', {
+      const res = await staffFetch('/api/staff/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -80,7 +80,6 @@ export function StaffLoginPage() {
         setPin('')
         return
       }
-      if (data.token) setStaffToken(data.token)
       toast.success(`Welcome, ${data.staff.name.split(' ')[0]}!`)
       setTimeout(() => { window.location.href = '/?view=staff-dashboard' }, 300)
     } catch {

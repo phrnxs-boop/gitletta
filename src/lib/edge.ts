@@ -9,32 +9,12 @@
  * That keeps the migration a mechanical swap at every call site instead of a
  * rewrite of 46 of them.
  *
- * Auth: owners send their Supabase access token as a bearer; staff send their
- * session token in `x-staff-session`. Both are understood by `_shared/auth.ts`.
+ * Auth: owners send their Supabase access token as a bearer. Staff carry an
+ * HttpOnly cookie set by the staff function, sent automatically by
+ * `credentials: 'include'` — nothing staff-related is readable from JavaScript.
  */
 
 const EDGE_BASE = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1`
-const STAFF_TOKEN_KEY = 'swixo-staff-session'
-
-export function getStaffToken(): string | null {
-  if (typeof window === 'undefined') return null
-  try {
-    return window.localStorage.getItem(STAFF_TOKEN_KEY)
-  } catch {
-    return null
-  }
-}
-
-export function setStaffToken(token: string | null): void {
-  if (typeof window === 'undefined') return
-  try {
-    if (token) window.localStorage.setItem(STAFF_TOKEN_KEY, token)
-    else window.localStorage.removeItem(STAFF_TOKEN_KEY)
-  } catch {
-    /* storage disabled — the cookie fallback still applies */
-  }
-}
-
 /** `/api/orders/123?x=1` -> `${EDGE_BASE}/orders/123?x=1` */
 function toEdgeUrl(path: string): string {
   const trimmed = path.replace(/^\/api/, '')
@@ -60,23 +40,23 @@ export async function edgeFetch(path: string, init: RequestInit = {}): Promise<R
     /* no browser session — fall through to the staff token */
   }
 
-  if (!headers.has('Authorization')) {
-    const staff = getStaffToken()
-    if (staff) headers.set('x-staff-session', staff)
-  }
-
   return fetch(toEdgeUrl(path), { ...init, headers, credentials: 'include' })
 }
 
 /**
- * Staff-scoped request. Sends ONLY the staff session token.
+ * Staff-scoped request. Deliberately does NOT attach the owner's bearer token.
  *
- * `edgeFetch` prefers the owner's bearer token when one exists, and the server's
- * `guard()` resolves an owner session before a staff one. So on a browser where
- * an owner is also signed in — which is the normal case when an owner tests
- * their own staff login — every staff call would be authenticated as the owner
- * and the staff endpoints, which require a staff session, would return 401.
- * Staff pages must therefore opt out of the owner bearer entirely.
+ * Two reasons:
+ *
+ *  - The staff session lives in an HttpOnly cookie set by the staff function,
+ *    so it is never readable from JavaScript and cannot be lifted by an XSS.
+ *    `credentials: 'include'` is what sends it.
+ *  - `edgeFetch` prefers the owner's bearer token when one exists, and the
+ *    server's `guard()` resolves an owner session before a staff one. So on a
+ *    browser where an owner is also signed in — the normal case when an owner
+ *    tests their own staff login — a staff call carrying that bearer would be
+ *    authenticated as the owner, and the staff endpoints require a staff
+ *    session. Opting out of the bearer is therefore required, not just tidy.
  */
 export async function staffFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers)
@@ -84,8 +64,6 @@ export async function staffFetch(path: string, init: RequestInit = {}): Promise<
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
-  const staff = getStaffToken()
-  if (staff) headers.set('x-staff-session', staff)
   return fetch(toEdgeUrl(path), { ...init, headers, credentials: 'include' })
 }
 
