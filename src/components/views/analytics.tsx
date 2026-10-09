@@ -11,11 +11,15 @@ import { cn } from '@/lib/utils'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import type { DateRange } from 'react-day-picker'
+import { format, startOfMonth, subDays } from 'date-fns'
 import { Separator } from '@/components/ui/separator'
 import {
   TrendingUp, TrendingDown, IndianRupee, ShoppingBag, ClipboardList, CalendarDays,
   ArrowUpRight, ArrowDownRight, Download, Clock, Users, Utensils, Trophy,
+  CalendarIcon, ChevronDown,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -26,6 +30,7 @@ interface TopTable { name: string; orders: number; revenue: number }
 interface CatBreak { name: string; value: number }
 
 interface AnalyticsPayload {
+  range?: { from: string; to: string; days: number; timezone: string }
   totalRevenue: number
   totalOrders: number
   avgOrder: number
@@ -77,18 +82,33 @@ function ChartSkeleton({ className }: { className?: string }) {
   return <div className={cn('w-full rounded-xl bg-secondary/30 animate-pulse', className)} />
 }
 
+/** Quick ranges. Each returns a fresh object so the picker always gets new refs. */
+const RANGE_PRESETS: { label: string; build: () => DateRange }[] = [
+  { label: 'Today', build: () => { const t = new Date(); return { from: t, to: t } } },
+  { label: 'Yesterday', build: () => { const y = subDays(new Date(), 1); return { from: y, to: y } } },
+  { label: 'Last 7 days', build: () => ({ from: subDays(new Date(), 6), to: new Date() }) },
+  { label: 'Last 14 days', build: () => ({ from: subDays(new Date(), 13), to: new Date() }) },
+  { label: 'Last 30 days', build: () => ({ from: subDays(new Date(), 29), to: new Date() }) },
+  { label: 'This month', build: () => ({ from: startOfMonth(new Date()), to: new Date() }) },
+]
+
 export function AnalyticsView() {
   const { data } = useApp()
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null)
   const [loading, setLoading] = useState(true)
-  const [period, setPeriod] = useState(7)
+  const [range, setRange] = useState<DateRange>(() => ({ from: subDays(new Date(), 6), to: new Date() }))
+  const [rangeOpen, setRangeOpen] = useState(false)
   const { scrollRef, collapsed } = useScrollCollapse()
 
   const load = useCallback(async () => {
     if (!data) return
     setLoading(true)
     try {
-      const res = await edgeFetch(`/api/analytics?days=${period}`, { headers: { 'x-tenant-id': data.tenant.id } })
+      const from = range.from ? format(range.from, 'yyyy-MM-dd') : ''
+      const to = range.to ? format(range.to, 'yyyy-MM-dd') : from
+      const res = await edgeFetch(`/api/analytics?from=${from}&to=${to}`, {
+        headers: { 'x-tenant-id': data.tenant.id },
+      })
       if (!res.ok) throw new Error('Failed')
       setAnalytics(await res.json())
     } catch {
@@ -96,12 +116,90 @@ export function AnalyticsView() {
     } finally {
       setLoading(false)
     }
-  }, [data, period])
+  }, [data, range])
 
   useEffect(() => { load() }, [load])
 
+  /**
+   * Download the report as CSV.
+   *
+   * Built from the payload already on screen, so what you export is exactly
+   * what you are looking at. A BOM is prepended so Excel reads the rupee sign
+   * correctly, and the file is named for the range it covers.
+   */
+  const exportReport = () => {
+    if (!analytics || !data) return
+    const rows: (string | number)[][] = []
+    const push = (...cells: (string | number)[]) => rows.push(cells)
+    const blank = () => rows.push([])
+    const money = (n: number) => n.toFixed(2)
+
+    push('Swixo sales report')
+    push('Restaurant', data.tenant.name)
+    push('From', analytics.range?.from ?? '')
+    push('To', analytics.range?.to ?? '')
+    push('Timezone', analytics.range?.timezone ?? '')
+    push('Generated', new Date().toLocaleString())
+    blank()
+
+    push('Summary')
+    push('Metric', `Amount (${sym})`)
+    push('Total revenue', money(analytics.totalRevenue))
+    push('Completed orders', analytics.totalOrders)
+    push('Average order', money(analytics.avgOrder))
+    push(`Revenue on ${analytics.range?.to ?? 'today'}`, money(analytics.todaysRevenue))
+    blank()
+
+    push('Daily revenue')
+    push('Date', 'Day', `Revenue (${sym})`, 'Orders')
+    for (const d of analytics.dailyRevenue ?? []) push(d.date, d.label, money(d.revenue), d.orders)
+    blank()
+
+    push('Top items')
+    push('Item', 'Quantity sold', `Revenue (${sym})`)
+    for (const t of analytics.topItems ?? []) push(t.name, t.qty, money(t.revenue))
+    blank()
+
+    push('Order types')
+    push('Type', 'Orders', `Revenue (${sym})`)
+    for (const t of analytics.typeBreakdown ?? []) push(t.type, t.count, money(t.revenue))
+    blank()
+
+    push('Top tables')
+    push('Table', 'Orders', `Revenue (${sym})`)
+    for (const t of analytics.topTables ?? []) push(t.name, t.orders, money(t.revenue))
+    blank()
+
+    push('Categories')
+    push('Category', `Revenue (${sym})`)
+    for (const c of analytics.categoryBreakdown ?? []) push(c.name, money(c.value))
+
+    const esc = (v: string | number) => {
+      const str = String(v ?? '')
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
+    }
+    // The BOM is what makes Excel render ₹ rather than mojibake.
+    const csv = '\uFEFF' + rows.map((r) => r.map(esc).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `swixo-report_${analytics.range?.from ?? 'from'}_to_${analytics.range?.to ?? 'to'}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    toast.success('Report downloaded', {
+      description: `${analytics.totalOrders} orders · ${sym}${money(analytics.totalRevenue)}`,
+    })
+  }
+
   if (!data) return null
   const sym = data.tenant.currencySymbol
+  const rangeLabel = range.from
+    ? range.to && format(range.from, 'yyyy-MM-dd') !== format(range.to, 'yyyy-MM-dd')
+      ? `${format(range.from, 'd MMM')} – ${format(range.to, 'd MMM yyyy')}`
+      : format(range.from, 'd MMM yyyy')
+    : 'Select dates'
   const typeTotal = (analytics?.typeBreakdown ?? []).reduce((s, t) => s + t.revenue, 0) || 1
 
   return (
@@ -133,15 +231,49 @@ export function AnalyticsView() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Select value={String(period)} onValueChange={(v) => setPeriod(Number(v))}>
-              <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="14">Last 14 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="secondary" size="sm" onClick={() => toast.success('Report exported')}>
+            <Popover open={rangeOpen} onOpenChange={setRangeOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="secondary" size="sm" className="h-9 gap-2 font-normal">
+                  <CalendarIcon className="h-4 w-4 opacity-70" />
+                  {rangeLabel}
+                  <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-auto p-0">
+                <div className="flex flex-col lg:flex-row">
+                  <div className="flex shrink-0 flex-wrap gap-1 border-b border-border p-2 lg:w-[136px] lg:flex-col lg:flex-nowrap lg:border-b-0 lg:border-r">
+                    {RANGE_PRESETS.map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          setRange(preset.build())
+                          setRangeOpen(false)
+                        }}
+                        className="rounded-md px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-secondary"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                  <Calendar
+                    mode="range"
+                    selected={range}
+                    onSelect={(next) => setRange(next ?? { from: undefined, to: undefined })}
+                    defaultMonth={range.from}
+                    numberOfMonths={2}
+                    disabled={{ after: new Date() }}
+                    className="p-3"
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={exportReport}
+              disabled={!analytics || loading}
+            >
               <Download className="h-4 w-4 mr-1.5" /> Export
             </Button>
           </div>
@@ -152,7 +284,7 @@ export function AnalyticsView() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-4 md:px-6 pt-1 pb-4 md:pb-6 space-y-5">
         {/* KPI cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard icon={IndianRupee} label="Total Revenue" value={loading ? '—' : `${sym}${(analytics?.totalRevenue ?? 0).toFixed(2)}`} sub={`${period} days`} tint="coral" />
+          <KpiCard icon={IndianRupee} label="Total Revenue" value={loading ? '—' : `${sym}${(analytics?.totalRevenue ?? 0).toFixed(2)}`} sub={`${analytics?.range?.days ?? 0} days`} tint="coral" />
           <KpiCard icon={ClipboardList} label="Total Orders" value={loading ? '—' : String(analytics?.totalOrders ?? 0)} sub="completed" tint="green" />
           <KpiCard icon={ShoppingBag} label="Avg Order" value={loading ? '—' : `${sym}${(analytics?.avgOrder ?? 0).toFixed(2)}`} sub="per transaction" tint="amber" />
           <KpiCard icon={CalendarDays} label="Today's Revenue" value={loading ? '—' : `${sym}${(analytics?.todaysRevenue ?? 0).toFixed(2)}`} sub={`${analytics?.todaysOrders ?? 0} orders today`} change={analytics?.revenueChange} tint="blue" />
@@ -163,7 +295,7 @@ export function AnalyticsView() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-semibold">Revenue Trend</h3>
-              <p className="text-xs text-muted-foreground">Daily revenue over {period} days</p>
+              <p className="text-xs text-muted-foreground">Daily revenue · {rangeLabel}</p>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="inline-block w-2 h-2 rounded-full" style={{ background: CORAL }} /> Revenue
