@@ -42,6 +42,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -76,6 +77,34 @@ export function OrdersView() {
   const [payOrder, setPayOrder] = useState<Order | null>(null)
   const [viewOrder, setViewOrder] = useState<Order | null>(null)
   const [billOrderId, setBillOrderId] = useState<string | null>(null)
+  const [deleteOrder, setDeleteOrder] = useState<Order | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  // Deleting is gated on orders.manage. An owner session has no staff record
+  // and therefore every permission; a staff session carries its role's list.
+  // The endpoint enforces this too — this only keeps the button off screens
+  // where the call would be refused anyway.
+  const canManageOrders =
+    !data?.currentStaff || (data?.staffPermissions ?? []).includes('orders.manage')
+
+  const confirmDelete = async () => {
+    if (!deleteOrder || !data) return
+    setDeleting(true)
+    try {
+      const res = await edgeFetch(`/api/orders/${deleteOrder.id}`, {
+        method: 'DELETE',
+        headers: { 'x-tenant-id': data.tenant.id },
+      })
+      if (!res.ok) throw new Error()
+      toast.success(`Order #${deleteOrder.orderNumber} deleted`)
+      setDeleteOrder(null)
+      await refresh()
+    } catch {
+      toast.error('Could not delete the order')
+    } finally {
+      setDeleting(false)
+    }
+  }
   const [paymentMethod, setPaymentMethod] = useState<string>('CASH')
   const [busy, setBusy] = useState<string | null>(null)
   const { scrollRef, collapsed } = useScrollCollapse()
@@ -314,6 +343,8 @@ export function OrdersView() {
                 }
                 onView={() => setViewOrder(order)}
                 onViewBill={() => setBillOrderId(order.id)}
+                canDelete={canManageOrders}
+                onDelete={() => setDeleteOrder(order)}
                 busy={busy === order.id + (actionForStatus(order.status)?.nextStatus || '')}
                 onUpdate={(next) => updateStatus(order, next)}
                 onPay={() => {
@@ -551,6 +582,32 @@ export function OrdersView() {
 
       {/* Bill dialog */}
       <BillDialog orderId={billOrderId} open={!!billOrderId} onOpenChange={(v) => !v && setBillOrderId(null)} />
+
+      {/* Deleting an order cannot be undone, so it asks first. */}
+      <Dialog open={!!deleteOrder} onOpenChange={(o) => !o && !deleting && setDeleteOrder(null)}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete order #{deleteOrder?.orderNumber}?</DialogTitle>
+            <DialogDescription>
+              This permanently removes the order and its items, and cannot be undone.
+              {deleteOrder?.status === 'COMPLETED' && ' Its revenue will no longer appear in analytics.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="secondary" onClick={() => setDeleteOrder(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDelete}
+              disabled={deleting}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deleting ? 'Deleting…' : 'Delete order'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -562,6 +619,8 @@ function OrderCard({
   onToggleExpand,
   onView,
   onViewBill,
+  onDelete,
+  canDelete,
   busy,
   onUpdate,
   onPay,
@@ -572,6 +631,8 @@ function OrderCard({
   onToggleExpand: () => void
   onView: () => void
   onViewBill: () => void
+  onDelete: () => void
+  canDelete: boolean
   busy: boolean
   onUpdate: (next: string) => void
   onPay: () => void
@@ -705,6 +766,18 @@ function OrderCard({
             <Button variant="outline" size="sm" onClick={onViewBill} className="shrink-0">
               <FileText className="h-4 w-4" />
             </Button>
+            {canDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onDelete}
+                title="Delete order"
+                aria-label={`Delete order ${order.orderNumber}`}
+                className="shrink-0 text-muted-foreground hover:border-destructive/50 hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         ) : (
           <div className="flex gap-2">
@@ -718,6 +791,18 @@ function OrderCard({
             <Button variant="outline" size="sm" onClick={onViewBill}>
               <FileText className="h-4 w-4 mr-1.5" /> Bill
             </Button>
+            {canDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onDelete}
+                title="Delete order"
+                aria-label={`Delete order ${order.orderNumber}`}
+                className="shrink-0 text-muted-foreground hover:border-destructive/50 hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         )}
       </div>
