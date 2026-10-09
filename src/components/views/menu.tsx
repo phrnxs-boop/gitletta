@@ -48,7 +48,7 @@ import {
   Loader2,
   PackageOpen,
   CheckCircle2,
-  CircleDollarSign,
+  BadgeIndianRupee,
   ListOrdered,
 } from 'lucide-react'
 
@@ -412,7 +412,7 @@ export function MenuView() {
             accent
           />
           <StatChip
-            icon={<CircleDollarSign className="h-3.5 w-3.5" />}
+            icon={<BadgeIndianRupee className="h-3.5 w-3.5" />}
             label="Avg Price"
             value={`${currency}${stats.avgPrice.toFixed(2)}`}
           />

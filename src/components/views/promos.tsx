@@ -39,7 +39,7 @@ import {
   Trash2,
   Copy,
   Percent,
-  DollarSign,
+  IndianRupee,
   Ticket,
   CheckCircle2,
   TrendingUp,
@@ -373,7 +373,7 @@ export function PromosView() {
                     <Percent className="h-3.5 w-3.5 mr-1 inline" /> Percentage
                   </SelectItem>
                   <SelectItem value="FIXED">
-                    <DollarSign className="h-3.5 w-3.5 mr-1 inline" /> Fixed amount
+                    <IndianRupee className="h-3.5 w-3.5 mr-1 inline" /> Fixed amount
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -627,7 +627,7 @@ function PromoCard({
               variant={isPercentage ? 'default' : 'secondary'}
               className={cn('text-[10px] uppercase', !isPercentage && 'bg-secondary text-secondary-foreground')}
             >
-              {isPercentage ? <Percent className="h-3 w-3" /> : <DollarSign className="h-3 w-3" />}
+              {isPercentage ? <Percent className="h-3 w-3" /> : <IndianRupee className="h-3 w-3" />}
               {promo.type}
             </Badge>
             <span className="text-sm font-semibold text-primary">{displayValue}</span>
