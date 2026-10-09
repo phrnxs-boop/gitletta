@@ -234,8 +234,18 @@ export function SettingsView() {
     for (const t of OPS_TOGGLES) {
       if (opToggles[t.key] !== (data.settings[t.key] === 'true')) return true
     }
+    // Preferences are part of the same save, so they must be able to raise it.
+    // Each comparison mirrors the default used when loading them above.
+    if (prefs.theme !== (data.settings.pref_theme || 'dark')) return true
+    if (prefs.language !== (data.settings.pref_language || 'en')) return true
+    if (prefs.emailAlerts !== (data.settings.pref_email_alerts !== 'false')) return true
+    if (prefs.pushAlerts !== (data.settings.pref_push_alerts !== 'false')) return true
+    if (prefs.soundAlerts !== (data.settings.pref_sound_alerts === 'true')) return true
+    if (prefs.dailyDigest !== (data.settings.pref_daily_digest !== 'false')) return true
+    if (prefs.defaultOrderType !== (data.settings.pref_default_order_type || 'DINE_IN')) return true
+    if (prefs.compactMode !== (data.settings.pref_compact_mode === 'true')) return true
     return false
-  }, [data, tenantForm, taxRate, serviceCharge, openingHours, timezone, opToggles])
+  }, [data, tenantForm, taxRate, serviceCharge, openingHours, timezone, opToggles, prefs])
 
   if (!data) return null
 
@@ -267,6 +277,16 @@ export function SettingsView() {
           instagram: tenantForm.instagram,
           facebook: tenantForm.facebook,
           youtube: tenantForm.youtube,
+          // These were read on load but never written, so every preference
+          // reset to its default on reload no matter what was chosen.
+          pref_theme: prefs.theme,
+          pref_language: prefs.language,
+          pref_email_alerts: String(prefs.emailAlerts),
+          pref_push_alerts: String(prefs.pushAlerts),
+          pref_sound_alerts: String(prefs.soundAlerts),
+          pref_daily_digest: String(prefs.dailyDigest),
+          pref_default_order_type: prefs.defaultOrderType,
+          pref_compact_mode: String(prefs.compactMode),
           ...Object.fromEntries(Object.entries(opToggles).map(([k, v]) => [k, String(v)])),
         },
       }
@@ -590,11 +610,10 @@ export function SettingsView() {
                 </div>
               </ExpandCard>
 
-              <div className="flex justify-end">
-                <Button className="bg-primary hover:bg-primary/90" onClick={() => toast.success('Preferences saved')}>
-                  <Save className="h-4 w-4" /> Save Preferences
-                </Button>
-              </div>
+              {/* No second save button here. Preferences are saved by the
+                  same "Save Changes" action as everything else on this page;
+                  this used to be a separate button that only showed a toast
+                  and wrote nothing. */}
             </div>
           </TabsContent>
 
