@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
   LayoutGrid,
-  Receipt,
+  ClipboardList,
   BarChart3,
   BookOpen,
   QrCode,
@@ -50,7 +50,7 @@ interface StaffData {
 
 const MODULE_ICONS: Record<string, any> = {
   dashboard: LayoutGrid,
-  orders: Receipt,
+  orders: ClipboardList,
   menu: BookOpen,
   qr: QrCode,
   analytics: BarChart3,
