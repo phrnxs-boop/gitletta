@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useRef, useEffect } from 'react'
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { useApp } from '@/components/app/data-context'
 import { useStore } from '@/lib/store'
 import { edgeFetch } from '@/lib/edge'
@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { StatusBadge, OrderTypeBadge, Tag } from '@/components/shared/badges'
-import { Search, Plus, Minus, Trash2, ShoppingBag, X, Check, CreditCard, Ticket } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingBag, X, Check, CreditCard, Ticket, Clock, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function DashboardView() {
@@ -132,7 +132,61 @@ export function DashboardView() {
     setPromoError('')
   }
 
-  const activeOrders = (data?.orders ?? []).filter(o => !['COMPLETED', 'CANCELLED'].includes(o.status)).slice(0, 4)
+  // ----- Open table sessions -------------------------------------------------
+  // The POS is where staff actually work, so this is where a table's open
+  // session belongs — including the ones that need closing by hand: a diner who
+  // scanned and never ordered, or whose order never got marked complete.
+  // (Sessions also expire on their own after 6 hours; see migration 0008.)
+  const [sessions, setSessions] = useState<any[]>([])
+  const [endingTable, setEndingTable] = useState<string | null>(null)
+
+  const loadSessions = useCallback(async () => {
+    if (!tenant?.id) return
+    try {
+      const res = await edgeFetch('/api/table-session/active', { headers: { 'x-tenant-id': tenant?.id ?? '' } })
+      if (!res.ok) return
+      const json = await res.json()
+      setSessions(Array.isArray(json) ? json : [])
+    } catch {
+      /* leave the previous list in place */
+    }
+  }, [tenant])
+
+  useEffect(() => {
+    loadSessions()
+    // Cheap enough to keep live: staff should see a table open without reloading.
+    const t = setInterval(loadSessions, 30000)
+    return () => clearInterval(t)
+  }, [loadSessions])
+
+  const endSession = async (tableId: string, tableName?: string) => {
+    setEndingTable(tableId)
+    try {
+      const res = await edgeFetch('/api/table-session/end', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-tenant-id': tenant?.id ?? '' },
+        body: JSON.stringify({ tableId }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success(`Session ended${tableName ? ` for ${tableName}` : ''}`, {
+        description: 'The diner must scan the QR code again to order.',
+      })
+      await loadSessions()
+    } catch {
+      toast.error('Could not end the session')
+    } finally {
+      setEndingTable(null)
+    }
+  }
+
+  /** How long a table has been open — the oldest session is the stale one. */
+  const sessionAge = (group: any) => {
+    const times = (group.sessions || []).map((s: any) => new Date(s.createdAt).getTime()).filter(Boolean)
+    if (!times.length) return ''
+    const mins = Math.max(0, Math.round((Date.now() - Math.min(...times)) / 60000))
+    if (mins < 60) return `${mins} min`
+    return `${Math.floor(mins / 60)}h ${mins % 60}m`
+  }
 
   // per-category counts for the pills
   const catCount = (catId: string) => catId === 'all' ? menuItems.length : menuItems.filter((m) => m.categoryId === catId).length
@@ -285,35 +339,71 @@ export function DashboardView() {
             )}
           </div>
 
-          {/* Active orders strip */}
-          {activeOrders.length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Active Orders</h3>
-              <div className="flex gap-3 overflow-x-auto scrollbar-thin pb-2">
-                {activeOrders.map((o) => (
-                  <div key={o.id} className="shrink-0 w-64 rounded-2xl border border-border bg-card p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-semibold">#{o.orderNumber}</span>
-                      <StatusBadge status={o.status} />
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-                      <OrderTypeBadge type={o.orderType} />
-                      <span>{o.items.length} items · {tenant.currencySymbol}{o.total.toFixed(2)}</span>
-                    </div>
-                    <div className="space-y-1">
-                      {o.items.slice(0, 3).map((it) => (
-                        <div key={it.id} className="text-xs flex justify-between">
-                          <span className="truncate text-muted-foreground">{it.quantity}× {it.name}</span>
-                          <span className="text-muted-foreground ml-2">{tenant.currencySymbol}{(it.price * it.quantity).toFixed(2)}</span>
-                        </div>
-                      ))}
-                      {o.items.length > 3 && <p className="text-xs text-muted-foreground">+{o.items.length - 3} more</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {/* Open table sessions */}
+          <div className="mt-8">
+            <div className="mb-3 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Active Sessions
+              </h3>
+              {sessions.length > 0 && (
+                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
+                  {sessions.length}
+                </span>
+              )}
             </div>
-          )}
+
+            {sessions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No tables are currently in session.
+              </p>
+            ) : (
+              <div className="flex gap-3 overflow-x-auto scrollbar-thin pb-2">
+                {sessions.map((group) => {
+                  const orderCount = (group.sessions || []).reduce(
+                    (n: number, s: any) => n + (s._count?.orders ?? 0),
+                    0,
+                  )
+                  const label = group.table?.name || 'Table'
+                  return (
+                    <div key={group.tableId} className="shrink-0 w-64 rounded-2xl border border-border bg-card p-4">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold">{label}</p>
+                          <p className="truncate text-[11px] text-muted-foreground">
+                            {group.table?.area}
+                            {group.table?.seats ? ` · ${group.table.seats} seats` : ''}
+                          </p>
+                        </div>
+                        {group.sessions.length > 1 && (
+                          <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                            {group.sessions.length} open
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Clock className="size-3.5" />
+                        <span>open {sessionAge(group)}</span>
+                        <span className="opacity-40">·</span>
+                        <span>{orderCount === 0 ? 'no order yet' : `${orderCount} order${orderCount === 1 ? '' : 's'}`}</span>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => endSession(group.tableId, label)}
+                        disabled={endingTable === group.tableId}
+                        className="h-8 w-full text-xs"
+                      >
+                        <LogOut className="mr-1.5 size-3.5" />
+                        {endingTable === group.tableId ? 'Ending…' : 'End session'}
+                      </Button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
