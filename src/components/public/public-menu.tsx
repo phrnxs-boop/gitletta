@@ -536,6 +536,29 @@ export function PublicMenu() {
     }
   }, [sessionState, sessionToken, sessionTenantId, sessionTableId, tenant?.id, table?.id])
 
+  // ----- Release the session when the menu goes away -----
+  //
+  // Closing a tab sends no request of its own, so without this the table stayed
+  // on the POS board until the idle window elapsed. sendBeacon is the one
+  // request the browser still delivers during unload; a text/plain body keeps it
+  // a "simple" request, because sendBeacon cannot answer a CORS preflight.
+  //
+  // pagehide rather than visibilitychange: switching apps or locking the phone
+  // should not end a diner's session, but leaving the page should.
+  useEffect(() => {
+    if (!sessionToken) return
+    const release = () => {
+      const base = process.env.NEXT_PUBLIC_SUPABASE_URL
+      if (!base || !navigator.sendBeacon) return
+      navigator.sendBeacon(
+        `${base}/functions/v1/table-session/release`,
+        new Blob([JSON.stringify({ sessionToken })], { type: 'text/plain' }),
+      )
+    }
+    window.addEventListener('pagehide', release)
+    return () => window.removeEventListener('pagehide', release)
+  }, [sessionToken])
+
   // ----- Derived values -----
   const currency = tenant?.currencySymbol || '$'
   const taxRate = (tenant?.taxRate ?? 8) / 100

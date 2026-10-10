@@ -123,7 +123,7 @@ async function validateTableSession(params: {
   // sends no request of its own, and without this the session stayed ACTIVE
   // until the six-hour age cap, showing up on the POS as a table that was not
   // in service. Silence now ends it, so nothing needs clearing by hand.
-  const IDLE_MS = 10 * 60 * 1000;
+  const IDLE_MS = 3 * 60 * 1000;
   const lastSeen = new Date(row.last_seen_at ?? row.created_at).getTime();
   if (Date.now() - lastSeen > IDLE_MS) {
     await admin()
@@ -151,6 +151,47 @@ async function validateTableSession(params: {
     return { ok: false, error: "This table is no longer available.", status: 403 };
   }
   return { ok: true, data };
+}
+
+/**
+ * POST /table-session/release — PUBLIC.
+ *
+ * The diner's menu calls this as the tab goes away, so a session with nothing
+ * on it ends in seconds instead of waiting out the idle window. The session
+ * token is the credential: a caller can only release the session they hold.
+ *
+ * A session that already has an order is deliberately left alone. That table is
+ * genuinely in service — the diner may have closed the tab to eat — and its
+ * order lifecycle is what ends it.
+ */
+async function releaseSession(req: Request): Promise<Response> {
+  const b = await body(req);
+  const token = String(b.sessionToken ?? "");
+  if (!token) return json(req, { error: "Missing session token" }, 400);
+
+  const db = admin();
+  const { data: mine } = await db
+    .from("table_sessions")
+    .select("id, tenant_id, table_id")
+    .eq("token", token)
+    .eq("status", "ACTIVE")
+    .maybeSingle();
+  if (!mine) return json(req, { success: true, ended: 0 });
+
+  const { count } = await db
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("table_session_id", mine.id);
+  if ((count ?? 0) > 0) {
+    return json(req, { success: true, ended: 0, kept: "session has an order" });
+  }
+
+  await db
+    .from("table_sessions")
+    .update({ status: "ENDED", ended_at: new Date().toISOString() })
+    .eq("id", mine.id);
+  publishSessionEnded(mine.tenant_id, { id: mine.id, tableId: mine.table_id });
+  return json(req, { success: true, ended: 1 });
 }
 
 /** Mirrors activateTableSession() from src/lib/table-session.ts. */
@@ -296,6 +337,7 @@ Deno.serve(async (req: Request) => {
   try {
     if (req.method === "POST") {
       if (route === "end") return await endSession(req);
+      if (route === "release") return await releaseSession(req);
       if (!route) return await startSession(req);
       return json(req, { error: "Not found" }, 404);
     }
