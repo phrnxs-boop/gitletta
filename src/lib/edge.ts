@@ -42,6 +42,11 @@ export async function edgeFetch(path: string, init: RequestInit = {}): Promise<R
     } catch {
       /* no browser session — fall through to the staff token */
     }
+  } else {
+    // A staff page: the staff token identifies the caller. Needed wherever the
+    // cookie could not be stored, which is the whole point of the header.
+    const token = currentStaffToken()
+    if (token) headers.set('x-staff-session', token)
   }
 
   return fetch(toEdgeUrl(path), { ...init, headers, credentials: 'include' })
@@ -61,6 +66,54 @@ export async function edgeFetch(path: string, init: RequestInit = {}): Promise<R
  * the staff cookie and are authorised as the staff member.
  */
 let staffSession = false
+
+/**
+ * The staff session token, kept so it can be sent as a header as well as a
+ * cookie.
+ *
+ * The cookie alone is not enough. It is issued by supabase.co while the app runs
+ * on its own origin, which makes it a third-party cookie, and browsers that
+ * block those never store it — the sign-in succeeds and then every request
+ * arrives unauthenticated. Chrome now partitions such cookies, which covers
+ * desktop, but Safari has no equivalent and staff on an iPhone still could not
+ * sign in.
+ *
+ * `guard()` has accepted an `x-staff-session` header all along; this is the
+ * client half of that. sessionStorage rather than localStorage: it is cleared
+ * when the tab closes and is not shared between tabs, so the token's exposure is
+ * limited to the session that is actually using it.
+ */
+const STAFF_TOKEN_KEY = 'swixo-staff-token'
+let staffToken: string | null = null
+
+export function rememberStaffToken(token: string): void {
+  staffToken = token
+  try {
+    window.sessionStorage.setItem(STAFF_TOKEN_KEY, token)
+  } catch {
+    /* storage blocked — the cookie path still works where it is allowed */
+  }
+}
+
+export function forgetStaffToken(): void {
+  staffToken = null
+  try {
+    window.sessionStorage.removeItem(STAFF_TOKEN_KEY)
+  } catch {
+    /* nothing to clear */
+  }
+}
+
+function currentStaffToken(): string | null {
+  if (staffToken) return staffToken
+  if (typeof window === 'undefined') return null
+  try {
+    staffToken = window.sessionStorage.getItem(STAFF_TOKEN_KEY)
+  } catch {
+    staffToken = null
+  }
+  return staffToken
+}
 
 export function setStaffSession(active: boolean): void {
   staffSession = active
@@ -87,6 +140,9 @@ export async function staffFetch(path: string, init: RequestInit = {}): Promise<
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
+  // Carry the token as well as the cookie — see rememberStaffToken.
+  const token = currentStaffToken()
+  if (token) headers.set('x-staff-session', token)
   return fetch(toEdgeUrl(path), { ...init, headers, credentials: 'include' })
 }
 

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { AppDataProvider, useApp } from '@/components/app/data-context'
 import { useStore, type ViewKey } from '@/lib/store'
-import { staffFetch, setStaffSession } from '@/lib/edge'
+import { staffFetch, setStaffSession, forgetStaffToken } from '@/lib/edge'
 import { DashboardView } from '@/components/views/dashboard'
 import { OrdersView } from '@/components/views/orders'
 import { MenuView } from '@/components/views/menu'
@@ -105,6 +105,7 @@ function StaffDashboardInner() {
     try {
       await staffFetch('/api/staff/logout', { method: 'POST' })
     } finally {
+      forgetStaffToken()
       window.location.href = '/?view=staff-login'
     }
   }

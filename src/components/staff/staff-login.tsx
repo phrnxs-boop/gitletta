@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Delete, ArrowLeft, Loader2, Lock, Shield } from 'lucide-react'
 import { toast } from 'sonner'
-import { edgeFetch, staffFetch } from '@/lib/edge'
+import { edgeFetch, staffFetch, rememberStaffToken } from '@/lib/edge'
 
 export function StaffLoginPage() {
   const searchParams = useSearchParams()
@@ -75,6 +75,10 @@ export function StaffLoginPage() {
         setPin('')
         return
       }
+      // Keep the token from the response. The matching cookie may never be
+      // stored — see rememberStaffToken — so this is what identifies the staff
+      // member on every later request.
+      if (data.token) rememberStaffToken(data.token)
       toast.success(`Welcome, ${data.staff.name.split(' ')[0]}!`)
       setTimeout(() => { window.location.href = '/?view=staff-dashboard' }, 300)
     } catch {
