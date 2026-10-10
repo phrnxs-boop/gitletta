@@ -259,6 +259,12 @@ interface AppContextValue {
   setTenantId: (id: string) => void
   refresh: () => Promise<void>
   addOrUpdateOrder: (order: Order, notify?: boolean) => void
+  /**
+   * Bumped whenever a table session ends. The POS board shows open sessions and
+   * is not fed by the orders table, so it has no other way to notice a diner
+   * closing their menu without the page being reloaded.
+   */
+  sessionRevision: number
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -268,6 +274,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tenantId, setTenantIdState] = useState<string | null>(null)
+  const [sessionRevision, setSessionRevision] = useState(0)
   const recentNotifiedIds = useRef<Set<string>>(new Set())
   const lastSyncTimeRef = useRef<string>(new Date().toISOString())
 
@@ -437,6 +444,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           realtimeDebounce = setTimeout(runDeltaSync, 150)
         }
       )
+      // A session ending is not an orders-table write, so postgres_changes above
+      // never fires for it. The staff function broadcasts it on this same topic
+      // instead; without listening, the POS board kept showing a table whose
+      // diner had already closed the menu until the page was reloaded.
+      .on('broadcast', { event: 'SESSION_ENDED' }, () => {
+        if (isCancelled) return
+        setSessionRevision((n) => n + 1)
+      })
       .subscribe()
 
     pollTimer = setInterval(runDeltaSync, 4000)
@@ -455,7 +470,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AppContext.Provider value={{ data, loading, error, tenantId, setTenantId, refresh, addOrUpdateOrder }}>
+    <AppContext.Provider value={{ data, loading, error, tenantId, setTenantId, refresh, addOrUpdateOrder, sessionRevision }}>
       {children}
     </AppContext.Provider>
   )

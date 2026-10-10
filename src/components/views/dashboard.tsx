@@ -15,7 +15,7 @@ import { Search, Plus, Minus, Trash2, ShoppingBag, X, Check, CreditCard, Ticket,
 import { toast } from 'sonner'
 
 export function DashboardView() {
-  const { data, refresh } = useApp()
+  const { data, refresh, sessionRevision } = useApp()
   const { cart, addToCart, updateCartQty, removeFromCart, setCartNotes, clearCart, orderType, setOrderType, selectedTableId, setSelectedTableId, promoCode, setPromoCode } = useStore()
   const [activeCat, setActiveCat] = useState<string>('all')
   const [search, setSearch] = useState('')
@@ -154,10 +154,11 @@ export function DashboardView() {
 
   useEffect(() => {
     loadSessions()
-    // Cheap enough to keep live: staff should see a table open without reloading.
+    // The poll is the safety net; sessionRevision is the live path, bumped the
+    // moment a session ends so the card disappears without a reload.
     const t = setInterval(loadSessions, 30000)
     return () => clearInterval(t)
-  }, [loadSessions])
+  }, [loadSessions, sessionRevision])
 
   const endSession = async (tableId: string, tableName?: string) => {
     setEndingTable(tableId)
