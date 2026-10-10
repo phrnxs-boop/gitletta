@@ -10,6 +10,7 @@ import { OnboardingFlow } from '@/components/onboarding/onboarding-flow'
 import { LoginPage } from '@/components/auth/login-page'
 import { StaffLoginPage } from '@/components/staff/staff-login'
 import { StaffDashboard } from '@/components/staff/staff-dashboard'
+import { ResetPasswordView } from '@/components/auth/reset-password'
 
 // Views that require a logged-in owner session
 const PROTECTED_VIEWS = ['onboarding', 'dashboard', '']
@@ -49,6 +50,16 @@ function PageContent() {
   const view = searchParams.get('view') ?? ''
 
   // Public views — no auth required
+  //
+  // A password-reset email lands here with a one-time `code`, either because the
+  // link asked for ?view=reset-password or because Supabase fell back to the
+  // project's Site URL — which happens whenever the redirect target is not on
+  // the allow list. Treating a bare code at the root as a reset link means the
+  // email works either way, with no dashboard configuration required.
+  if (view === 'reset-password') return <ResetPasswordView />
+  if (view === '' && (searchParams.has('code') || searchParams.get('type') === 'recovery')) {
+    return <ResetPasswordView />
+  }
   if (view === 'public-menu' || searchParams.has('table')) return <PublicMenu />
   if (view === 'landing') return <LandingPage />
   if (view === 'login') return <LoginPage />
