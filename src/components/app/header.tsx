@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Search, ChevronDown, Building2, Check, Plus, Menu as MenuIcon } from 'lucide-react'
+import { Search, ChevronDown, Building2, Check, Menu as MenuIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { edgeFetch } from '@/lib/edge'
 import { createClient } from '@/lib/supabase/client'
@@ -94,15 +94,15 @@ export function Header() {
 
         {/* Tenant switcher */}
         <DropdownMenu open={openTenants} onOpenChange={(o) => { setOpenTenants(o); if (o && !tenants) loadTenants() }}>
-          <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-border bg-secondary/40 hover:bg-secondary px-2.5 sm:px-3 py-2 transition-colors">
-            <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-              <Building2 className="h-3.5 w-3.5 text-primary" />
+          <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-lg border border-border bg-secondary/40 hover:bg-secondary px-2 py-1.5 transition-colors">
+            <div className="w-5 h-5 rounded-md bg-primary/20 flex items-center justify-center shrink-0">
+              <Building2 className="h-3 w-3 text-primary" />
             </div>
-            <span className="text-sm font-medium hidden sm:block max-w-[120px] truncate">{tenant.name}</span>
-            <ChevronDown className="h-4 w-4 text-muted-foreground hidden sm:block" />
+            <span className="text-xs font-medium hidden sm:block max-w-[92px] truncate">{tenant.name}</span>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground hidden sm:block" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Switch restaurant</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Your restaurant</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {(tenants || []).map((t) => (
               <DropdownMenuItem
@@ -117,10 +117,9 @@ export function Header() {
                 {t.id === tenant.id && <Check className="h-4 w-4 text-primary" />}
               </DropdownMenuItem>
             ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-primary cursor-pointer">
-              <Plus className="h-4 w-4 mr-2" /> Add restaurant
-            </DropdownMenuItem>
+            {/* "Add restaurant" used to sit here with no handler. Creating a
+                restaurant needs more than a menu item — see the note on
+                GET /tenants — so it is gone rather than lying. */}
           </DropdownMenuContent>
         </DropdownMenu>
 

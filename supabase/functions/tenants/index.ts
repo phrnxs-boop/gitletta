@@ -57,10 +57,18 @@ async function list(req: Request): Promise<Response> {
   const g = await guard(req, { permission: "settings.view" });
   if (!g.ok) return g.response;
 
+  // Only the caller's own restaurant.
+  //
+  // This returned every row in the table, so any owner could read the name,
+  // slug, plan and active flag of every other restaurant on the platform — and
+  // the header's dropdown offered to switch to them, which then failed with a
+  // 403 because guard() resolves the tenant from the session and ignores the
+  // requested id. A profile belongs to exactly one restaurant (profiles.tenant_id),
+  // so one row is all there is to return.
   const { data, error } = await admin()
     .from("tenants")
     .select("id, name, slug, tagline, plan, active")
-    .order("created_at", { ascending: true });
+    .eq("id", g.session.tenantId);
   if (error) return json(req, { error: error.message }, 500);
   return json(req, data ?? []);
 }
