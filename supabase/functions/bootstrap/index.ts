@@ -27,7 +27,15 @@ Deno.serve(async (req: Request) => {
       return json(req, { error: "Method not allowed" }, 405);
     }
 
-    const g = await guard(req, { permission: "dashboard.view" });
+    // Authenticated, not permission-gated.
+    //
+    // bootstrap is the app shell's data loader, not the Dashboard module. It
+    // used to require dashboard.view, which Waiter, Cashier and Kitchen do not
+    // hold — so those roles loaded the staff shell from /staff/me and then got
+    // a 403 for every module's data, leaving the screens empty. The module the
+    // permission is named after is gated separately by the sidebar's `modules`
+    // map; each endpoint still enforces its own permission for reads and writes.
+    const g = await guard(req);
     if (!g.ok) return g.response;
     const tenantId = g.session.tenantId;
 
@@ -158,6 +166,14 @@ Deno.serve(async (req: Request) => {
     let currentStaff: any = null;
     let staffPermissions: string[] = [];
 
+    // users/roles/staff are a people directory. Only send them to a caller who
+    // can actually reach the screens that show them.
+    const canSeePeople =
+      g.session.kind !== "staff" ||
+      g.session.permissions.some((p: string) =>
+        ["roles.view", "roles.manage", "staff.view", "staff.manage"].includes(p),
+      );
+
     // The caller's effective permissions, regardless of session kind. An owner
     // holds every permission; a staff member holds their role's list. Exposing
     // this explicitly matters because previously an owner and a staff member
@@ -201,9 +217,9 @@ Deno.serve(async (req: Request) => {
       currentStaff,
       staffPermissions,
       permissions: effectivePermissions,
-      users,
-      roles,
-      staff,
+      users: canSeePeople ? users : [],
+      roles: canSeePeople ? roles : [],
+      staff: canSeePeople ? staff : [],
       categories,
       menuItems,
       tables,
