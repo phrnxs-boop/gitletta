@@ -157,11 +157,6 @@ export function StaffLoginPage() {
                 ))
               )}
             </div>
-            <div className="mt-4 text-center">
-              <button onClick={() => window.location.href = '/?view=login'} className="text-xs text-muted-foreground hover:text-primary">
-                Owner login →
-              </button>
-            </div>
           </Card>
         ) : (
           /* PIN entry */
