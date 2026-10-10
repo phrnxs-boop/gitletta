@@ -96,7 +96,12 @@ export function AnalyticsView() {
   const { data } = useApp()
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null)
   const [loading, setLoading] = useState(true)
-  const [range, setRange] = useState<DateRange>(() => ({ from: subDays(new Date(), 6), to: new Date() }))
+  // Defaults to today alone. A single day is what an owner checks during
+  // service; longer windows are one tap away in the presets.
+  const [range, setRange] = useState<DateRange>(() => {
+    const today = new Date()
+    return { from: today, to: today }
+  })
   const [rangeOpen, setRangeOpen] = useState(false)
   const { scrollRef, collapsed } = useScrollCollapse()
 
@@ -284,7 +289,7 @@ export function AnalyticsView() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pt-1 pb-4 md:pb-6 space-y-5">
         {/* KPI cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard icon={IndianRupee} label="Total Revenue" value={loading ? '—' : `${sym}${(analytics?.totalRevenue ?? 0).toFixed(2)}`} sub={`${analytics?.range?.days ?? 0} days`} tint="coral" />
+          <KpiCard icon={IndianRupee} label="Total Revenue" value={loading ? '—' : `${sym}${(analytics?.totalRevenue ?? 0).toFixed(2)}`} sub={`${analytics?.range?.days ?? 0} ${(analytics?.range?.days ?? 0) === 1 ? 'day' : 'days'}`} tint="coral" />
           <KpiCard icon={ClipboardList} label="Total Orders" value={loading ? '—' : String(analytics?.totalOrders ?? 0)} sub="completed" tint="green" />
           <KpiCard icon={ShoppingBag} label="Avg Order" value={loading ? '—' : `${sym}${(analytics?.avgOrder ?? 0).toFixed(2)}`} sub="per transaction" tint="amber" />
           <KpiCard icon={CalendarDays} label="Today's Revenue" value={loading ? '—' : `${sym}${(analytics?.todaysRevenue ?? 0).toFixed(2)}`} sub={`${analytics?.todaysOrders ?? 0} orders today`} change={analytics?.revenueChange} tint="blue" />
