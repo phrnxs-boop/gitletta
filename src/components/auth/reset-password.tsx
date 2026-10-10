@@ -23,6 +23,10 @@ type Stage = 'checking' | 'form' | 'done' | 'invalid' | 'request'
  * a code on the root URL, because Supabase falls back to the project's Site URL
  * when the redirect target is not on the allow list. That means the link works
  * whether or not anyone has configured a redirect URL.
+ *
+ * The form is never shown on the strength of an existing session. updateUser()
+ * acts on whoever is signed in, so doing that would change the password of the
+ * account already in the browser rather than the one the link was issued for.
  */
 export function ResetPasswordView() {
   const [stage, setStage] = useState<Stage>('checking')
@@ -86,11 +90,16 @@ export function ResetPasswordView() {
         return
       }
 
-      // No credentials in the URL: either the link was already used, or someone
-      // opened this page directly to ask for one.
-      const { data: existing } = await supabase.auth.getSession()
+      // No credentials in the URL at all.
+      //
+      // Critically, this does NOT fall back to whatever session the browser
+      // happens to hold. updateUser() changes the password of the signed-in
+      // user, so treating an existing session as permission to show the form
+      // meant that opening this page while signed in as A and following a reset
+      // link meant for B would silently change A's password. A reset must be
+      // backed by a recovery token, which is exactly what is missing here.
       if (cancelled) return
-      setStage(existing?.session ? 'form' : 'request')
+      setStage('request')
     }
 
     run()
