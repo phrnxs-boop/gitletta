@@ -328,7 +328,16 @@ export function StaffDashboard() {
   // request before a parent effect had a chance to run. Setting a module flag
   // is idempotent, so doing it on render is safe.
   setStaffSession(true)
-  useEffect(() => () => setStaffSession(false), [])
+  // Set it again on mount. Under React StrictMode — which this app enables in
+  // development — effects run mount -> cleanup -> mount, so the cleanup below
+  // fires immediately and, with nothing to re-establish it, left the flag false
+  // for the life of the page. In dev that put the staff app back to sending the
+  // owner's bearer whenever an owner session was also open, which is the
+  // shadowing this flag exists to prevent.
+  useEffect(() => {
+    setStaffSession(true)
+    return () => setStaffSession(false)
+  }, [])
   return (
     <AppDataProvider>
       <StaffDashboardInner />
