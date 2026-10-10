@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { edgeFetch } from '@/lib/edge'
 import { createClient } from '@/lib/supabase/client'
 import { Notifications } from '@/components/app/notifications'
+import { GlobalSearch } from '@/components/app/global-search'
 
 export function Header() {
   const { data, setTenantId, refresh } = useApp()
@@ -89,14 +90,7 @@ export function Header() {
 
       <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
         {/* Search — desktop only */}
-        <div className="hidden lg:flex items-center gap-2 bg-secondary/60 rounded-xl px-3 py-2 w-56 xl:w-64">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            placeholder="Search…"
-            className="bg-transparent outline-none text-sm flex-1 placeholder:text-muted-foreground"
-          />
-          <kbd className="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5">⌘K</kbd>
-        </div>
+        <GlobalSearch />
 
         {/* Tenant switcher */}
         <DropdownMenu open={openTenants} onOpenChange={(o) => { setOpenTenants(o); if (o && !tenants) loadTenants() }}>
