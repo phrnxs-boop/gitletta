@@ -8,10 +8,11 @@ import {
   DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Search, Bell, ChevronDown, Building2, Check, Plus, Menu as MenuIcon } from 'lucide-react'
+import { Search, ChevronDown, Building2, Check, Plus, Menu as MenuIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { edgeFetch } from '@/lib/edge'
 import { createClient } from '@/lib/supabase/client'
+import { Notifications } from '@/components/app/notifications'
 
 export function Header() {
   const { data, setTenantId, refresh } = useApp()
@@ -130,10 +131,7 @@ export function Header() {
         </DropdownMenu>
 
         {/* Notifications — hide on small screens to avoid cramping */}
-        <button className="relative h-9 w-9 rounded-xl border border-border bg-secondary/40 hover:bg-secondary items-center justify-center transition-colors hidden sm:flex">
-          <Bell className="h-4 w-4 text-muted-foreground" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary ring-2 ring-background" />
-        </button>
+        <Notifications />
 
         {/* User */}
         <DropdownMenu>
