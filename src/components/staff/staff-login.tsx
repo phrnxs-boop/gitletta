@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Delete, ArrowLeft, Loader2, Lock, Shield, ChevronDown, Check, Store } from 'lucide-react'
+import { Delete, ArrowLeft, Loader2, Lock, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 import { edgeFetch, staffFetch } from '@/lib/edge'
 
@@ -14,7 +14,6 @@ export function StaffLoginPage() {
   const initialTenantSlug = searchParams.get('tenant') || ''
 
   const [tenant, setTenant] = useState<any>(null)
-  const [availableTenants, setAvailableTenants] = useState<any[]>([])
   const [staff, setStaff] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedStaff, setSelectedStaff] = useState<any>(null)
@@ -22,7 +21,6 @@ export function StaffLoginPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [lockedUntil, setLockedUntil] = useState<Date | null>(null)
-  const [tenantSelectorOpen, setTenantSelectorOpen] = useState(false)
 
   const loadTenant = (slugOrId: string) => {
     setLoading(true)
@@ -37,9 +35,6 @@ export function StaffLoginPage() {
         if (data.tenant) {
           setTenant(data.tenant)
           setStaff(data.staff || [])
-        }
-        if (data.availableTenants) {
-          setAvailableTenants(data.availableTenants)
         }
       })
       .catch(() => {
@@ -122,52 +117,11 @@ export function StaffLoginPage() {
             )}
           </div>
 
-          <div className="relative inline-block">
-            <button
-              type="button"
-              onClick={() => availableTenants.length > 1 && setTenantSelectorOpen(!tenantSelectorOpen)}
-              className={cn(
-                'inline-flex items-center gap-1.5 text-xl font-bold rounded-lg px-2 py-0.5 transition-colors',
-                availableTenants.length > 1 ? 'hover:bg-secondary/80 cursor-pointer' : 'cursor-default'
-              )}
-            >
-              <span>{tenant?.name || 'Restaurant'}</span>
-              {availableTenants.length > 1 && (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              )}
-            </button>
-
-            {/* Restaurant switcher popover */}
-            {tenantSelectorOpen && availableTenants.length > 1 && (
-              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-56 rounded-2xl border border-border bg-popover p-1.5 shadow-elevated z-50 animate-in fade-in zoom-in-95">
-                <p className="text-[11px] font-semibold text-muted-foreground px-2 py-1 uppercase tracking-wider">
-                  Select Restaurant
-                </p>
-                <div className="space-y-1">
-                  {availableTenants.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => {
-                        setTenantSelectorOpen(false)
-                        loadTenant(t.slug || t.id)
-                      }}
-                      className={cn(
-                        'flex items-center justify-between w-full px-2.5 py-1.5 rounded-xl text-xs font-medium transition-colors text-left',
-                        t.id === tenant?.id
-                          ? 'bg-primary/10 text-primary font-semibold'
-                          : 'hover:bg-secondary text-foreground'
-                      )}
-                    >
-                      <span className="truncate">{t.name}</span>
-                      {t.id === tenant?.id && <Check className="h-3.5 w-3.5 shrink-0" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
+          {/* The restaurant is fixed. Staff belong to one restaurant, and the
+              page knows which from the ?tenant= link they arrived on, so there
+              is nothing to choose here — and nothing a visitor could switch to
+              reach another restaurant's roster. */}
+          <span className="text-xl font-bold">{tenant?.name || 'Restaurant'}</span>
           {tenant?.tagline && <p className="text-xs text-muted-foreground mt-0.5">{tenant.tagline}</p>}
         </div>
 
@@ -184,27 +138,6 @@ export function StaffLoginPage() {
                   <p className="text-xs text-muted-foreground mb-4">
                     Ask your manager to create an account in Role Access.
                   </p>
-                  {availableTenants.length > 1 && (
-                    <div className="pt-2 border-t border-border/60">
-                      <p className="text-xs text-muted-foreground mb-2">Or switch to another restaurant:</p>
-                      <div className="flex flex-col gap-1.5">
-                        {availableTenants
-                          .filter((t) => t.id !== tenant?.id)
-                          .map((t) => (
-                            <Button
-                              key={t.id}
-                              variant="outline"
-                              size="sm"
-                              className="text-xs justify-start h-8"
-                              onClick={() => loadTenant(t.slug || t.id)}
-                            >
-                              <Store className="h-3.5 w-3.5 mr-1.5 text-primary" />
-                              {t.name}
-                            </Button>
-                          ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               ) : (
                 staff.map(s => (

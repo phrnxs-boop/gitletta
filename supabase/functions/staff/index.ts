@@ -295,18 +295,20 @@ async function loginGet(req: Request): Promise<Response> {
   // signed-in session; the staff-login page is reached via a ?tenant= link.
   if (!tenant) return json(req, { error: "Restaurant not found" }, 404);
 
-  const [staffRes, tenantsRes] = await Promise.all([
+  // Deliberately not the whole tenants table. This endpoint is public, so a
+  // list of every restaurant on the platform is a directory anyone can harvest
+  // — and staff belong to exactly one restaurant, which the page already knows
+  // from the ?tenant= link. The staff roster for THIS tenant is all it returns.
+  const [staffRes] = await Promise.all([
     db
       .from("staff")
       .select("id, name, employee_id, avatar")
       .eq("tenant_id", tenant.id)
       .eq("active", true)
       .order("name", { ascending: true }),
-    db.from("tenants").select("id, name, slug, logo").order("name", { ascending: true }),
   ]);
 
   if (staffRes.error) return json(req, { error: staffRes.error.message }, 500);
-  if (tenantsRes.error) return json(req, { error: tenantsRes.error.message }, 500);
 
   const staff = (staffRes.data ?? []).map((s: any) => ({
     id: s.id,
@@ -324,7 +326,7 @@ async function loginGet(req: Request): Promise<Response> {
       logo: tenant.logo,
     },
     staff,
-    availableTenants: tenantsRes.data ?? [],
+
   });
 }
 
