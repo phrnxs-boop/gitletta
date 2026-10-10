@@ -34,51 +34,42 @@ export function useScrollCollapse(collapseAt = 48, expandAt = 12) {
   }, [])
 
   useEffect(() => {
-    let el: HTMLDivElement | null = null
-    let observer: MutationObserver | null = null
-    let settleTimer: ReturnType<typeof setTimeout> | null = null
+    /**
+     * Listen at the document, and decide from the event's target.
+     *
+     * A single ref is not enough here. Views render both their mobile and their
+     * desktop layout and hide one with CSS, so two scroll containers exist in
+     * the DOM and the ref can only ever point at one of them — and the one it
+     * lands on may well be the hidden pane, which cannot scroll and therefore
+     * never reports a position. The collapse then silently never fires.
+     *
+     * Scroll events do not bubble, but they can be captured on the way down, so
+     * one listener sees every scroll on the page. Anything with no box is a
+     * hidden pane and is ignored.
+     */
     let frame = 0
 
-    const onScroll = () => {
+    const onScroll = (event: Event) => {
+      const target = event.target as HTMLElement | null
+      if (!target || typeof target.scrollTop !== 'number') return
+
+      const rect = target.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) return // a hidden duplicate
+
       if (frame) return
       frame = requestAnimationFrame(() => {
         frame = 0
-        const top = el?.scrollTop ?? 0
+        const top = target.scrollTop
         // Hysteresis: only ever flip once the dead zone has been crossed.
         if (!collapsedRef.current && top > collapseAt) apply(true)
         else if (collapsedRef.current && top < expandAt) apply(false)
       })
     }
 
-    const attach = () => {
-      if (el) return
-      el = scrollRef.current
-      if (!el) return
-      el.addEventListener('scroll', onScroll, { passive: true })
-      apply(el.scrollTop > collapseAt)
-      if (observer) { observer.disconnect(); observer = null }
-      if (settleTimer) { clearTimeout(settleTimer); settleTimer = null }
-    }
-
-    attach()
-
-    // The container may not exist yet when data is still loading. A
-    // MutationObserver is cheap and event-driven, so it replaces the old 50ms
-    // polling loop; it gives up after a few seconds either way.
-    if (!scrollRef.current) {
-      observer = new MutationObserver(attach)
-      observer.observe(document.body, { childList: true, subtree: true })
-      settleTimer = setTimeout(() => {
-        if (observer) { observer.disconnect(); observer = null }
-        settleTimer = null
-      }, 5000)
-    }
-
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true })
     return () => {
       if (frame) cancelAnimationFrame(frame)
-      if (observer) observer.disconnect()
-      if (settleTimer) clearTimeout(settleTimer)
-      if (el) el.removeEventListener('scroll', onScroll)
+      document.removeEventListener('scroll', onScroll, { capture: true })
     }
   }, [collapseAt, expandAt, apply])
 
