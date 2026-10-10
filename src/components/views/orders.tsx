@@ -80,12 +80,13 @@ export function OrdersView() {
   const [deleteOrder, setDeleteOrder] = useState<Order | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  // Deleting is gated on orders.manage. An owner session has no staff record
-  // and therefore every permission; a staff session carries its role's list.
-  // The endpoint enforces this too — this only keeps the button off screens
-  // where the call would be refused anyway.
-  const canManageOrders =
-    !data?.currentStaff || (data?.staffPermissions ?? []).includes('orders.manage')
+  // Deleting is gated on orders.manage. bootstrap reports the caller's
+  // effective permissions — every key for an owner, the role's list for staff —
+  // so this can fail closed. It previously inferred "owner" from the absence of
+  // a staff record, which quietly granted the permission whenever the staff
+  // session was not detected. The endpoint enforces it independently; this only
+  // keeps the button off screens where the call would be refused anyway.
+  const canManageOrders = (data?.permissions ?? []).includes('orders.manage')
 
   const confirmDelete = async () => {
     if (!deleteOrder || !data) return

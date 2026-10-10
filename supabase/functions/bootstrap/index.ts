@@ -4,6 +4,7 @@ import { guard } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
 import { toCamel } from "../_shared/case.ts";
 import { json, preflight } from "../_shared/http.ts";
+import { PERMISSION_KEYS } from "../_shared/permissions.ts";
 
 /**
  * /functions/v1/bootstrap  (GET, dashboard.view)
@@ -156,6 +157,15 @@ Deno.serve(async (req: Request) => {
     // (employee id, avatar) the dashboard shows.
     let currentStaff: any = null;
     let staffPermissions: string[] = [];
+
+    // The caller's effective permissions, regardless of session kind. An owner
+    // holds every permission; a staff member holds their role's list. Exposing
+    // this explicitly matters because previously an owner and a staff member
+    // with nothing granted both arrived as an empty list, so a client could not
+    // tell "can do everything" from "can do nothing" and had to guess — and
+    // guessing wrong is how a restricted role got a delete button.
+    const effectivePermissions: string[] =
+      g.session.kind === "staff" ? [...g.session.permissions] : [...PERMISSION_KEYS];
     if (g.session.kind === "staff") {
       const { data: staffRow } = await db
         .from("staff")
@@ -190,6 +200,7 @@ Deno.serve(async (req: Request) => {
       currentUser,
       currentStaff,
       staffPermissions,
+      permissions: effectivePermissions,
       users,
       roles,
       staff,

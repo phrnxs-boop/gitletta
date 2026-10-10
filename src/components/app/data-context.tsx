@@ -188,6 +188,8 @@ export interface AppData {
     avatar?: string | null
   } | null
   staffPermissions?: string[]
+  /** The caller's effective permissions: every key for an owner, the role's list for staff. */
+  permissions?: string[]
   users: (User & { roleRef?: Role | null })[]
   roles: Role[]
   staff: Staff[]

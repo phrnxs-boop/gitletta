@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { AppDataProvider, useApp } from '@/components/app/data-context'
 import { useStore, type ViewKey } from '@/lib/store'
-import { staffFetch } from '@/lib/edge'
+import { staffFetch, setStaffSession } from '@/lib/edge'
 import { DashboardView } from '@/components/views/dashboard'
 import { OrdersView } from '@/components/views/orders'
 import { MenuView } from '@/components/views/menu'
@@ -319,6 +319,16 @@ function StaffDashboardInner() {
 }
 
 export function StaffDashboard() {
+  // Scope every request on this page to the staff session. Without this, an
+  // owner session in the same browser shadows the staff cookie and the whole
+  // staff app runs with the owner's permissions. See setStaffSession.
+  //
+  // Set during render rather than in an effect: React runs child effects before
+  // parent ones, so AppDataProvider (a child) would fire its first bootstrap
+  // request before a parent effect had a chance to run. Setting a module flag
+  // is idempotent, so doing it on render is safe.
+  setStaffSession(true)
+  useEffect(() => () => setStaffSession(false), [])
   return (
     <AppDataProvider>
       <StaffDashboardInner />

@@ -30,17 +30,40 @@ export async function edgeFetch(path: string, init: RequestInit = {}): Promise<R
   }
 
   // Owner JWT. Imported lazily so this module stays importable on the server.
-  try {
-    const { createClient } = await import('./supabase/client')
-    const {
-      data: { session },
-    } = await createClient().auth.getSession()
-    if (session?.access_token) headers.set('Authorization', `Bearer ${session.access_token}`)
-  } catch {
-    /* no browser session — fall through to the staff token */
+  // Skipped entirely on a staff page, so the staff cookie is what authorises
+  // the request rather than an owner session that happens to be in the browser.
+  if (!staffSession) {
+    try {
+      const { createClient } = await import('./supabase/client')
+      const {
+        data: { session },
+      } = await createClient().auth.getSession()
+      if (session?.access_token) headers.set('Authorization', `Bearer ${session.access_token}`)
+    } catch {
+      /* no browser session — fall through to the staff token */
+    }
   }
 
   return fetch(toEdgeUrl(path), { ...init, headers, credentials: 'include' })
+}
+
+/**
+ * Whether this page is a staff session.
+ *
+ * The owner's Supabase session and a staff session can both exist in the same
+ * browser — an owner testing their own staff login does exactly that. When they
+ * do, `guard()` resolves the owner first, so a request carrying the owner's
+ * bearer is authorised as the owner no matter which staff member is signed in.
+ * That is how a role without orders.manage was able to delete orders: the
+ * request was never the staff member's at all.
+ *
+ * The staff app turns this on while it is mounted, so its requests carry only
+ * the staff cookie and are authorised as the staff member.
+ */
+let staffSession = false
+
+export function setStaffSession(active: boolean): void {
+  staffSession = active
 }
 
 /**
