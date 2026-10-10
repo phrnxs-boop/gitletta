@@ -68,6 +68,35 @@ const PAYMENT_METHODS = [
   { value: 'WALLET', label: 'Wallet', icon: Wallet },
 ] as const
 
+/**
+ * When an order was placed, in the terms someone reading the board uses:
+ * "Today", "Yesterday", then a date.
+ *
+ * The cards showed a bare time, so 07:31 AM today and 09:44 PM three days ago
+ * looked identical — you could not tell how old a ticket was without opening
+ * it. Anything older than yesterday gets its date; today and yesterday are
+ * named, which is what the person scanning the list is actually asking.
+ */
+function orderWhen(iso: string, opts: { weekday?: boolean } = {}): string {
+  const d = new Date(iso)
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  const startOfYesterday = new Date(startOfToday)
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1)
+
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  if (d >= startOfToday) return `Today · ${time}`
+  if (d >= startOfYesterday) return `Yesterday · ${time}`
+
+  const date = d.toLocaleDateString(
+    [],
+    opts.weekday
+      ? { weekday: 'short', day: 'numeric', month: 'short' }
+      : { day: 'numeric', month: 'short' },
+  )
+  return `${date} · ${time}`
+}
+
 export function OrdersView() {
   const { data, refresh } = useApp()
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -480,13 +509,7 @@ export function OrdersView() {
                   </div>
                 </DialogTitle>
                 <DialogDescription>
-                  {new Date(viewOrder.createdAt).toLocaleString([], {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {orderWhen(viewOrder.createdAt, { weekday: true })}
                   {viewOrder.completedAt && (
                     <span className="text-muted-foreground"> · Completed {new Date(viewOrder.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   )}
@@ -688,12 +711,9 @@ function OrderCard({
             {where}
             {who && <span className="text-foreground/70">· {who}</span>}
           </span>
-          <span className="inline-flex items-center gap-1 text-muted-foreground">
+          <span className="inline-flex items-center gap-1 whitespace-nowrap text-muted-foreground">
             <Clock className="h-3 w-3" />
-            {new Date(order.createdAt).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            {orderWhen(order.createdAt)}
           </span>
         </div>
       </div>
