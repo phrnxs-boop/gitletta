@@ -66,14 +66,27 @@ function jsonWithCookie(req: Request, data: unknown, setCookie: string, status =
   return res;
 }
 
+/**
+ * The staff session cookie.
+ *
+ * `Partitioned` is load-bearing, not decoration. This cookie is issued by
+ * supabase.co while the app runs on its own origin, which makes it a third-party
+ * cookie — and browsers that block third-party cookies then refuse to store it
+ * at all. The login would succeed, the session row would be written, and the
+ * next request would arrive with no cookie and get a 401, sending staff back to
+ * the name list. Partitioned cookies (CHIPS) are stored even then, scoped to the
+ * site the user is actually on.
+ *
+ * HttpOnly stays: the token is never readable from JavaScript.
+ */
 function sessionCookie(token: string): string {
   return `${STAFF_COOKIE}=${encodeURIComponent(token)}; HttpOnly; Path=/; Max-Age=${
     SESSION_HOURS * 60 * 60
-  }; SameSite=None; Secure`;
+  }; SameSite=None; Secure; Partitioned`;
 }
 
 function clearCookie(): string {
-  return `${STAFF_COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=None; Secure`;
+  return `${STAFF_COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=None; Secure; Partitioned`;
 }
 
 // ---------------------------------------------------------------------------
