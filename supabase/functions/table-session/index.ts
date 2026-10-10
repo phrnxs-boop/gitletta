@@ -116,6 +116,36 @@ async function validateTableSession(params: {
     };
   }
 
+  // Idle timeout.
+  //
+  // The menu polls this endpoint every 1.5s while it is open, so a session we
+  // have not heard from in a while means the diner closed it — closing a tab
+  // sends no request of its own, and without this the session stayed ACTIVE
+  // until the six-hour age cap, showing up on the POS as a table that was not
+  // in service. Silence now ends it, so nothing needs clearing by hand.
+  const IDLE_MS = 10 * 60 * 1000;
+  const lastSeen = new Date(row.last_seen_at ?? row.created_at).getTime();
+  if (Date.now() - lastSeen > IDLE_MS) {
+    await admin()
+      .from("table_sessions")
+      .update({ status: "ENDED", ended_at: new Date().toISOString() })
+      .eq("id", row.id);
+    return {
+      ok: false,
+      error: "Session ended. Please scan the table QR code again to continue.",
+      status: 403,
+    };
+  }
+
+  // Record the heartbeat, but only when it has gone stale. Writing on every
+  // poll would be a row update per diner per 1.5s for no extra information.
+  if (Date.now() - lastSeen > 20_000) {
+    await admin()
+      .from("table_sessions")
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq("id", row.id);
+  }
+
   const data = shape(row);
   if (!data.table || !data.table.active) {
     return { ok: false, error: "This table is no longer available.", status: 403 };
@@ -133,6 +163,8 @@ async function activateTableSession(params: { qrToken: string; deviceFp?: string
       status: 400,
     };
   }
+
+  await admin().rpc("expire_stale_table_sessions");
 
   const { data, error } = await admin().rpc("start_table_session", {
     p_qr_token: qrToken,
@@ -350,6 +382,11 @@ async function active(req: Request): Promise<Response> {
   const g = await guard(req, { permission: "tables.view" });
   if (!g.ok) return g.response;
   const tenantId = g.session.tenantId;
+
+  // Clear anything abandoned before reporting. A session whose menu was closed
+  // stops heartbeating but is never revisited, so without this the board keeps
+  // listing tables that are not in service until the six-hour cap.
+  await admin().rpc("expire_stale_table_sessions");
 
   const { data, error } = await admin()
     .from("table_sessions")
