@@ -275,7 +275,23 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [tenantId, setTenantIdState] = useState<string | null>(null)
   const [sessionRevision, setSessionRevision] = useState(0)
+  // Seeded from the loaded data so an order fetched on first load is not
+  // announced as new afterwards.
+  useEffect(() => {
+    if (!data?.orders) return
+    for (const o of data.orders) knownOrderIds.current.add(o.id)
+  }, [data])
   const recentNotifiedIds = useRef<Set<string>>(new Set())
+  /**
+   * Ids we have already been told about.
+   *
+   * Brand-newness cannot be decided inside the setData updater — React may run
+   * that later, or twice — so it is tracked here, before the state call. Without
+   * it the toast fired for any order the caller flagged, including an order the
+   * user had just touched: tapping "Start Preparing" changed the status, the next
+   * delta sync returned the same order, and the board announced it as new.
+   */
+  const knownOrderIds = useRef<Set<string>>(new Set())
   const lastSyncTimeRef = useRef<string>(new Date().toISOString())
 
   const refresh = useCallback(async () => {
@@ -308,7 +324,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const addOrUpdateOrder = useCallback((order: Order, shouldNotify: boolean = false) => {
     if (!order || !order.id) return
 
-    let isBrandNew = false
+    // Decided before the state call, so it reflects what we knew a moment ago.
+    const isBrandNew = !knownOrderIds.current.has(order.id)
+    if (isBrandNew) knownOrderIds.current.add(order.id)
 
     setData((prev) => {
       if (!prev) return prev
@@ -320,7 +338,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         nextOrders[existingIdx] = { ...nextOrders[existingIdx], ...order }
       } else {
         // Prepend brand new order
-        isBrandNew = true
         nextOrders = [order, ...prev.orders]
       }
 
@@ -358,8 +375,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    // If new order arrived, trigger audio chime and toast notification
-    if (shouldNotify && !recentNotifiedIds.current.has(order.id)) {
+    // Only a genuinely new order is announced. A status change is not news, and
+    // the delta sync flags every order it carries.
+    if (isBrandNew && shouldNotify && !recentNotifiedIds.current.has(order.id)) {
       recentNotifiedIds.current.add(order.id)
       setTimeout(() => recentNotifiedIds.current.delete(order.id), 60000)
 
