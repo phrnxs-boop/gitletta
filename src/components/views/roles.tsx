@@ -109,7 +109,7 @@ export function RolesView() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className={cn(
-        'px-3.5 md:px-6 flex items-center justify-between gap-3 flex-wrap transition-all duration-200 ease-out',
+        'px-3.5 md:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 transition-all duration-200 ease-out',
         collapsed ? 'pt-1.5 pb-1.5' : 'pt-3 md:pt-6 pb-2.5',
       )}>
         <div>
@@ -127,35 +127,40 @@ export function RolesView() {
             <p className="text-sm text-muted-foreground mt-0.5">Manage staff roles and granular permissions</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Tab toggle: Roles & Permissions vs Staff Accounts */}
-          <div className="inline-flex rounded-xl bg-secondary/50 border border-border p-0.5">
+        {/* Tabs and the action button stack on phones. Side by side they cannot
+            both fit at 390px — the tab labels are nowrap, so the row overran the
+            viewport and the button was clipped rather than wrapped. */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          {/* Tab toggle: Roles & Permissions vs Staff Accounts.
+              flex-1 on phones so the pair shares the row with the button rather
+              than wrapping its labels onto two lines. */}
+          <div className="inline-flex flex-1 sm:flex-none rounded-xl bg-secondary/50 border border-border p-0.5">
             <button
               onClick={() => setActiveTab('roles')}
               className={cn(
-                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-premium',
+                'flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-premium',
                 activeTab === 'roles' ? 'bg-primary text-white shadow-glow-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <Shield className="h-3.5 w-3.5" /> Roles & Permissions
+              <Shield className="h-3.5 w-3.5 shrink-0" /> Roles & Permissions
             </button>
             <button
               onClick={() => setActiveTab('staff')}
               className={cn(
-                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-premium',
+                'flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-premium',
                 activeTab === 'staff' ? 'bg-primary text-white shadow-glow-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <Users className="h-3.5 w-3.5" /> Staff Accounts
+              <Users className="h-3.5 w-3.5 shrink-0" /> Staff Accounts
             </button>
           </div>
           {activeTab === 'roles' ? (
-            <Button onClick={() => setCreateOpen(true)} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => setCreateOpen(true)} className="bg-primary hover:bg-primary/90 shrink-0 whitespace-nowrap w-full sm:w-auto">
               <Plus className="h-4 w-4" />
               Create Role
             </Button>
           ) : (
-            <Button onClick={() => setStaffCreateOpen(true)} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => setStaffCreateOpen(true)} className="bg-primary hover:bg-primary/90 shrink-0 whitespace-nowrap w-full sm:w-auto">
               <UserPlus className="h-4 w-4" />
               Add Staff
             </Button>
@@ -166,7 +171,11 @@ export function RolesView() {
       {/* Top stats — collapse away to free up vertical room when scrolled */}
       <div className={cn(
         'overflow-hidden transition-all duration-200 ease-out px-3.5 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3',
-        collapsed ? 'max-h-0 opacity-0 pb-0' : 'max-h-32 opacity-100 pb-3',
+        // The expanded height has to clear the tallest layout this grid takes.
+        // It is one row from md up (four columns, ~128px), but two rows on a
+        // phone (two columns, ~192px) — and a single max-h-32 cut the second row
+        // in half, which read as the role chips sitting on top of the cards.
+        collapsed ? 'max-h-0 opacity-0 pb-0' : 'max-h-[13rem] md:max-h-32 opacity-100 pb-3',
       )}>
         <StatCard icon={<Shield className="h-4 w-4" />} label="Total Roles" value={roles.length} tint="#f97316" />
         <StatCard icon={<ShieldCheck className="h-4 w-4" />} label="System Roles" value={systemCount} tint="#4ade80" />
@@ -179,8 +188,9 @@ export function RolesView() {
       <div className="flex-1 min-h-0 overflow-hidden px-3.5 md:px-6 pb-4 md:pb-6">
         {/* Mobile: horizontal scrollable role pills + detail below */}
         <div className="lg:hidden flex flex-col gap-3 h-full min-h-0">
-          <div className="shrink-0 -mx-1 px-1 overflow-x-auto scrollbar-thin">
-            <div className="flex gap-2 pb-1 w-max min-w-full">
+          {/* Scrolls on its own, so a long role list never widens the page. */}
+          <div className="shrink-0 -mx-3.5 px-3.5 overflow-x-auto overscroll-x-contain scrollbar-thin">
+            <div className="flex gap-2 py-1 w-max min-w-full">
               {roles.map((role) => {
                 const active = role.id === (selectedRole?.id ?? null)
                 return (
