@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useApp, type Order } from '@/components/app/data-context'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { BillDialog } from '@/components/shared/bill-dialog'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
 import { edgeFetch } from '@/lib/edge'
@@ -98,6 +99,7 @@ function orderWhen(iso: string, opts: { weekday?: boolean } = {}): string {
 }
 
 export function OrdersView() {
+  const t = useT()
   const { data, refresh } = useApp()
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
@@ -254,7 +256,7 @@ export function OrdersView() {
                   : 'max-h-8 opacity-100',
               )}
             >
-              Manage and track every order across your restaurant.
+              {t('orders.title')}
             </p>
           </div>
           <div
@@ -327,7 +329,7 @@ export function OrdersView() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by order # or customer…"
+                placeholder={t('orders.search')}
                 className="bg-transparent outline-none text-sm flex-1 placeholder:text-muted-foreground"
               />
               {search && (
@@ -357,7 +359,7 @@ export function OrdersView() {
         {filtered.length === 0 ? (
           <EmptyState
             icon={Inbox}
-            title="No orders found"
+            title={t('orders.noOrders')}
             description="Adjust your filters or check back later."
           />
         ) : (
@@ -391,7 +393,7 @@ export function OrdersView() {
       <Dialog open={!!payOrder} onOpenChange={(o) => !o && setPayOrder(null)}>
         <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto scrollbar-thin">
           <DialogHeader>
-            <DialogTitle>Complete & Pay</DialogTitle>
+            <DialogTitle>{t('orders.complete')}</DialogTitle>
             <DialogDescription>
               {payOrder
                 ? `Order #${payOrder.orderNumber} · ${cs}${payOrder.total.toFixed(2)}`
@@ -627,7 +629,7 @@ export function OrdersView() {
               className="bg-destructive text-white hover:bg-destructive/90"
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              {deleting ? 'Deleting…' : 'Delete order'}
+              {deleting ? 'Deleting…' : t('orders.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -661,6 +663,7 @@ function OrderCard({
   onUpdate: (next: string) => void
   onPay: () => void
 }) {
+  const t = useT()
   const action = actionForStatus(order.status)
 
   const where =
@@ -779,7 +782,7 @@ function OrderCard({
               ) : (
                 action.icon && <action.icon className="h-4 w-4 mr-2" />
               )}
-              {action.label}
+              {t(action.label)}
             </Button>
             <Button variant="outline" size="sm" onClick={onView} className="shrink-0">
               <Eye className="h-4 w-4" />
@@ -905,6 +908,8 @@ function EmptyState({
   )
 }
 
+// `label` is a dictionary key, not prose, so the caller resolves it in the
+// language the restaurant has chosen.
 function actionForStatus(status: string): {
   label: string
   nextStatus?: string
@@ -913,13 +918,13 @@ function actionForStatus(status: string): {
 } | null {
   switch (status) {
     case 'PENDING':
-      return { label: 'Start Preparing', nextStatus: 'PREPARING', icon: ChefHat }
+      return { label: 'orders.start', nextStatus: 'PREPARING', icon: ChefHat }
     case 'PREPARING':
-      return { label: 'Mark Ready', nextStatus: 'READY', icon: CheckCircle2 }
+      return { label: 'orders.ready', nextStatus: 'READY', icon: CheckCircle2 }
     case 'READY':
-      return { label: 'Mark Served', nextStatus: 'SERVED', icon: Utensils }
+      return { label: 'orders.served', nextStatus: 'SERVED', icon: Utensils }
     case 'SERVED':
-      return { label: 'Complete & Pay', nextStatus: 'COMPLETED', icon: CreditCard }
+      return { label: 'orders.complete', nextStatus: 'COMPLETED', icon: CreditCard }
     case 'COMPLETED':
     case 'CANCELLED':
     default:

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { useApp } from '@/components/app/data-context'
+import { useT } from '@/lib/i18n'
 import { useStore } from '@/lib/store'
 import { edgeFetch } from '@/lib/edge'
 import { cn } from '@/lib/utils'
@@ -15,6 +16,7 @@ import { Search, Plus, Minus, Trash2, ShoppingBag, X, Check, CreditCard, Ticket,
 import { toast } from 'sonner'
 
 export function DashboardView() {
+  const tr = useT()
   const { data, refresh, sessionRevision } = useApp()
   const { cart, addToCart, updateCartQty, removeFromCart, setCartNotes, clearCart, orderType, setOrderType, selectedTableId, setSelectedTableId, promoCode, setPromoCode } = useStore()
   const [activeCat, setActiveCat] = useState<string>('all')
@@ -94,8 +96,8 @@ export function DashboardView() {
     )
     if (!found) {
       setAppliedPromo(null)
-      setPromoError('Invalid or expired promo code')
-      toast.error('Invalid promo code')
+      setPromoError(tr('pos.promoInvalid'))
+      toast.error(tr('pos.promoInvalid'))
       return
     }
     // check usage limit
@@ -108,8 +110,8 @@ export function DashboardView() {
     // check expiry
     if (found.validTo && new Date(found.validTo) < new Date()) {
       setAppliedPromo(null)
-      setPromoError('Promo code has expired')
-      toast.error('Promo code has expired')
+      setPromoError(tr('pos.promoExpired'))
+      toast.error(tr('pos.promoExpired'))
       return
     }
     if (subtotal < found.minOrder) {
@@ -277,11 +279,11 @@ export function DashboardView() {
               collapsed ? 'opacity-0 scale-90 pointer-events-none' : 'opacity-100 scale-100'
             )}>
               <div className="rounded-xl bg-secondary/40 border border-border px-3 py-1.5">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Today</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{tr('pos.today')}</p>
                 <p className="text-sm font-bold">{tenant.currencySymbol}{(data?.summary.revenue ?? 0).toFixed(0)}</p>
               </div>
               <div className="rounded-xl bg-secondary/40 border border-border px-3 py-1.5">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Active</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{tr('pos.active')}</p>
                 <p className="text-sm font-bold">{data?.summary.activeOrders ?? 0}</p>
               </div>
             </div>
@@ -295,7 +297,7 @@ export function DashboardView() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search for food, coffee, etc…"
+              placeholder={tr('pos.search')}
               className="bg-transparent outline-none text-sm flex-1 placeholder:text-muted-foreground min-w-0"
             />
             {search && <button onClick={() => setSearch('')} className="shrink-0"><X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" /></button>}
@@ -306,7 +308,7 @@ export function DashboardView() {
         <div className="px-3.5 md:px-6 pb-3">
           <div className="w-full overflow-x-auto scrollbar-thin -mx-1 px-1">
             <div className="flex gap-2 w-max pb-1">
-              <CategoryPill active={activeCat === 'all'} onClick={() => setActiveCat('all')} icon="🍴" label="All" count={menuItems.length} />
+              <CategoryPill active={activeCat === 'all'} onClick={() => setActiveCat('all')} icon="🍴" label={tr('pos.all')} count={menuItems.length} />
               {categories.map((c) => (
                 <CategoryPill
                   key={c.id}
@@ -335,7 +337,7 @@ export function DashboardView() {
             ))}
             {filtered.length === 0 && (
               <div className="col-span-full py-16 text-center text-muted-foreground">
-                <p className="text-sm">No items found</p>
+                <p className="text-sm">{tr('pos.noItems')}</p>
               </div>
             )}
           </div>
@@ -344,7 +346,7 @@ export function DashboardView() {
           <div className="mt-8">
             <div className="mb-3 flex items-center gap-2">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Active Sessions
+                {tr('pos.sessions')}
               </h3>
               {sessions.length > 0 && (
                 <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
@@ -355,7 +357,7 @@ export function DashboardView() {
 
             {sessions.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                No tables are currently in session.
+                {tr('pos.noSessions')}
               </p>
             ) : (
               <div className="flex gap-3 overflow-x-auto scrollbar-thin pb-2">
@@ -386,7 +388,7 @@ export function DashboardView() {
                         <Clock className="size-3.5" />
                         <span>open {sessionAge(group)}</span>
                         <span className="opacity-40">·</span>
-                        <span>{orderCount === 0 ? 'no order yet' : `${orderCount} order${orderCount === 1 ? '' : 's'}`}</span>
+                        <span>{orderCount === 0 ? tr('pos.noOrderYet') : `${orderCount} order${orderCount === 1 ? '' : 's'}`}</span>
                       </div>
 
                       <Button
@@ -397,7 +399,7 @@ export function DashboardView() {
                         className="h-8 w-full text-xs"
                       >
                         <LogOut className="mr-1.5 size-3.5" />
-                        {endingTable === group.tableId ? 'Ending…' : 'End session'}
+                        {endingTable === group.tableId ? 'Ending…' : tr('pos.endSession')}
                       </Button>
                     </div>
                   )
@@ -459,7 +461,7 @@ export function DashboardView() {
       <Sheet open={cartOpen} onOpenChange={setCartOpen}>
         <SheetContent side="right" className="w-full sm:w-[420px] p-0 bg-card overflow-hidden flex flex-col">
           <SheetHeader className="px-4 pt-4 pb-2 shrink-0 border-b border-border">
-            <SheetTitle>Order Cart</SheetTitle>
+            <SheetTitle>{tr('pos.cart')}</SheetTitle>
           </SheetHeader>
           <CartPanel
             embedded
@@ -628,6 +630,7 @@ interface CartPanelProps {
 }
 
 function CartPanel(p: CartPanelProps) {
+  const tr = useT()
   const { embedded } = p
   return (
     <div className={cn('flex flex-col h-full min-h-0 flex-1', embedded && 'overflow-hidden')}>
@@ -645,14 +648,14 @@ function CartPanel(p: CartPanelProps) {
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
               )}
             >
-              {t === 'DINE_IN' ? '🍽️ Dine In' : t === 'TAKEAWAY' ? '🥡 Takeaway' : '🛵 Delivery'}
+              {t === 'DINE_IN' ? `🍽️ ${tr('pos.dineIn')}` : t === 'TAKEAWAY' ? `🥡 ${tr('pos.takeaway')}` : `🛵 ${tr('pos.delivery')}`}
             </button>
           ))}
         </div>
         {p.orderType === 'DINE_IN' ? (
           <Select value={p.selectedTableId || ''} onValueChange={(v) => p.setSelectedTableId(v)}>
             <SelectTrigger className="bg-secondary/50 border-0 h-9">
-              <SelectValue placeholder="Select table" />
+              <SelectValue placeholder={tr('pos.selectTable')} />
             </SelectTrigger>
             <SelectContent>
               {p.tables.map((t) => (
@@ -685,8 +688,8 @@ function CartPanel(p: CartPanelProps) {
             <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-3">
               <ShoppingBag className="h-7 w-7 text-muted-foreground" />
             </div>
-            <p className="text-sm font-medium">No items yet</p>
-            <p className="text-xs text-muted-foreground mt-1">Tap menu items to add them</p>
+            <p className="text-sm font-medium">{tr('pos.cartEmpty')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{tr('pos.cartHint')}</p>
           </div>
         ) : (
           <div className="space-y-3 py-4">
@@ -758,26 +761,26 @@ function CartPanel(p: CartPanelProps) {
               value={p.promoCode}
               onChange={(e) => { p.setPromoCode(e.target.value.toUpperCase()); if (p.promoError) { /* clear handled in parent */ } }}
               onKeyDown={(e) => { if (e.key === 'Enter') p.onApplyPromo() }}
-              placeholder="Promo code"
+              placeholder={tr('pos.promo')}
               className="flex-1 bg-secondary/60 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-muted-foreground uppercase min-w-0"
             />
-            <Button variant="secondary" size="sm" onClick={p.onApplyPromo} className="h-8">Apply</Button>
+            <Button variant="secondary" size="sm" onClick={p.onApplyPromo} className="h-8">{tr('pos.apply')}</Button>
           </div>
         )}
         {p.promoError && !p.appliedPromo && (
           <p className="text-xs text-destructive">{p.promoError}</p>
         )}
         <div className="space-y-1 text-xs">
-          <Row label={`Sub total`} value={`${p.currencySymbol}${p.subtotal.toFixed(2)}`} />
+          <Row label={tr('pos.subtotal')} value={`${p.currencySymbol}${p.subtotal.toFixed(2)}`} />
           {p.discount > 0 && (
             <Row label={`Discount`} value={`−${p.currencySymbol}${p.discount.toFixed(2)}`} muted className="text-primary" />
           )}
-          <Row label={`Tax (${p.taxRate}%)`} value={`${p.currencySymbol}${p.tax.toFixed(2)}`} muted />
-          <Row label={`Service (${p.serviceRate}%)`} value={`${p.currencySymbol}${p.service.toFixed(2)}`} muted />
+          <Row label={`${tr('pos.tax')} (${p.taxRate}%)`} value={`${p.currencySymbol}${p.tax.toFixed(2)}`} muted />
+          <Row label={`${tr('pos.service')} (${p.serviceRate}%)`} value={`${p.currencySymbol}${p.service.toFixed(2)}`} muted />
         </div>
         <Separator />
         <div className="flex justify-between items-center">
-          <span className="text-xs font-medium text-muted-foreground">Total</span>
+          <span className="text-xs font-medium text-muted-foreground">{tr('pos.total')}</span>
           <span className="text-2xl font-bold tracking-tight text-gradient-primary">{p.currencySymbol}{p.total.toFixed(2)}</span>
         </div>
         <Button
@@ -788,7 +791,7 @@ function CartPanel(p: CartPanelProps) {
           {p.submitting ? (
             <><span className="animate-spin mr-2">⏳</span> Placing order…</>
           ) : (
-            <><CreditCard className="h-4 w-4 mr-2" /> Continue to Payment · {p.currencySymbol}{p.total.toFixed(2)}</>
+            <><CreditCard className="h-4 w-4 mr-2" /> {tr('pos.checkout')} · {p.currencySymbol}{p.total.toFixed(2)}</>
           )}
         </Button>
       </div>

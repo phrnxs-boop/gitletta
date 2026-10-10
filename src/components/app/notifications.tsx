@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useApp } from '@/components/app/data-context'
 import { useStore } from '@/lib/store'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
@@ -59,6 +60,7 @@ function ago(at: number): string {
 export function Notifications() {
   const { data } = useApp()
   const { setView } = useStore()
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [seenAt, setSeenAt] = useState<number>(() => {
     if (typeof window === 'undefined') return 0
@@ -183,7 +185,7 @@ export function Notifications() {
         className="w-[min(360px,calc(100vw-1rem))] p-0 bg-card border-border"
       >
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
-          <span className="text-sm font-semibold">Notifications</span>
+          <span className="text-sm font-semibold">{t('notifications.title')}</span>
           {notices.length > 0 && (
             <Badge variant="secondary" className="bg-secondary/70 text-[10px]">{notices.length}</Badge>
           )}
@@ -192,7 +194,7 @@ export function Notifications() {
         {notices.length === 0 ? (
           <div className="px-3 py-8 text-center">
             <Inbox className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">You&apos;re all caught up.</p>
+            <p className="text-sm text-muted-foreground">{t('notifications.empty')}</p>
           </div>
         ) : (
           <div className="max-h-[min(420px,60vh)] overflow-y-auto overscroll-contain scrollbar-thin">

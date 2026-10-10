@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '@/components/app/data-context'
 import { useStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { Search, ClipboardList, BookOpen, Table2, LayoutGrid, BarChart3, QrCode, Ticket, Users, ShieldCheck, Settings, CornerDownLeft } from 'lucide-react'
 
 interface Hit {
@@ -41,6 +42,7 @@ const PAGES: Hit[] = [
 export function GlobalSearch() {
   const { data } = useApp()
   const { setView } = useStore()
+  const t = useT()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -135,8 +137,8 @@ export function GlobalSearch() {
           onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          placeholder="Search orders, dishes…"
-          aria-label="Search orders, dishes and pages"
+          placeholder={t('search.placeholder')}
+          aria-label={t('search.label')}
           className="bg-transparent outline-none text-sm flex-1 min-w-0 placeholder:text-muted-foreground"
         />
         <kbd className="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
@@ -180,7 +182,7 @@ export function GlobalSearch() {
 
       {open && query.trim() && hits.length === 0 && (
         <div className="absolute right-0 top-full mt-2 w-[340px] rounded-xl border border-border bg-card shadow-2xl p-6 text-center z-50">
-          <p className="text-sm text-muted-foreground">Nothing matches “{query.trim()}”.</p>
+          <p className="text-sm text-muted-foreground">{t('search.nothing')} “{query.trim()}”.</p>
         </div>
       )}
     </div>

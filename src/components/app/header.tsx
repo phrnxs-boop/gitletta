@@ -14,9 +14,11 @@ import { edgeFetch } from '@/lib/edge'
 import { createClient } from '@/lib/supabase/client'
 import { Notifications } from '@/components/app/notifications'
 import { GlobalSearch } from '@/components/app/global-search'
+import { useT } from '@/lib/i18n'
 
 export function Header() {
   const { data, setTenantId, refresh } = useApp()
+  const t = useT()
   const { view, setSidebarOpen, setView, setSettingsTab } = useStore()
   const [tenants, setTenants] = useState<any[] | null>(null)
   const [openTenants, setOpenTenants] = useState(false)

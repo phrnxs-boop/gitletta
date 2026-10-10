@@ -26,6 +26,7 @@ import {
   Settings, Store, SlidersHorizontal, CreditCard, AlertTriangle, Save, Building2, MapPin, Phone, Mail, Globe, Clock, Trash2, Check, Sparkles, User, Palette, Bell, Lock, KeyRound, Smartphone, Moon, Sun, Languages, ShieldCheck, ChevronDown, FileText, Star, ExternalLink, RefreshCw, MessageSquare, Send, Instagram, Facebook, Youtube,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { LANGUAGES } from '@/lib/i18n'
 
 const CURRENCIES = [
   { code: 'INR', symbol: '₹' },
@@ -532,16 +533,9 @@ export function SettingsView() {
                     <Select value={prefs.language} onValueChange={(v) => setPrefs(p => ({ ...p, language: v }))}>
                       <SelectTrigger className="bg-secondary/50 border-border w-32 shrink-0"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="en">English</SelectItem>
-                        <SelectItem value="hi">हिन्दी (Hindi)</SelectItem>
-                        <SelectItem value="bn">বাংলা (Bengali)</SelectItem>
-                        <SelectItem value="ta">தமிழ் (Tamil)</SelectItem>
-                        <SelectItem value="te">తెలుగు (Telugu)</SelectItem>
-                        <SelectItem value="mr">मराठी (Marathi)</SelectItem>
-                        <SelectItem value="gu">ગુજરાતી (Gujarati)</SelectItem>
-                        <SelectItem value="kn">ಕನ್ನಡ (Kannada)</SelectItem>
-                        <SelectItem value="ml">മലയാളം (Malayalam)</SelectItem>
-                        <SelectItem value="pa">ਪੰਜਾਬੀ (Punjabi)</SelectItem>
+                        {LANGUAGES.map((l) => (
+                          <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

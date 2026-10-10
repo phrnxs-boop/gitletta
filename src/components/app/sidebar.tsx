@@ -9,6 +9,7 @@ import {
   LogOut, UtensilsCrossed,
 } from 'lucide-react'
 import { edgeFetch } from '@/lib/edge'
+import { useT } from '@/lib/i18n'
 import { createClient } from '@/lib/supabase/client'
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -17,20 +18,24 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
 
+// label and desc are dictionary keys, resolved at render so the sidebar
+// follows the chosen language. `short` stays literal: it is a compact rail
+// label, not prose.
 const NAV: { key: ViewKey; label: string; short: string; icon: any; desc: string }[] = [
-  { key: 'dashboard', label: 'POS Dashboard', short: 'POS', icon: LayoutGrid, desc: 'Take new orders' },
-  { key: 'orders', label: 'Orders', short: 'Orders', icon: ClipboardList, desc: 'Manage active orders' },
-  { key: 'analytics', label: 'Analytics', short: 'Stats', icon: BarChart3, desc: 'Revenue & insights' },
-  { key: 'menu', label: 'Menu', short: 'Menu', icon: BookOpen, desc: 'Manage dishes' },
-  { key: 'qr', label: 'QR Codes', short: 'QR', icon: QrCode, desc: 'Table QR codes' },
-  { key: 'promos', label: 'Promo Codes', short: 'Promos', icon: Ticket, desc: 'Discounts & coupons' },
-  { key: 'roles', label: 'Role Access', short: 'Roles', icon: Users, desc: 'Staff & permissions' },
-  { key: 'security', label: 'Security', short: 'Secure', icon: ShieldCheck, desc: 'Sessions & logs' },
-  { key: 'settings', label: 'Settings', short: 'Settings', icon: Settings, desc: 'Restaurant config' },
+  { key: 'dashboard', label: 'nav.dashboard', short: 'POS', icon: LayoutGrid, desc: 'nav.dashboard.desc' },
+  { key: 'orders', label: 'nav.orders', short: 'Orders', icon: ClipboardList, desc: 'nav.orders.desc' },
+  { key: 'analytics', label: 'nav.analytics', short: 'Stats', icon: BarChart3, desc: 'nav.analytics.desc' },
+  { key: 'menu', label: 'nav.menu', short: 'Menu', icon: BookOpen, desc: 'nav.menu.desc' },
+  { key: 'qr', label: 'nav.qr', short: 'QR', icon: QrCode, desc: 'nav.qr.desc' },
+  { key: 'promos', label: 'nav.promos', short: 'Promos', icon: Ticket, desc: 'nav.promos.desc' },
+  { key: 'roles', label: 'nav.roles', short: 'Roles', icon: Users, desc: 'nav.roles.desc' },
+  { key: 'security', label: 'nav.security', short: 'Secure', icon: ShieldCheck, desc: 'nav.security.desc' },
+  { key: 'settings', label: 'nav.settings', short: 'Settings', icon: Settings, desc: 'nav.settings.desc' },
 ]
 
 export function Sidebar() {
   const { view, setView } = useStore()
+  const t = useT()
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -52,7 +57,7 @@ export function Sidebar() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setView(item.key)}
-                    aria-label={item.label}
+                    aria-label={t(item.label)}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
                       'group relative flex h-11 w-11 items-center justify-center rounded-xl transition-premium',
@@ -68,7 +73,7 @@ export function Sidebar() {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="font-medium">
-                  {item.label}
+                  {t(item.label)}
                 </TooltipContent>
               </Tooltip>
             )
@@ -113,6 +118,7 @@ export function Sidebar() {
 /** Main menu hamburger side panel — left drawer with all views */
 export function MobileMoreSheet() {
   const { view, setView, sidebarOpen, setSidebarOpen } = useStore()
+  const t = useT()
   const { data } = useApp()
   return (
     <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
@@ -146,8 +152,8 @@ export function MobileMoreSheet() {
                   <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.5 : 2} />
                 </span>
                 <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-medium truncate">{item.label}</span>
-                  <span className="block text-[11px] text-muted-foreground truncate">{item.desc}</span>
+                  <span className="block text-sm font-medium truncate">{t(item.label)}</span>
+                  <span className="block text-[11px] text-muted-foreground truncate">{t(item.desc)}</span>
                 </span>
                 {active && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
               </button>
