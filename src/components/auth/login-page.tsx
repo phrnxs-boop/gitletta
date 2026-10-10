@@ -6,10 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import {
-  Eye, EyeOff, ArrowRight, Loader2, Shield, Mail, Lock, User, Store,
-  QrCode, ClipboardList, Receipt, Users,
-} from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, Loader2, Shield, Mail, Lock, User, Store } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSearchParams } from 'next/navigation'
 import { edgeFetch } from '@/lib/edge'
@@ -143,55 +140,62 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background lg:grid lg:grid-cols-[3fr_2fr]">
+    <div className="h-[100dvh] overflow-hidden bg-background lg:grid lg:grid-cols-[3fr_2fr]">
 
       {/* ── Branding ───────────────────────────────────────────────────────
           Three fifths on desktop. Hidden on small screens, where the same
           mark and headline reappear as a compact header above the card —
           a half-screen brand panel on a phone would push the form off it. */}
-      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-secondary/30 border-r border-border p-12 xl:p-16">
-        <div className="absolute -top-32 -left-24 w-[520px] h-[520px] bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-[380px] h-[380px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+      <aside className="relative hidden lg:flex flex-col gap-6 xl:gap-8 overflow-hidden bg-secondary/30 border-r border-border p-10 xl:p-12">
+        <div className="absolute -top-40 -left-32 w-[560px] h-[560px] bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shadow-glow-primary">
-              <span className="text-white font-bold text-lg">S</span>
-            </div>
-            <span className="text-lg font-bold tracking-tight">Swixo</span>
+        <div className="relative flex items-center gap-3 shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shadow-glow-primary">
+            <span className="text-white font-bold text-lg">S</span>
           </div>
-
-          <h1 className="mt-16 text-4xl xl:text-5xl font-bold tracking-tight leading-[1.1]">
-            Run the whole restaurant
-            <br />
-            <span className="text-primary">from one screen.</span>
-          </h1>
-          <p className="mt-5 text-base text-muted-foreground max-w-md leading-relaxed">
-            Take orders on the counter, let guests order from a QR code at the
-            table, and watch both lands in the same place.
-          </p>
-
-          <ul className="mt-12 space-y-5 max-w-md">
-            {[
-              { icon: QrCode, title: 'QR ordering at the table', body: 'Guests scan, order and see the bill — no app to install.' },
-              { icon: ClipboardList, title: 'Counter and table, one queue', body: 'Dine-in, takeaway and delivery orders in a single list.' },
-              { icon: Receipt, title: 'GST-ready billing', body: 'Tax and service charge worked out on the server, not the browser.' },
-              { icon: Users, title: 'Staff roles that hold', body: 'Waiters see orders. Managers see roles. Owners see everything.' },
-            ].map((f) => (
-              <li key={f.title} className="flex gap-3.5">
-                <span className="mt-0.5 w-8 h-8 shrink-0 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
-                  <f.icon className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold">{f.title}</span>
-                  <span className="block text-sm text-muted-foreground mt-0.5 leading-relaxed">{f.body}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <span className="text-lg font-bold tracking-tight">Swixo</span>
         </div>
 
-        <p className="relative flex items-center gap-1.5 text-xs text-muted-foreground">
+        <h1 className="relative shrink-0 text-3xl xl:text-[2.4rem] font-bold tracking-tight leading-[1.15] max-w-[16ch]">
+          Run the whole restaurant
+          <span className="text-primary"> from one screen.</span>
+        </h1>
+
+        {/* The shots take whatever height is left and crop from the top rather
+            than pushing past the panel — so the page never needs to scroll,
+            whatever the window height. */}
+        <div className="relative flex-1 min-h-0">
+          <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-black/20">
+            <div className="flex shrink-0 items-center gap-1.5 border-b border-border bg-secondary/40 px-3 py-2">
+              <span className="size-2 rounded-full bg-muted-foreground/30" />
+              <span className="size-2 rounded-full bg-muted-foreground/30" />
+              <span className="size-2 rounded-full bg-muted-foreground/30" />
+            </div>
+            <img
+              src="/screenshots/orders.webp"
+              alt="The live order board"
+              width={1600}
+              height={800}
+              loading="eager"
+              className="min-h-0 w-full flex-1 object-cover object-top"
+            />
+          </div>
+
+          {/* the phone hangs off the desk shot's bottom-right corner, overlapping the
+              frame rather than the content inside it */}
+          <div className="absolute -bottom-5 -right-5 w-[92px] xl:w-[104px] overflow-hidden rounded-[1.3rem] border border-border bg-card p-1.5 shadow-2xl shadow-black/40">
+            <img
+              src="/screenshots/mobile-menu.webp"
+              alt="The diner menu on a phone"
+              width={780}
+              height={1688}
+              loading="lazy"
+              className="block w-full rounded-[1rem]"
+            />
+          </div>
+        </div>
+
+        <p className="relative flex items-center gap-1.5 shrink-0 text-xs text-muted-foreground">
           <Shield className="h-3.5 w-3.5" />
           Secure authentication · Multitenant isolation
         </p>
@@ -200,7 +204,9 @@ export function LoginPage() {
       {/* ── Sign in / sign up ──────────────────────────────────────────────
           Two fifths on desktop; full width with a compact brand header on
           small screens. */}
-      <main className="relative flex items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
+      {/* overflow-y-auto is a safety valve: on a short window the form stays
+          reachable instead of being clipped, and on a normal one there is no bar. */}
+      <main className="relative flex h-full items-center justify-center overflow-y-auto px-4 py-8 sm:px-6 lg:px-10">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[420px] h-[300px] bg-primary/5 rounded-full blur-3xl pointer-events-none lg:hidden" />
 
         <div className="relative w-full max-w-sm">
