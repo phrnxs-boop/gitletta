@@ -6,7 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Eye, EyeOff, ArrowRight, Loader2, Shield, Mail, Lock, User, Store } from 'lucide-react'
+import {
+  Eye, EyeOff, ArrowRight, Loader2, Shield, Mail, Lock, User, Store,
+  QrCode, ClipboardList, Receipt, Users,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { useSearchParams } from 'next/navigation'
 import { edgeFetch } from '@/lib/edge'
@@ -140,28 +143,94 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background flex items-center justify-center p-4 overflow-y-auto">
-      {/* Background glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-[100dvh] bg-background lg:grid lg:grid-cols-[3fr_2fr]">
 
-      <div className="relative w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-6">
-          <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-hover items-center justify-center shadow-glow-primary mb-3">
-            <span className="text-white font-bold text-2xl">S</span>
+      {/* ── Branding ───────────────────────────────────────────────────────
+          Three fifths on desktop. Hidden on small screens, where the same
+          mark and headline reappear as a compact header above the card —
+          a half-screen brand panel on a phone would push the form off it. */}
+      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-secondary/30 border-r border-border p-12 xl:p-16">
+        <div className="absolute -top-32 -left-24 w-[520px] h-[520px] bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-[380px] h-[380px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shadow-glow-primary">
+              <span className="text-white font-bold text-lg">S</span>
+            </div>
+            <span className="text-lg font-bold tracking-tight">Swixo</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {mode === 'register' ? 'Create your Swixo Account' : 'Welcome to Swixo'}
+
+          <h1 className="mt-16 text-4xl xl:text-5xl font-bold tracking-tight leading-[1.1]">
+            Run the whole restaurant
+            <br />
+            <span className="text-primary">from one screen.</span>
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {mode === 'register'
-              ? 'Sign up to configure your restaurant in minutes'
-              : 'Sign in to access your restaurant dashboard'}
+          <p className="mt-5 text-base text-muted-foreground max-w-md leading-relaxed">
+            Take orders on the counter, let guests order from a QR code at the
+            table, and watch both lands in the same place.
           </p>
+
+          <ul className="mt-12 space-y-5 max-w-md">
+            {[
+              { icon: QrCode, title: 'QR ordering at the table', body: 'Guests scan, order and see the bill — no app to install.' },
+              { icon: ClipboardList, title: 'Counter and table, one queue', body: 'Dine-in, takeaway and delivery orders in a single list.' },
+              { icon: Receipt, title: 'GST-ready billing', body: 'Tax and service charge worked out on the server, not the browser.' },
+              { icon: Users, title: 'Staff roles that hold', body: 'Waiters see orders. Managers see roles. Owners see everything.' },
+            ].map((f) => (
+              <li key={f.title} className="flex gap-3.5">
+                <span className="mt-0.5 w-8 h-8 shrink-0 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+                  <f.icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold">{f.title}</span>
+                  <span className="block text-sm text-muted-foreground mt-0.5 leading-relaxed">{f.body}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
+
+        <p className="relative flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Shield className="h-3.5 w-3.5" />
+          Secure authentication · Multitenant isolation
+        </p>
+      </aside>
+
+      {/* ── Sign in / sign up ──────────────────────────────────────────────
+          Two fifths on desktop; full width with a compact brand header on
+          small screens. */}
+      <main className="relative flex items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[420px] h-[300px] bg-primary/5 rounded-full blur-3xl pointer-events-none lg:hidden" />
+
+        <div className="relative w-full max-w-sm">
+          {/* Compact branding, small screens only */}
+          <div className="text-center mb-6 lg:hidden">
+            <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-hover items-center justify-center shadow-glow-primary mb-3">
+              <span className="text-white font-bold text-2xl">S</span>
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {mode === 'register' ? 'Create your Swixo Account' : 'Welcome to Swixo'}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {mode === 'register'
+                ? 'Sign up to configure your restaurant in minutes'
+                : 'Sign in to access your restaurant dashboard'}
+            </p>
+          </div>
 
         {/* Card */}
         <div className="card-premium rounded-3xl border border-border p-6 shadow-elevated">
+          <div className="hidden lg:block mb-5">
+            <h2 className="text-lg font-bold tracking-tight">
+              {mode === 'register' ? 'Create your account' : 'Welcome back'}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {mode === 'register'
+                ? 'Set up your restaurant in a few minutes.'
+                : 'Sign in to your restaurant dashboard.'}
+            </p>
+          </div>
           {/* Mode Switch Tabs */}
           <div className="grid grid-cols-2 p-1 mb-5 bg-secondary/60 rounded-xl">
             <button
@@ -323,12 +392,15 @@ export function LoginPage() {
               {mode === 'register' ? 'Sign in here →' : 'Create an account →'}
             </button>
           </p>
-          <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+          {/* The branding panel carries this line on desktop, so it appears
+              here only when that panel is hidden. */}
+          <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground lg:hidden">
             <Shield className="h-3 w-3" />
             Secure authentication · Multitenant isolation
           </div>
         </div>
-      </div>
+        </div>
+      </main>
     </div>
   )
 }
