@@ -22,6 +22,8 @@ interface Notice {
   body: string
   at: number
   view?: string
+  /** How many things this one line stands for, when it is an aggregate. */
+  count?: number
 }
 
 const TONES: Record<Kind, { icon: typeof Bell; cls: string }> = {
@@ -68,71 +70,81 @@ export function Notifications() {
     const out: Notice[] = []
     const now = Date.now()
 
-    // Orders waiting on someone. PENDING has not been started; READY is plated
-    // and needs carrying out, which is just as time-sensitive.
-    for (const o of data.orders ?? []) {
-      if (o.status === 'PENDING') {
-        out.push({
-          id: `order-${o.id}`, kind: 'order', view: 'orders',
-          title: `Order #${o.orderNumber} has not been started`,
-          body: o.table?.name ? `${o.table.name} · waiting to be prepared` : 'Waiting to be prepared',
-          at: new Date(o.createdAt).getTime(),
-        })
-      } else if (o.status === 'READY') {
-        out.push({
-          id: `ready-${o.id}`, kind: 'ready', view: 'orders',
-          title: `Order #${o.orderNumber} is ready`,
-          body: o.table?.name ? `${o.table.name} · ready to serve` : 'Ready to serve',
-          at: new Date(o.createdAt).getTime(),
-        })
-      }
+    /**
+     * One line per kind of thing, not one line per order.
+     *
+     * Listing five near-identical "Order #x has not been started" rows buries
+     * the one fact that matters — how many are waiting and how long the oldest
+     * has been. Counts collapse into a single entry that says both, and the
+     * entry clears itself as the orders are started.
+     */
+    const pending = (data.orders ?? []).filter((o) => o.status === 'PENDING')
+    if (pending.length > 0) {
+      const oldest = Math.min(...pending.map((o) => new Date(o.createdAt).getTime()))
+      const hrs = Math.floor((now - oldest) / 3600000)
+      out.push({
+        id: 'orders-pending', kind: 'order', view: 'orders', count: pending.length,
+        title: pending.length === 1
+          ? `Order #${pending[0].orderNumber} has not been started`
+          : `${pending.length} orders have not been started`,
+        body: pending.length === 1
+          ? (pending[0].table?.name ? `${pending[0].table.name} · waiting to be prepared` : 'Waiting to be prepared')
+          : `Oldest is ${hrs < 1 ? 'under an hour' : hrs < 24 ? `${hrs}h` : `${Math.floor(hrs / 24)} days`} old`,
+        // the newest, so a fresh order is what lights the bell
+        at: Math.max(...pending.map((o) => new Date(o.createdAt).getTime())),
+      })
     }
 
-    // Bookings later today, plus anything overdue and unactioned.
+    const ready = (data.orders ?? []).filter((o) => o.status === 'READY')
+    if (ready.length > 0) {
+      out.push({
+        id: 'orders-ready', kind: 'ready', view: 'orders', count: ready.length,
+        title: ready.length === 1 ? `Order #${ready[0].orderNumber} is ready to serve` : `${ready.length} orders are ready to serve`,
+        body: ready.length === 1 && ready[0].table?.name ? ready[0].table.name : 'Waiting to be carried out',
+        at: Math.max(...ready.map((o) => new Date(o.createdAt).getTime())),
+      })
+    }
+
+    // Bookings stay individual — they are few, and each is a specific person.
     const today = new Date().toISOString().slice(0, 10)
     for (const r of data.reservations ?? []) {
       if (r.status === 'CANCELLED' || r.status === 'SEATED') continue
       const when = new Date(`${r.date}T${(r.time || '00:00').slice(0, 5)}:00`).getTime()
       if (Number.isNaN(when)) continue
-      const isToday = r.date === today
-      const soon = when - now < 3 * 60 * 60 * 1000
-      if (!isToday && !(when < now && when > now - 6 * 60 * 60 * 1000)) continue
-      if (isToday || soon) {
-        out.push({
-          id: `res-${r.id}`, kind: 'reservation', view: 'orders',
-          title: `${r.name} · ${r.partySize} ${r.partySize === 1 ? 'guest' : 'guests'}`,
-          body: `${r.date === today ? 'Today' : r.date} at ${r.time}${r.table?.name ? ` · ${r.table.name}` : ''}`,
-          at: when,
-        })
-      }
+      if (r.date !== today && !(when < now && when > now - 6 * 60 * 60 * 1000)) continue
+      out.push({
+        id: `res-${r.id}`, kind: 'reservation', view: 'orders',
+        title: `${r.name} · ${r.partySize} ${r.partySize === 1 ? 'guest' : 'guests'}`,
+        body: `${r.date === today ? 'Today' : r.date} at ${r.time}${r.table?.name ? ` · ${r.table.name}` : ''}`,
+        at: when,
+      })
     }
 
-    // Dishes switched off — a diner cannot order them, so it matters.
     const soldOut = (data.menuItems ?? []).filter((m) => !m.available)
-    for (const m of soldOut.slice(0, 5)) {
+    if (soldOut.length > 0) {
       out.push({
-        id: `sold-${m.id}`, kind: 'soldout', view: 'menu',
-        title: `${m.name} is unavailable`,
-        body: 'Not orderable until you switch it back on',
+        id: 'menu-soldout', kind: 'soldout', view: 'menu', count: soldOut.length,
+        title: soldOut.length === 1 ? `${soldOut[0].name} is unavailable` : `${soldOut.length} dishes are unavailable`,
+        body: 'Not orderable until switched back on',
         at: now,
       })
     }
 
-    // Failed sign-ins in the last day.
-    for (const l of data.securityLogs ?? []) {
-      if (l.action !== 'LOGIN_FAILED') continue
-      const at = new Date(l.createdAt).getTime()
-      if (now - at > 24 * 60 * 60 * 1000) continue
+    const failed = (data.securityLogs ?? []).filter(
+      (l) => l.action === 'LOGIN_FAILED' && now - new Date(l.createdAt).getTime() < 24 * 3600000,
+    )
+    if (failed.length > 0) {
       out.push({
-        id: `sec-${l.id}`, kind: 'security', view: 'security',
-        title: 'A sign-in attempt failed',
-        body: l.user?.email ? l.user.email : 'Staff PIN refused',
-        at,
+        id: 'security-failed', kind: 'security', view: 'security', count: failed.length,
+        title: failed.length === 1 ? 'A sign-in attempt failed' : `${failed.length} sign-in attempts failed`,
+        body: 'In the last 24 hours',
+        at: Math.max(...failed.map((l) => new Date(l.createdAt).getTime())),
       })
     }
 
-    return out.sort((a, b) => b.at - a.at).slice(0, 20)
+    return out.sort((a, b) => b.at - a.at)
   }, [data])
+
 
   const unread = notices.filter((n) => n.at > seenAt).length
 
@@ -161,7 +173,15 @@ export function Notifications() {
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-[340px] p-0 bg-card border-border">
+      {/* Width is capped against the viewport so the panel cannot run off a
+          narrow screen, and the list gets its own scroll area bounded by the
+          viewport rather than a fixed pixel height — otherwise it overflows a
+          short window with no way to reach the rest. */}
+      <DropdownMenuContent
+        align="end"
+        collisionPadding={8}
+        className="w-[min(360px,calc(100vw-1rem))] p-0 bg-card border-border"
+      >
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
           <span className="text-sm font-semibold">Notifications</span>
           {notices.length > 0 && (
@@ -175,7 +195,7 @@ export function Notifications() {
             <p className="text-sm text-muted-foreground">You&apos;re all caught up.</p>
           </div>
         ) : (
-          <div className="max-h-[380px] overflow-y-auto scrollbar-thin">
+          <div className="max-h-[min(420px,60vh)] overflow-y-auto overscroll-contain scrollbar-thin">
             {notices.map((n) => {
               const tone = TONES[n.kind]
               const Icon = tone.icon
@@ -189,7 +209,14 @@ export function Notifications() {
                     <Icon className="h-3.5 w-3.5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-medium leading-snug">{n.title}</span>
+                    <span className="flex items-start gap-2">
+                      <span className="flex-1 text-[13px] font-medium leading-snug">{n.title}</span>
+                      {typeof n.count === 'number' && n.count > 1 && (
+                        <span className="mt-0.5 shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                          {n.count}
+                        </span>
+                      )}
+                    </span>
                     <span className="block text-xs text-muted-foreground mt-0.5 leading-snug">{n.body}</span>
                     <span className="block text-[11px] text-muted-foreground/70 mt-1">{ago(n.at)}</span>
                   </span>
