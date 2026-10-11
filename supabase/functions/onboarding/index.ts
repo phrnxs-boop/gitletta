@@ -163,8 +163,20 @@ Deno.serve(async (req: Request) => {
     if (rolesError) return json(req, { error: rolesError.message }, 500);
 
     // 3. Seed default settings (idempotent).
+    //
+    // The tax IDs typed during setup belong here: they are settings keys, not
+    // tenant columns. They used to be collected by the onboarding form and then
+    // dropped on the floor — the payload never carried them and this function
+    // had no field for them — so a restaurant that entered its GSTIN at setup
+    // ended up with an empty one, and its bills printed with no tax ID at all.
+    // Only written when actually provided, so an empty field can never blank a
+    // value the owner set later in Settings.
+    const settingsSeed: Record<string, string> = { ...DEFAULT_SETTINGS };
+    if (restaurant?.gstin) settingsSeed.gstin = String(restaurant.gstin).trim();
+    if (restaurant?.fssai) settingsSeed.fssai = String(restaurant.fssai).trim();
+
     const { error: settingsError } = await db.from("settings").upsert(
-      Object.entries(DEFAULT_SETTINGS).map(([key, value]) => ({
+      Object.entries(settingsSeed).map(([key, value]) => ({
         tenant_id: tenantId,
         key,
         value,

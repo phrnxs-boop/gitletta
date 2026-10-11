@@ -1875,6 +1875,10 @@ function StepGoLive({
               taxRate: data.customize.taxRate,
               serviceCharge: data.customize.serviceCharge,
               logo: data.restaurant.logo,
+              // Collected on the setup form; without these the values never
+              // reached the server and the bill printed with no tax IDs.
+              gstin: data.restaurant.gstin || undefined,
+              fssai: data.restaurant.fssai || undefined,
             },
             categories: data.menu.categories.map((c) => ({ id: c.id, name: c.name })),
             menuItems: flattenedItems,
@@ -1915,6 +1919,8 @@ function StepGoLive({
               taxRate: data.customize.taxRate,
               serviceCharge: data.customize.serviceCharge,
               logo: data.restaurant.logo,
+              gstin: data.restaurant.gstin || undefined,
+              fssai: data.restaurant.fssai || undefined,
             },
             categories: data.menu.categories.map((c) => ({ id: c.id, name: c.name })),
             menuItems: flattenedItems,
