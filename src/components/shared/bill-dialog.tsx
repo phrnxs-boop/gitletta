@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,183 @@ interface BillData {
   terms: string[]
 }
 
+/** Escape a value for the print document — these are real HTML documents, and a
+ *  dish name or a customer name is user input. */
+function esc(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * The bill as a standalone document for printing and "Save as PDF".
+ *
+ * The dialog is styled with Tailwind, but a stylesheet does not travel into a
+ * `window.open` document — only the markup does. The previous version copied the
+ * dialog's DOM into a fresh window whose CSS used class names the markup never
+ * carried (`.header`, `.meta-row`, `.totals`), so `flex justify-between` had no
+ * rule behind it and every label printed straight into its value: "Bill
+ * NoBILL-000085", "TableTable 2", "Subtotal₹515.00". This builds the page from
+ * the bill data with its own CSS instead, so alignment is structural.
+ */
+function buildPrintHtml(bill: BillData): string {
+  const money = (n: number) => `${esc(bill.restaurant.currencySymbol)}${n.toFixed(2)}`
+  const orderTypeLabel =
+    bill.orderType === 'DINE_IN' ? 'Dine In' : bill.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Delivery'
+
+  const meta: [string, string][] = [
+    ['Bill No', bill.billNumber],
+    ['Order No', `#${bill.orderNumber}`],
+    ['Date', new Date(bill.invoiceDate).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })],
+  ]
+  if (bill.table) meta.push(['Table', bill.table.area ? `${bill.table.name} · ${bill.table.area}` : bill.table.name])
+  meta.push(['Type', orderTypeLabel])
+  if (bill.customerName) meta.push(['Customer', bill.customerName])
+  if (bill.customerPhone) meta.push(['Phone', bill.customerPhone])
+  if (bill.servedBy) meta.push(['Served by', bill.servedBy])
+
+  const itemsHtml = bill.items
+    .map(
+      (it) => `
+        <tr>
+          <td class="item">${esc(it.name)}${it.notes ? `<div class="note">↳ ${esc(it.notes)}</div>` : ''}</td>
+          <td class="qty">${it.quantity}</td>
+          <td class="num">${money(it.unitPrice)}</td>
+          <td class="num strong">${money(it.total)}</td>
+        </tr>`,
+    )
+    .join('')
+
+  const totalRows: string[] = [
+    `<div class="row"><span>Subtotal</span><span class="num val">${money(bill.subtotal)}</span></div>`,
+  ]
+  if (bill.discount > 0) {
+    totalRows.push(
+      `<div class="row accent"><span>Discount${bill.promoCode ? ` (${esc(bill.promoCode)})` : ''}</span><span class="num val">−${money(bill.discount)}</span></div>`,
+    )
+  }
+  totalRows.push(
+    `<div class="row"><span>Taxable amount</span><span class="num val">${money(bill.taxableAmount)}</span></div>`,
+  )
+  if (bill.taxBreakup.totalTax > 0) {
+    totalRows.push(
+      `<div class="row muted"><span>CGST (${bill.taxBreakup.cgstRate}%)</span><span class="num val">${money(bill.taxBreakup.cgstAmount)}</span></div>`,
+      `<div class="row muted"><span>SGST (${bill.taxBreakup.sgstRate}%)</span><span class="num val">${money(bill.taxBreakup.sgstAmount)}</span></div>`,
+    )
+  }
+  if (bill.serviceCharge > 0) {
+    totalRows.push(
+      `<div class="row"><span>Service charge</span><span class="num val">${money(bill.serviceCharge)}</span></div>`,
+    )
+  }
+
+  const contact = [bill.restaurant.phone, bill.restaurant.email].filter(Boolean).map(esc).join(' &nbsp;·&nbsp; ')
+  const ids = [
+    bill.restaurant.gstin ? `<span>GSTIN ${esc(bill.restaurant.gstin)}</span>` : '',
+    bill.restaurant.fssai ? `<span>FSSAI ${esc(bill.restaurant.fssai)}</span>` : '',
+  ].join('')
+  const paid = bill.paymentStatus === 'PAID'
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>Bill ${esc(bill.billNumber)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #f3f4f6;
+    color: #111827;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet { max-width: 720px; margin: 24px auto; background: #fff; padding: 36px 40px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  .head { text-align: center; }
+  .logo { display: block; width: 52px; height: 52px; border-radius: 14px; object-fit: cover; margin: 0 auto 10px; }
+  .monogram { width: 52px; height: 52px; border-radius: 14px; background: #f97316; color: #fff; font-size: 22px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+  .brand { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .tagline, .addr, .contact { margin: 4px 0 0; font-size: 12px; color: #6b7280; }
+  .ids { margin-top: 10px; font-size: 10px; color: #6b7280; letter-spacing: .02em; }
+  .ids span { display: inline-block; border: 1px solid #e5e7eb; border-radius: 6px; padding: 3px 8px; margin: 0 3px; background: #fafafa; }
+  .rule { border: 0; border-top: 1px dashed #d1d5db; margin: 18px 0; }
+  .meta { font-size: 12px; }
+  .row { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; }
+  .row > span:first-child { color: #6b7280; }
+  .num { font-variant-numeric: tabular-nums; }
+  .meta .val { font-weight: 600; text-align: right; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th { padding: 0 0 8px; border-bottom: 1px solid #e5e7eb; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #9ca3af; text-align: left; }
+  td { padding: 9px 0; border-bottom: 1px dotted #e5e7eb; font-size: 12px; vertical-align: top; }
+  th.num, td.num { text-align: right; }
+  th.qty, td.qty { text-align: center; }
+  td.item { padding-right: 12px; word-break: break-word; }
+  td.strong { font-weight: 600; }
+  .note { margin-top: 2px; font-size: 10px; font-style: italic; color: #9ca3af; }
+  .totals { width: 100%; max-width: 320px; margin: 14px 0 0 auto; font-size: 12px; }
+  .totals .val { text-align: right; font-weight: 500; }
+  .totals .muted > span { color: #9ca3af; }
+  .totals .accent > span { color: #ea580c; }
+  .grand { margin-top: 8px; padding-top: 9px; border-top: 1px solid #111827; font-size: 15px; font-weight: 700; }
+  .grand > span:first-child { color: #111827; }
+  .pay { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; font-size: 12px; }
+  .pay .label { color: #6b7280; }
+  .pay .status { font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .pay .paid { color: #15803d; }
+  .pay .unpaid { color: #b91c1c; }
+  .foot { margin-top: 18px; text-align: center; font-size: 10px; line-height: 1.6; color: #9ca3af; }
+  @page { size: A4; margin: 14mm; }
+  @media print {
+    body { background: #fff; }
+    .sheet { max-width: none; margin: 0; padding: 0; box-shadow: none; }
+  }
+</style></head><body>
+  <div class="sheet">
+    <div class="head">
+      ${bill.restaurant.logo
+        ? `<img class="logo" src="${esc(bill.restaurant.logo)}" alt="">`
+        : `<div class="monogram">${esc((bill.restaurant.name || 'R').trim().charAt(0).toUpperCase())}</div>`}
+      <h1 class="brand">${esc(bill.restaurant.name)}</h1>
+      ${bill.restaurant.tagline ? `<p class="tagline">${esc(bill.restaurant.tagline)}</p>` : ''}
+      ${bill.restaurant.address ? `<p class="addr">${esc(bill.restaurant.address)}</p>` : ''}
+      ${contact ? `<p class="contact">${contact}</p>` : ''}
+      ${ids ? `<div class="ids">${ids}</div>` : ''}
+    </div>
+
+    <hr class="rule">
+
+    <div class="meta">
+      ${meta.map(([k, v]) => `<div class="row"><span>${esc(k)}</span><span class="val">${esc(v)}</span></div>`).join('')}
+    </div>
+
+    <hr class="rule">
+
+    <table>
+      <colgroup><col><col style="width:52px"><col style="width:88px"><col style="width:96px"></colgroup>
+      <thead>
+        <tr><th>Item</th><th class="qty">Qty</th><th class="num">Price</th><th class="num">Total</th></tr>
+      </thead>
+      <tbody>${itemsHtml}</tbody>
+    </table>
+
+    <div class="totals">
+      ${totalRows.join('')}
+      <div class="row grand"><span>Grand Total</span><span class="num">${money(bill.grandTotal)}</span></div>
+    </div>
+
+    <div class="pay">
+      <span class="label">Payment</span>
+      <span class="status ${paid ? 'paid' : 'unpaid'}">${esc(bill.paymentStatus)}${bill.paymentMethod ? ` · ${esc(bill.paymentMethod)}` : ''}</span>
+    </div>
+
+    <hr class="rule">
+    <div class="foot">${bill.terms.map((t) => `<p>${esc(t)}</p>`).join('')}</div>
+  </div>
+</body></html>`
+}
+
 export function BillDialog({
   orderId,
   open,
@@ -65,7 +242,6 @@ export function BillDialog({
 }) {
   const [bill, setBill] = useState<BillData | null>(null)
   const [loading, setLoading] = useState(false)
-  const printRef = useRef<HTMLDivElement>(null)
 
   const loadBill = async (id: string) => {
     setLoading(true)
@@ -92,45 +268,20 @@ export function BillDialog({
 
   const handlePrint = () => {
     if (!bill) return
-    const printContent = printRef.current?.innerHTML
-    if (!printContent) return
-    const w = window.open('', '_blank', 'width=400,height=600')
+    const w = window.open('', '_blank', 'width=900,height=1000')
     if (!w) { toast.error('Please allow popups to print'); return }
-    w.document.write(`
-      <!DOCTYPE html><html><head><meta charset="utf-8"><title>${bill.billNumber}</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', monospace; }
-        body { padding: 16px; color: #1a1d29; background: #fff; width: 320px; }
-        .header { text-align: center; margin-bottom: 12px; }
-        .header h1 { font-size: 18px; font-weight: bold; }
-        .header p { font-size: 11px; color: #555; margin-top: 2px; }
-        .header .info { font-size: 10px; color: #777; margin-top: 4px; }
-        .divider { border-top: 1px dashed #ccc; margin: 8px 0; }
-        .meta { font-size: 11px; margin-bottom: 8px; }
-        .meta-row { display: flex; justify-content: space-between; }
-        .meta-row span:first-child { color: #777; }
-        table { width: 100%; font-size: 11px; border-collapse: collapse; }
-        th { text-align: left; padding: 4px 0; border-bottom: 1px solid #ddd; font-size: 10px; color: #777; }
-        th:last-child, td:last-child { text-align: right; }
-        th:nth-child(2), td:nth-child(2) { text-align: center; }
-        td { padding: 3px 0; border-bottom: 1px dotted #eee; }
-        .totals { font-size: 11px; margin-top: 8px; }
-        .total-row { display: flex; justify-content: space-between; padding: 2px 0; }
-        .total-row.bold { font-weight: bold; font-size: 13px; border-top: 1px solid #333; padding-top: 6px; margin-top: 4px; }
-        .total-row span:first-child { color: #555; }
-        .total-row.bold span:first-child { color: #000; }
-        .footer { text-align: center; margin-top: 12px; font-size: 10px; color: #777; }
-        .footer p { margin-top: 2px; }
-      </style></head><body>${printContent}</body></html>
-    `)
+    w.document.open()
+    w.document.write(buildPrintHtml(bill))
     w.document.close()
     w.focus()
-    setTimeout(() => { w.print(); w.close() }, 300)
+    // The window is left open rather than closed after printing: closing it can
+    // tear down the print dialog before the browser has finished with it.
+    setTimeout(() => { w.print() }, 350)
   }
 
   const handleDownloadPDF = () => {
     handlePrint()
-    toast.success('PDF download started — use "Save as PDF" in the print dialog')
+    toast.success('Choose "Save as PDF" in the print dialog')
   }
 
   const fmtDate = (d: string) => new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
@@ -161,7 +312,7 @@ export function BillDialog({
         )}
 
         {bill && (
-          <div ref={printRef} className="px-5 py-4">
+          <div className="px-5 py-4">
             {/* Header */}
             <div className="text-center mb-4">
               {bill.restaurant.logo ? (
@@ -185,6 +336,21 @@ export function BillDialog({
               {bill.restaurant.gstin && <span className="inline-block bg-gray-100 px-2 py-0.5 rounded mr-1">GSTIN: {bill.restaurant.gstin}</span>}
               {bill.restaurant.fssai && <span className="inline-block bg-gray-100 px-2 py-0.5 rounded">FSSAI: {bill.restaurant.fssai}</span>}
             </div>
+
+            {/* A GST invoice is not valid without these, so a missing one is said
+                out loud here rather than left as a silent gap the owner never
+                notices. Deliberately not part of the printed document, and not
+                shown to a diner viewing their own bill — it is an operator hint,
+                not something a customer should read. */}
+            {!sessionToken && (!bill.restaurant.gstin || !bill.restaurant.fssai) && (
+              <div className="text-[10px] leading-relaxed text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 mb-3">
+                {!bill.restaurant.gstin && !bill.restaurant.fssai
+                  ? 'GSTIN and FSSAI are not set for this restaurant.'
+                  : `${!bill.restaurant.gstin ? 'GSTIN' : 'FSSAI'} is not set for this restaurant.`}{' '}
+                Add {!bill.restaurant.gstin && !bill.restaurant.fssai ? 'them' : 'it'} under{' '}
+                <span className="font-medium">Settings → Restaurant Profile</span> so {!bill.restaurant.gstin && !bill.restaurant.fssai ? 'they appear' : 'it appears'} on bills.
+              </div>
+            )}
 
             <div className="border-t border-dashed border-gray-300 my-3" />
 
