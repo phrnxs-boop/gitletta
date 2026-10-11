@@ -432,7 +432,12 @@ export function MenuView() {
             )}
           </div>
           <Select value={catFilter} onValueChange={(v) => setActiveCat(v)}>
-            <SelectTrigger className="w-full sm:w-[180px] shrink-0 bg-secondary/60 border-0">
+            {/* Radix builds the closed box from the selected row's own children,
+                so the delete control was appearing inside it too — the value is
+                not a separate string, it is that row rendered again. It is
+                excluded here, and the chevron is taken out of the flow so the
+                name can sit in the middle rather than being pushed left by it. */}
+            <SelectTrigger className="relative w-full sm:w-[180px] shrink-0 justify-center bg-secondary/60 border-0 [&>svg]:absolute [&>svg]:right-3 [&_.cat-delete]:hidden">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -476,7 +481,7 @@ export function MenuView() {
                       onPointerUp={(e) => { e.preventDefault(); e.stopPropagation() }}
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); openDeleteCategory(c) }}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openDeleteCategory(c) } }}
-                      className="ml-auto grid size-6 shrink-0 place-items-center rounded-md text-destructive/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      className="cat-delete ml-auto grid size-6 shrink-0 place-items-center rounded-md text-destructive/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </span>
