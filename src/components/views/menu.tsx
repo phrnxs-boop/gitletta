@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import { useApp, type MenuItem } from '@/components/app/data-context'
+import { useApp, type MenuItem, type Category } from '@/components/app/data-context'
 import { cn } from '@/lib/utils'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
 import { edgeFetch } from '@/lib/edge'
@@ -151,6 +151,11 @@ export function MenuView() {
   }
   // Category dialog
   const [catDialogOpen, setCatDialogOpen] = useState(false)
+  // Deleting a category can take its dishes with it, so the dialog needs to
+  // know which one, and where its dishes should go if the owner keeps them.
+  const [catToDelete, setCatToDelete] = useState<Category | null>(null)
+  const [moveDishesTo, setMoveDishesTo] = useState('')
+  const [deletingCat, setDeletingCat] = useState(false)
   const [catForm, setCatForm] = useState({ name: '', icon: '🍽️' })
   const [catSaving, setCatSaving] = useState(false)
 
@@ -305,6 +310,51 @@ export function MenuView() {
     }
   }
 
+  /**
+   * Deleting a category takes its dishes with it: `menu_items.category_id` is
+   * NOT NULL and its foreign key cascades, so there is no "uncategorised" to
+   * fall back to. The dialog therefore has to say so and offer to hand the
+   * dishes to another category first — the count is known before the decision
+   * is made, not reported after it.
+   */
+  const openDeleteCategory = (c: Category) => {
+    setCatToDelete(c)
+    setMoveDishesTo('')
+  }
+
+  const dishesIn = (id: string) => menuItems.filter((m) => m.categoryId === id).length
+
+  const confirmDeleteCategory = async () => {
+    if (!catToDelete) return
+    setDeletingCat(true)
+    try {
+      const moving = !!moveDishesTo && dishesIn(catToDelete.id) > 0
+      const res = await edgeFetch(
+        `/api/categories/${catToDelete.id}${moving ? `?moveTo=${encodeURIComponent(moveDishesTo)}` : ''}`,
+        {
+          method: 'DELETE',
+          headers: { 'content-type': 'application/json', 'x-tenant-id': tenant.id },
+        },
+      )
+      if (!res.ok) throw new Error('failed')
+      const result = await res.json().catch(() => ({}))
+      if (moving) {
+        toast.success('Category deleted', { description: `${result.moved ?? 0} dishes moved across.` })
+      } else if ((result.deletedItems ?? 0) > 0) {
+        toast.success('Category deleted', { description: `${result.deletedItems} dishes were deleted with it.` })
+      } else {
+        toast.success('Category deleted')
+      }
+      if (activeCat === catToDelete.id) setActiveCat('all')
+      setCatToDelete(null)
+      await refresh()
+    } catch {
+      toast.error('Could not delete the category')
+    } finally {
+      setDeletingCat(false)
+    }
+  }
+
   const handleAddCategory = async () => {
     if (!catForm.name.trim()) {
       toast.error('Category name is required')
@@ -430,7 +480,12 @@ export function MenuView() {
             {categories.map((c) => {
               const count = menuItems.filter((m) => m.categoryId === c.id).length
               return (
-                <CatPill key={c.id} active={activeCat === c.id} onClick={() => setActiveCat(c.id)}>
+                <CatPill
+                  key={c.id}
+                  active={activeCat === c.id}
+                  onClick={() => setActiveCat(c.id)}
+                  onDelete={() => openDeleteCategory(c)}
+                >
                   <span className="mr-1">{c.icon || '🍽️'}</span>
                   {c.name} <span className="ml-1 opacity-60">({count})</span>
                 </CatPill>
@@ -646,6 +701,74 @@ export function MenuView() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Category Dialog */}
+      <Dialog open={!!catToDelete} onOpenChange={(o) => { if (!o) setCatToDelete(null) }}>
+        <DialogContent className="sm:max-w-md bg-card">
+          <DialogHeader>
+            <DialogTitle>Delete “{catToDelete?.name}”?</DialogTitle>
+            <DialogDescription>
+              {catToDelete && dishesIn(catToDelete.id) === 0
+                ? 'This category has no dishes in it.'
+                : 'Dishes belong to a category, so this one cannot simply be removed from under them.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {catToDelete && dishesIn(catToDelete.id) > 0 && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm">
+                <span className="font-medium text-destructive">
+                  {dishesIn(catToDelete.id)} {dishesIn(catToDelete.id) === 1 ? 'dish is' : 'dishes are'}
+                </span>{' '}
+                <span className="text-muted-foreground">
+                  in this category. Deleting it deletes them too, along with their prices and photos.
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="move-to">Keep them by moving them to</Label>
+                <Select value={moveDishesTo || '__none'} onValueChange={(v) => setMoveDishesTo(v === '__none' ? '' : v)}>
+                  <SelectTrigger id="move-to" className="bg-secondary/50 border-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none">Nothing — delete the dishes too</SelectItem>
+                    {categories
+                      .filter((c) => c.id !== catToDelete.id)
+                      .map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.icon || '🍽️'} {c.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {categories.filter((c) => c.id !== catToDelete.id).length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    There is no other category to move them to.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCatToDelete(null)} disabled={deletingCat}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDeleteCategory}
+              disabled={deletingCat}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deletingCat
+                ? 'Deleting…'
+                : moveDishesTo && catToDelete && dishesIn(catToDelete.id) > 0
+                  ? 'Move dishes & delete'
+                  : 'Delete category'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Category Dialog */}
       <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
         <DialogContent className="sm:max-w-md bg-card">
@@ -797,23 +920,43 @@ function StatChip({
 function CatPill({
   active,
   onClick,
+  onDelete,
   children,
 }: {
   active: boolean
   onClick: () => void
+  /** Omitted for the "All" pill, which is not a category. */
+  onDelete?: () => void
   children: React.ReactNode
 }) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        'shrink-0 rounded-xl px-3.5 py-2 text-sm font-medium transition-all',
+        'group shrink-0 inline-flex items-center gap-1 rounded-xl py-2 text-sm font-medium transition-all',
+        onDelete ? 'pl-3.5 pr-2' : 'px-3.5',
         active
           ? 'bg-primary text-primary-foreground shadow-sm'
           : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground',
       )}
     >
       {children}
+      {onDelete && (
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label="Delete category"
+          title="Delete category"
+          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onDelete() } }}
+          className={cn(
+            'ml-0.5 grid size-5 place-items-center rounded-md transition-colors',
+            active ? 'hover:bg-black/20' : 'hover:bg-black/10 dark:hover:bg-white/10',
+          )}
+        >
+          <X className="h-3 w-3" />
+        </span>
+      )}
     </button>
   )
 }
