@@ -438,9 +438,28 @@ export function MenuView() {
             <SelectContent>
               <SelectItem value="all"><span className="mr-1">🍴</span>All categories</SelectItem>
               {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  <span className="mr-1">{c.icon || '🍽️'}</span>
-                  {c.name}
+                <SelectItem key={c.id} value={c.id} className="pr-2">
+                  {/* Radix selects on pointer events, so the delete control
+                      claims them first and stops them reaching the item —
+                      otherwise tapping it would also pick the category and
+                      close the list. */}
+                  <span className="flex w-full items-center gap-1">
+                    <span className="mr-1">{c.icon || '🍽️'}</span>
+                    <span className="flex-1">{c.name}</span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Delete ${c.name}`}
+                      title={`Delete ${c.name}`}
+                      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                      onPointerUp={(e) => { e.preventDefault(); e.stopPropagation() }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); openDeleteCategory(c) }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openDeleteCategory(c) } }}
+                      className="grid size-6 shrink-0 place-items-center rounded-md text-destructive/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </span>
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -480,12 +499,7 @@ export function MenuView() {
             {categories.map((c) => {
               const count = menuItems.filter((m) => m.categoryId === c.id).length
               return (
-                <CatPill
-                  key={c.id}
-                  active={activeCat === c.id}
-                  onClick={() => setActiveCat(c.id)}
-                  onDelete={() => openDeleteCategory(c)}
-                >
+                <CatPill key={c.id} active={activeCat === c.id} onClick={() => setActiveCat(c.id)}>
                   <span className="mr-1">{c.icon || '🍽️'}</span>
                   {c.name} <span className="ml-1 opacity-60">({count})</span>
                 </CatPill>
@@ -920,49 +934,23 @@ function StatChip({
 function CatPill({
   active,
   onClick,
-  onDelete,
   children,
 }: {
   active: boolean
   onClick: () => void
-  /** Omitted for the "All" pill, which is not a category. */
-  onDelete?: () => void
   children: React.ReactNode
 }) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        'group shrink-0 inline-flex items-center gap-1 rounded-xl py-2 text-sm font-medium transition-all',
-        onDelete ? 'pl-3.5 pr-2' : 'px-3.5',
+        'shrink-0 rounded-xl px-3.5 py-2 text-sm font-medium transition-all',
         active
           ? 'bg-primary text-primary-foreground shadow-sm'
           : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground',
       )}
     >
       {children}
-      {/* A small bin rather than a cross: an x on a pill reads as "close this
-          filter", which is the opposite of what it does. Styled like the delete
-          control on the dish cards, so the same shape means the same thing in
-          both places. */}
-      {onDelete && (
-        <span
-          role="button"
-          tabIndex={0}
-          aria-label="Delete category"
-          title="Delete category"
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onDelete() } }}
-          className={cn(
-            'ml-0.5 grid size-5 place-items-center rounded-md transition-colors',
-            active
-              ? 'text-primary-foreground/75 hover:text-primary-foreground hover:bg-black/20'
-              : 'text-destructive/60 hover:text-destructive hover:bg-destructive/10',
-          )}
-        >
-          <Trash2 className="h-3 w-3" />
-        </span>
-      )}
     </button>
   )
 }
