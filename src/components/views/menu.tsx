@@ -438,14 +438,30 @@ export function MenuView() {
             <SelectContent>
               <SelectItem value="all"><span className="mr-1">🍴</span>All categories</SelectItem>
               {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id} className="pr-2">
+                <SelectItem
+                  key={c.id}
+                  value={c.id}
+                  /* Radix puts the children inside its own span, which is the
+                     flex item and hugs its content — so nothing inside can push
+                     to the right edge, and the bins ended up at six different
+                     offsets. Growing that wrapper from the outside is what
+                     actually lines them up. The check indicator is a span too
+                     but is absolutely positioned, so it is out of flow and
+                     unaffected. */
+                  className="w-full [&>span]:flex-1"
+                >
                   {/* Radix selects on pointer events, so the delete control
                       claims them first and stops them reaching the item —
                       otherwise tapping it would also pick the category and
                       close the list. */}
-                  <span className="flex w-full items-center gap-1">
+                  {/* ml-auto on the bin rather than flex-1 on the row: letting
+                      the row and the name both grow left the bins at different
+                      offsets depending on how long each name was — measured at a
+                      37px spread across six categories. Pushing the bin itself
+                      puts them on one line whatever the parent's display is. */}
+                  <span className="flex w-full min-w-0 items-center gap-2">
                     <span className="mr-1">{c.icon || '🍽️'}</span>
-                    <span className="flex-1">{c.name}</span>
+                    <span className="truncate">{c.name}</span>
                     <span
                       role="button"
                       tabIndex={0}
@@ -455,7 +471,7 @@ export function MenuView() {
                       onPointerUp={(e) => { e.preventDefault(); e.stopPropagation() }}
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); openDeleteCategory(c) }}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openDeleteCategory(c) } }}
-                      className="grid size-6 shrink-0 place-items-center rounded-md text-destructive/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      className="ml-auto grid size-6 shrink-0 place-items-center rounded-md text-destructive/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </span>
