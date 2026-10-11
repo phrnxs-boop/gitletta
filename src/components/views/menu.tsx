@@ -941,6 +941,10 @@ function CatPill({
       )}
     >
       {children}
+      {/* A small bin rather than a cross: an x on a pill reads as "close this
+          filter", which is the opposite of what it does. Styled like the delete
+          control on the dish cards, so the same shape means the same thing in
+          both places. */}
       {onDelete && (
         <span
           role="button"
@@ -951,10 +955,12 @@ function CatPill({
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onDelete() } }}
           className={cn(
             'ml-0.5 grid size-5 place-items-center rounded-md transition-colors',
-            active ? 'hover:bg-black/20' : 'hover:bg-black/10 dark:hover:bg-white/10',
+            active
+              ? 'text-primary-foreground/75 hover:text-primary-foreground hover:bg-black/20'
+              : 'text-destructive/60 hover:text-destructive hover:bg-destructive/10',
           )}
         >
-          <X className="h-3 w-3" />
+          <Trash2 className="h-3 w-3" />
         </span>
       )}
     </button>
