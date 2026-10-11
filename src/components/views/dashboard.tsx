@@ -56,13 +56,22 @@ export function DashboardView() {
   const tables = data?.tables ?? []
   const tenant = data?.tenant
 
+  /* Hidden items (available=false) are managed in the Menu view but must never
+     appear on the POS board — staff cannot sell what is not on the menu. The
+     diner menu filters them server-side and place_order rejects them, so this
+     closes the one surface that still rendered them. */
+  const visibleMenuItems = useMemo(
+    () => menuItems.filter((m) => m.available),
+    [menuItems],
+  )
+
   const filtered = useMemo(() => {
-    return menuItems.filter((m) => {
+    return visibleMenuItems.filter((m) => {
       if (activeCat !== 'all' && m.categoryId !== activeCat) return false
       if (search && !m.name.toLowerCase().includes(search.toLowerCase())) return false
       return true
     })
-  }, [menuItems, activeCat, search])
+  }, [visibleMenuItems, activeCat, search])
 
   const subtotal = cart.reduce((s, c) => s + c.price * c.quantity, 0)
   const taxRate = tenant?.taxRate ?? 8
@@ -192,7 +201,10 @@ export function DashboardView() {
   }
 
   // per-category counts for the pills
-  const catCount = (catId: string) => catId === 'all' ? menuItems.length : menuItems.filter((m) => m.categoryId === catId).length
+  const catCount = (catId: string) =>
+    catId === 'all'
+      ? visibleMenuItems.length
+      : visibleMenuItems.filter((m) => m.categoryId === catId).length
 
   if (!data || !tenant) return null
 
@@ -308,7 +320,7 @@ export function DashboardView() {
         <div className="px-3.5 md:px-6 pb-3">
           <div className="w-full overflow-x-auto scrollbar-thin -mx-1 px-1">
             <div className="flex gap-2 w-max pb-1">
-              <CategoryPill active={activeCat === 'all'} onClick={() => setActiveCat('all')} icon="🍴" label={tr('pos.all')} count={menuItems.length} />
+              <CategoryPill active={activeCat === 'all'} onClick={() => setActiveCat('all')} icon="🍴" label={tr('pos.all')} count={visibleMenuItems.length} />
               {categories.map((c) => (
                 <CategoryPill
                   key={c.id}
