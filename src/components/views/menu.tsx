@@ -448,7 +448,12 @@ export function MenuView() {
                      actually lines them up. The check indicator is a span too
                      but is absolutely positioned, so it is out of flow and
                      unaffected. */
-                  className="w-full [&>span]:flex-1"
+                  /* The option reserves 32px on the right for its tick, which is
+                     what kept the bin off the edge. Moving that tick to the left
+                     — for this dropdown only, not the shared component — frees
+                     the whole right side. The tick's own right-2 is overridden
+                     by a more specific selector. */
+                  className="w-full pl-8 pr-2 [&>span]:flex-1 [&>span:first-child]:!left-2 [&>span:first-child]:!right-auto"
                 >
                   {/* Radix selects on pointer events, so the delete control
                       claims them first and stops them reaching the item —
