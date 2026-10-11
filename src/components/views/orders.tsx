@@ -665,6 +665,9 @@ function OrderCard({
 }) {
   const t = useT()
   const action = actionForStatus(order.status)
+  /* A bill is only final once the order is completed — until then there is
+     nothing settled to hand the customer, so the control is shown but inert. */
+  const billReady = order.status === 'COMPLETED'
 
   const where =
     order.orderType === 'DINE_IN'
@@ -787,7 +790,15 @@ function OrderCard({
             <Button variant="outline" size="sm" onClick={onView} className="shrink-0">
               <Eye className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={onViewBill} className="shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onViewBill}
+              disabled={!billReady}
+              title="The bill becomes available once the order is completed"
+              aria-label={`Bill for order ${order.orderNumber} (available once the order is completed)`}
+              className="shrink-0"
+            >
               <FileText className="h-4 w-4" />
             </Button>
             {canDelete && (
@@ -812,7 +823,13 @@ function OrderCard({
             <Button variant="secondary" size="sm" onClick={onView}>
               <Eye className="h-4 w-4 mr-1.5" /> View
             </Button>
-            <Button variant="outline" size="sm" onClick={onViewBill}>
+            <Button
+              variant={billReady ? 'default' : 'outline'}
+              size="sm"
+              onClick={onViewBill}
+              disabled={!billReady}
+              title={billReady ? 'View, print or download the bill' : 'No bill for a cancelled order'}
+            >
               <FileText className="h-4 w-4 mr-1.5" /> Bill
             </Button>
             {canDelete && (
