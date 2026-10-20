@@ -1,23 +1,63 @@
 import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
+/**
+ * Request a sign-in code for the Super Admin panel.
+ *
+ * The gate is the `super_admins` allowlist. Without it this endpoint was an
+ * open signup: `signInWithOtp` creates the account for any address that asks,
+ * so two stray accounts (phrnx@icloud.com and phrnx@gmail.com) were created
+ * this way before the allowlist existed. They could not reach any admin data
+ * — the guard caught them — but an admin login screen should not be a way to
+ * create accounts.
+ *
+ * Two deliberate choices:
+ *
+ *   - the response is the same whether or not the address is on the
+ *     allowlist, so this endpoint cannot be used to find out who is an
+ *     administrator;
+ *   - `shouldCreateUser: false`, so even if the allowlist check were bypassed
+ *     no account would be created.
+ */
 export async function POST(req: Request) {
   try {
     const { email } = await req.json()
-    const supabase = await createClient()
+    const address = String(email ?? '').trim().toLowerCase()
 
-    // To force a 6-digit code instead of a magic link, we must use
-    // the sign-in with OTP method but we need to ensure the project
-    // is configured for "OTP" rather than "Magic Link".
-    // In the API, this is handled by the Auth settings in the Supabase dashboard.
+    if (!address) {
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+    }
+
+    const { data: allowed, error: allowlistError } = await supabaseAdmin()
+      .from('super_admins')
+      .select('id')
+      .eq('email', address)
+      .maybeSingle()
+
+    if (allowlistError) {
+      console.error('OTP: allowlist lookup failed', allowlistError)
+      return NextResponse.json({ error: 'Could not start sign-in' }, { status: 500 })
+    }
+
+    if (!allowed) {
+      // Same answer as a success, so the endpoint reveals nothing.
+      return NextResponse.json({ success: true })
+    }
+
+    const supabase = await createClient()
     const { error } = await supabase.auth.signInWithOtp({
-      email,
+      email: address,
+      options: { shouldCreateUser: false },
     })
 
     if (error) throw error
     return NextResponse.json({ success: true })
   } catch (e: any) {
     console.error('OTP Error:', e)
-    return NextResponse.json({ error: e.message || 'Failed to send sign-in code' }, { status: 400 })
+    return NextResponse.json(
+      { error: e.message || 'Failed to send sign-in code' },
+      { status: 400 },
+    )
   }
 }

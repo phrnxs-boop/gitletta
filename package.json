@@ -8,7 +8,8 @@
     "start": "NODE_ENV=production node .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:promo": "tsx scripts/test-promo.mts"
+    "test:promo": "tsx scripts/test-promo.mts",
+    "test:superadmin": "tsx scripts/test-superadmin-security.mts && tsx scripts/test-superadmin-api.mts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
