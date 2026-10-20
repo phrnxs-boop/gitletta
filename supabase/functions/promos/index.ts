@@ -2,12 +2,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { guard } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
+import { evaluatePromo } from "../_shared/promo.ts";
 import { body, json, preflight, subPath } from "../_shared/http.ts";
 
 /**
  * /functions/v1/promos
  *   GET            list promo codes (promos.view)
  *   POST           create a promo (promos.manage)
+ *   POST  /validate check a code against a cart total (orders.manage)
  *   PATCH  [?id=]  update a promo (promos.manage)
  *   DELETE [?id=]  delete a promo (promos.manage)
  *
@@ -47,6 +49,7 @@ Deno.serve(async (req: Request) => {
       case "GET":
         return await list(req);
       case "POST":
+        if (segments[0] === "validate") return await validate(req);
         return await create(req);
       case "PATCH":
       case "PUT":
@@ -74,6 +77,45 @@ async function list(req: Request): Promise<Response> {
 
   if (error) return json(req, { error: error.message }, 500);
   return json(req, (data ?? []).map(mapPromo));
+}
+
+/**
+ * Check a promo code against a cart total without applying it.
+ *
+ * The POS asks this before showing a discount, so the cashier learns straight
+ * away that a code is expired, used up, or below the minimum order — instead
+ * of discovering it when the server quietly charges full price.
+ *
+ * Guarded by orders.manage, not promos.view: a cashier needs this to take an
+ * order, and the Waiter/Cashier/Kitchen roles have orders.manage while being
+ * kept out of promo administration.
+ */
+async function validate(req: Request): Promise<Response> {
+  const g = await guard(req, { permission: "orders.manage" });
+  if (!g.ok) return g.response;
+  const tenantId = g.session.tenantId;
+
+  const b = await body(req) as any;
+  const code = typeof b.code === "string" ? b.code : "";
+  const total = Number(b.total) || 0;
+
+  const { data: tenant } = await admin()
+    .from("tenants")
+    .select("currency_symbol")
+    .eq("id", tenantId)
+    .maybeSingle();
+
+  const result = await evaluatePromo(admin(), tenantId, code, total, {
+    currencySymbol: tenant?.currency_symbol ?? "₹",
+  });
+
+  return json(req, {
+    applied: result.applied,
+    reason: result.reason,
+    discount: result.discount,
+    code: result.code,
+    promo: result.promo ? mapPromo(result.promo) : null,
+  });
 }
 
 async function create(req: Request): Promise<Response> {

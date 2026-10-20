@@ -26,6 +26,7 @@ export function DashboardView() {
   const [cartOpen, setCartOpen] = useState(false)
   const [appliedPromo, setAppliedPromo] = useState<any | null>(null)
   const [promoError, setPromoError] = useState('')
+  const [promoChecking, setPromoChecking] = useState(false)
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
 
@@ -77,15 +78,18 @@ export function DashboardView() {
   const taxRate = tenant?.taxRate ?? 8
   const serviceRate = tenant?.serviceCharge ?? 0
 
-  // discount from applied promo (mirrors API logic)
+  // Discount from the applied promo.
+  //
+  // The server decides whether a code applies; this only mirrors the
+  // arithmetic so the total on screen keeps up with the cart. The rule set
+  // matches the server's evaluatePromo() exactly, including max_discount
+  // capping fixed-amount codes as well as percentages.
   let discount = 0
   if (appliedPromo && subtotal >= appliedPromo.minOrder) {
-    if (appliedPromo.type === 'PERCENTAGE') {
-      discount = (subtotal * appliedPromo.value) / 100
-      if (appliedPromo.maxDiscount > 0) discount = Math.min(discount, appliedPromo.maxDiscount)
-    } else {
-      discount = appliedPromo.value
-    }
+    discount = appliedPromo.type === 'PERCENTAGE'
+      ? (subtotal * appliedPromo.value) / 100
+      : appliedPromo.value
+    if (appliedPromo.maxDiscount > 0) discount = Math.min(discount, appliedPromo.maxDiscount)
     discount = Math.min(discount, subtotal) // never go negative
   }
   const taxableAmount = Math.max(0, subtotal - discount)
@@ -93,48 +97,51 @@ export function DashboardView() {
   const service = +((subtotal) * serviceRate / 100).toFixed(2)
   const total = +(subtotal - discount + tax + service).toFixed(2)
 
-  // validate promo code against tenant's promos
-  const applyPromo = () => {
+  // Validate the promo code against the server.
+  //
+  // The server is the authority: it owns expiry, usage limits and the minimum
+  // order, and it runs the same evaluation the order goes through — so the
+  // total the cashier sees is the total that gets charged. The old version
+  // checked the bootstrap-cached list, which went stale as soon as a promo was
+  // used, and the server only re-checked two of the four rules.
+  const applyPromo = async () => {
     setPromoError('')
-    if (!promoCode.trim()) {
+    const code = promoCode.trim()
+    if (!code) {
       setAppliedPromo(null)
       return
     }
-    const found = (data?.promos ?? []).find(
-      (p: any) => p.code.toUpperCase() === promoCode.trim().toUpperCase() && p.active
-    )
-    if (!found) {
+    setPromoChecking(true)
+    try {
+      const res = await edgeFetch('/api/promos/validate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-tenant-id': tenant?.id ?? '' },
+        body: JSON.stringify({ code, total: subtotal }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      const result = await res.json()
+
+      if (!result.applied) {
+        setAppliedPromo(null)
+        setPromoError(result.reason || tr('pos.promoInvalid'))
+        toast.error(result.reason || tr('pos.promoInvalid'))
+        return
+      }
+
+      setAppliedPromo(result.promo)
+      setPromoCode(result.code || code)
+      toast.success(`Promo "${result.code}" applied`, {
+        description: result.promo.type === 'PERCENTAGE'
+          ? `${result.promo.value}% off${result.promo.maxDiscount > 0 ? ` (max ${tenant?.currencySymbol}${result.promo.maxDiscount})` : ''}`
+          : `${tenant?.currencySymbol}${result.promo.value} off`,
+      })
+    } catch {
       setAppliedPromo(null)
       setPromoError(tr('pos.promoInvalid'))
       toast.error(tr('pos.promoInvalid'))
-      return
+    } finally {
+      setPromoChecking(false)
     }
-    // check usage limit
-    if (found.usageLimit > 0 && found.usedCount >= found.usageLimit) {
-      setAppliedPromo(null)
-      setPromoError('Promo usage limit reached')
-      toast.error('Promo usage limit reached')
-      return
-    }
-    // check expiry
-    if (found.validTo && new Date(found.validTo) < new Date()) {
-      setAppliedPromo(null)
-      setPromoError(tr('pos.promoExpired'))
-      toast.error(tr('pos.promoExpired'))
-      return
-    }
-    if (subtotal < found.minOrder) {
-      setAppliedPromo(null)
-      setPromoError(`Minimum order ${tenant?.currencySymbol}${found.minOrder.toFixed(2)} required`)
-      toast.error(`Minimum order of ${tenant?.currencySymbol}${found.minOrder.toFixed(2)} required`)
-      return
-    }
-    setAppliedPromo(found)
-    toast.success(`Promo "${found.code}" applied`, {
-      description: found.type === 'PERCENTAGE'
-        ? `${found.value}% off${found.maxDiscount > 0 ? ` (max ${tenant?.currencySymbol}${found.maxDiscount})` : ''}`
-        : `${tenant?.currencySymbol}${found.value} off`,
-    })
   }
 
   const removePromo = () => {
@@ -245,7 +252,18 @@ export function DashboardView() {
       setPromoError('')
       setCustomerName('')
       setCustomerPhone('')
-      toast.success(`Order #${order.orderNumber} placed!`)
+      if (order.promoApplied === false && order.promoReason) {
+        // The server is the authority on promos, and it can still decline a
+        // code the cashier had already applied — the cart may have changed
+        // since, or the promo may have been used up in between. Say so, or the
+        // customer is charged full price on a total they were shown discounted.
+        toast.error(`Promo not applied: ${order.promoReason}`, {
+          description: `Order #${order.orderNumber} placed at full price.`,
+          duration: 8000,
+        })
+      } else {
+        toast.success(`Order #${order.orderNumber} placed!`)
+      }
       refresh()
       setCartOpen(false)
     } catch {
@@ -448,6 +466,7 @@ export function DashboardView() {
           setPromoCode={setPromoCode}
           appliedPromo={appliedPromo}
           promoError={promoError}
+          promoChecking={promoChecking}
           onApplyPromo={applyPromo}
           onRemovePromo={removePromo}
           onSubmit={submitOrder}
@@ -500,6 +519,7 @@ export function DashboardView() {
             setPromoCode={setPromoCode}
             appliedPromo={appliedPromo}
             promoError={promoError}
+            promoChecking={promoChecking}
             onApplyPromo={applyPromo}
             onRemovePromo={removePromo}
             onSubmit={submitOrder}
@@ -632,6 +652,7 @@ interface CartPanelProps {
   setPromoCode: (c: string) => void
   appliedPromo: any | null
   promoError: string
+  promoChecking: boolean
   onApplyPromo: () => void
   onRemovePromo: () => void
   onSubmit: () => void
@@ -776,7 +797,9 @@ function CartPanel(p: CartPanelProps) {
               placeholder={tr('pos.promo')}
               className="flex-1 bg-secondary/60 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-muted-foreground uppercase min-w-0"
             />
-            <Button variant="secondary" size="sm" onClick={p.onApplyPromo} className="h-8">{tr('pos.apply')}</Button>
+            <Button variant="secondary" size="sm" onClick={p.onApplyPromo} disabled={p.promoChecking} className="h-8">
+              {p.promoChecking ? 'Checking…' : tr('pos.apply')}
+            </Button>
           </div>
         )}
         {p.promoError && !p.appliedPromo && (

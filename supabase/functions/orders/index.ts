@@ -2,6 +2,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { guard } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
+import { evaluatePromo } from "../_shared/promo.ts";
 import { body, json, preflight, subPath } from "../_shared/http.ts";
 
 /**
@@ -350,45 +351,33 @@ async function create(req: Request): Promise<Response> {
       return json(req, { error: "No valid items in order" }, 400);
     }
 
-    const { data: tenant } = await db
+    const { data: tenant, error: tenantError } = await db
       .from("tenants")
-      .select("tax_rate, service_charge")
+      .select("tax_rate, service_charge, currency_symbol")
       .eq("id", tenantId)
       .maybeSingle();
+    if (tenantError) {
+      return json(req, { error: tenantError.message }, 500);
+    }
     const taxRate = (tenant?.tax_rate ?? 8) / 100;
     const serviceRate = (tenant?.service_charge ?? 0) / 100;
 
-    let discount = 0;
-    let promoCodeId: string | undefined;
-    let promoCodeStr: string | undefined;
-    if (promoCode) {
-      const { data: promo } = await db
-        .from("promo_codes")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .eq("code", promoCode)
-        .eq("active", true)
-        .maybeSingle();
+    // One authority on whether the code applies, and why not if it does not.
+    // The rules match place_order() so the POS and the diner path agree.
+    const promoEval = await evaluatePromo(db, tenantId, promoCode, itemsTotal, {
+      currencySymbol: tenant?.currency_symbol ?? "₹",
+    });
 
-      if (promo) {
-        if (promo.type === "PERCENTAGE") {
-          discount = (itemsTotal * promo.value) / 100;
-          if (promo.max_discount > 0) discount = Math.min(discount, promo.max_discount);
-        } else {
-          discount = promo.value;
-        }
-        if (itemsTotal >= promo.min_order) {
-          promoCodeId = promo.id;
-          promoCodeStr = promo.code;
-          await db
-            .from("promo_codes")
-            .update({ used_count: (promo.used_count ?? 0) + 1 })
-            .eq("id", promo.id)
-            .eq("tenant_id", tenantId);
-        } else {
-          discount = 0;
-        }
-      }
+    const discount = promoEval.discount;
+    const promoCodeId = promoEval.applied ? promoEval.promo.id : undefined;
+    const promoCodeStr = promoEval.applied ? promoEval.code : undefined;
+
+    if (promoEval.applied) {
+      await db
+        .from("promo_codes")
+        .update({ used_count: (promoEval.promo.used_count ?? 0) + 1 })
+        .eq("id", promoEval.promo.id)
+        .eq("tenant_id", tenantId);
     }
 
     const tax = +((itemsTotal - discount) * taxRate).toFixed(2);
@@ -441,7 +430,14 @@ async function create(req: Request): Promise<Response> {
 
     const order = mapOrder(orderRow);
     publishEvent({ type: "ORDER_CREATED", tenantId, order });
-    return json(req, order, 201);
+    // The promo verdict travels with the order so the POS can tell the
+    // cashier why a code did not apply, instead of silently charging full
+    // price on a total the cashier had already seen discounted.
+    return json(
+      req,
+      { ...order, promoApplied: promoEval.applied, promoReason: promoEval.reason },
+      201,
+    );
   } catch (error: any) {
     console.error("Order creation error:", error);
     return json(req, { error: error?.message || "Failed to place order" }, 500);
