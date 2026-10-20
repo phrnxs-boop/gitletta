@@ -97,6 +97,88 @@ async function getUsageAnalytics(req: Request) {
   });
 }
 
+// --- Retention & Reports Logic ---
+async function getRetentionData(req: Request) {
+  const db = admin();
+
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  
+  const { data: expiringTrials } = await db
+    .from("tenants")
+    .select("*, profiles(email)")
+    .eq("subscription_status", "trial")
+    .lte("trial_ends_at", nextWeek.toISOString())
+    .gte("trial_ends_at", new Date().toISOString());
+
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+
+  const { data: inactiveSessions } = await db
+    .from("table_sessions")
+    .select("tenant_id")
+    .lt("last_seen_at", twoWeeksAgo.toISOString())
+    .eq("status", "ACTIVE");
+
+  const inactiveSet = new Set(inactiveSessions?.map(s => s.tenant_id) || []);
+  const { data: inactiveDetails } = await db
+    .from("tenants")
+    .select("*, profiles(email)")
+    .in("id", Array.from(inactiveSet));
+
+  return json(req, {
+    expiringTrials: expiringTrials || [],
+    inactiveTenants: inactiveDetails || [],
+  });
+}
+
+async function getCsvReport(req: Request) {
+  const url = new URL(req.url);
+  const type = url.searchParams.get("type") || "crm";
+  
+  let query = "";
+  let headers = "";
+
+  if (type === "crm") {
+    headers = "Restaurant,Email,Plan,Status,Joined\n";
+    const { data } = await admin()
+      .from("tenants")
+      .select("name, profiles(email), plan, active, created_at");
+    
+    const rows = data?.map(r => 
+      `"${r.name}","${r.profiles?.email || ''}","${r.plan}","${r.active}","${r.created_at}"`
+    ).join("\n") || "";
+    query = headers + rows;
+  } else if (type === "revenue") {
+    headers = "Amount,Currency,Status,Date,Restaurant\n";
+    const { data } = await admin()
+      .from("subscription_payments")
+      .select("amount, currency, status, created_at, tenants(name)");
+    
+    const rows = data?.map(r => 
+      `"${r.amount}","${r.currency}","${r.status}","${r.created_at}","${r.tenants?.name || ''}"`
+    ).join("\n") || "";
+    query = headers + rows;
+  } else {
+    return json(req, { error: "Invalid report type" }, 400);
+  }
+
+  await admin()
+    .from("super_admin_reports")
+    .insert({
+      admin_id: (await admin().auth.getUser()).data.user?.id,
+      report_type: type,
+      created_at: new Date().toISOString()
+    });
+
+  return new Response(query, {
+    headers: {
+      "Content-Type": "text/csv",
+      "Content-Disposition": `attachment; filename=swixo_${type}_report.csv`,
+    },
+  });
+}
+
 async function getBusinessOverview(req: Request) {
   const { count: totalTenants } = await admin().from("tenants").select("*", { count: "exact", head: true });
   const thirtyDaysAgo = new Date();
@@ -151,6 +233,8 @@ Deno.serve(async (req: Request) => {
       if (route === "payments") return await getPaymentAnalytics(req);
       if (route === "reports") return await getRevenueReports(req);
       if (route === "analytics") return await getUsageAnalytics(req);
+      if (route === "retention") return await getRetentionData(req);
+      if (route === "reports/csv") return await getCsvReport(req);
       return json(req, { error: "Not found" }, 404);
     }
 
