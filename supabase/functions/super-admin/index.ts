@@ -3,7 +3,7 @@ import { json, preflight, subPath } from "../_shared/http.ts";
 import { admin } from "../_shared/db.ts";
 import { superGuard } from "../_shared/super_admin.ts";
 
-// Inline payments logic to avoid bundling issues with local files in the MCP deploy script
+// --- Payments Logic ---
 async function getPaymentAnalytics(req: Request) {
   const db = admin();
 
@@ -61,6 +61,42 @@ async function getRevenueReports(req: Request) {
   return json(req, reports);
 }
 
+// --- Usage Analytics Logic ---
+async function getUsageAnalytics(req: Request) {
+  const db = admin();
+
+  const { data: featureUsage } = await db
+    .from("feature_usage")
+    .select("feature_id, count(*)")
+    .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    .group("feature_id");
+
+  const { count: activeTenants } = await db
+    .from("table_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "ACTIVE")
+    .gte("last_seen_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+  const { data: orderTrend } = await db
+    .from("orders")
+    .select("created_at, id")
+    .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+  const dailyOrders: Record<string, number> = {};
+  orderTrend?.forEach(o => {
+    const date = new Date(o.created_at).toISOString().split('T')[0];
+    dailyOrders[date] = (dailyOrders[date] || 0) + 1;
+  });
+
+  return json(req, {
+    metrics: {
+      activeTenants_24h: activeTenants,
+      topFeatures: featureUsage,
+    },
+    orderTrend: dailyOrders,
+  });
+}
+
 async function getBusinessOverview(req: Request) {
   const { count: totalTenants } = await admin().from("tenants").select("*", { count: "exact", head: true });
   const thirtyDaysAgo = new Date();
@@ -114,6 +150,7 @@ Deno.serve(async (req: Request) => {
       if (route === "crm") return await getRestaurantCRM(req);
       if (route === "payments") return await getPaymentAnalytics(req);
       if (route === "reports") return await getRevenueReports(req);
+      if (route === "analytics") return await getUsageAnalytics(req);
       return json(req, { error: "Not found" }, 404);
     }
 
