@@ -22,6 +22,63 @@ function LoginInner() {
     }
   }, [search])
 
+  // A sign-in link lands here in one of two shapes, and only one of them
+  // reaches the server:
+  //
+  //   ?code=…                 PKCE — the code is in the query string
+  //   #access_token=…&…       implicit — the tokens are in the fragment
+  //
+  // The fragment never leaves the browser, so it is read here and posted to
+  // the server, which writes the session into the HttpOnly cookie and checks
+  // the allowlist. Either way the tokens are scrubbed from the address bar.
+  useEffect(() => {
+    const hash = window.location.hash.startsWith('#')
+      ? window.location.hash.slice(1)
+      : ''
+    const frag = new URLSearchParams(hash)
+    const accessToken = frag.get('access_token')
+    const refreshToken = frag.get('refresh_token')
+    const code = new URLSearchParams(window.location.search).get('code')
+
+    if (!accessToken && !code) return
+
+    let cancelled = false
+    const run = async () => {
+      setStep('code')
+      setLoading(true)
+      setError(null)
+      setNotice('Signing you in…')
+
+      try {
+        const res = await fetch('/api/auth/callback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken, refreshToken, code }),
+        })
+        const payload = await res.json().catch(() => ({}))
+
+        // Take the tokens out of the address bar either way.
+        window.history.replaceState({}, '', '/superadmin/login')
+
+        if (!res.ok) {
+          throw new Error(payload?.error || 'That sign-in link could not be used.')
+        }
+        if (cancelled) return
+        window.location.href = '/superadmin'
+      } catch (e: any) {
+        if (cancelled) return
+        setNotice(null)
+        setError(e.message || 'That sign-in link could not be used.')
+        setLoading(false)
+        setStep('email')
+      }
+    }
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)

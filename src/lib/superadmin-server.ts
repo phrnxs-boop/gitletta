@@ -118,3 +118,41 @@ export async function getSuperAdminIdentity(): Promise<SuperAdminCheck> {
 export function hasServiceRole(): boolean {
   return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
 }
+
+/**
+ * Where a sign-in link should send the administrator.
+ *
+ * The link carries a session, so where it points matters: it must be an
+ * origin we recognise, and it must be absolute. The `Host` header is not
+ * trusted on its own — a request that arrived with a forged host would
+ * otherwise be able to have the sign-in token mailed to somewhere else.
+ * Only the known origins are used.
+ */
+const ADMIN_ORIGINS = [
+  'https://www.restrofi.in',
+  'https://restrofi.in',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+]
+
+export function resolveAdminOrigin(req: Request): string {
+  const forwardedHost = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? ''
+  const forwardedProto = req.headers.get('x-forwarded-proto') ?? ''
+
+  const candidates = [
+    forwardedProto && forwardedHost ? `${forwardedProto}://${forwardedHost}` : '',
+    forwardedHost
+      ? `${forwardedHost.includes('localhost') || forwardedHost.includes('127.0.0.1') ? 'http' : 'https'}://${forwardedHost}`
+      : '',
+    process.env.NEXT_PUBLIC_SITE_URL ?? '',
+  ].filter(Boolean)
+
+  for (const candidate of candidates) {
+    const match = ADMIN_ORIGINS.find(
+      (origin) => candidate.toLowerCase().startsWith(origin.toLowerCase()),
+    )
+    if (match) return match
+  }
+
+  return ADMIN_ORIGINS[0]
+}

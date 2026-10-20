@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { resolveAdminOrigin } from '@/lib/superadmin-server'
 import { NextResponse } from 'next/server'
 
 /**
@@ -48,7 +49,17 @@ export async function POST(req: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.signInWithOtp({
       email: address,
-      options: { shouldCreateUser: false },
+      options: {
+        shouldCreateUser: false,
+        // The link has to come back to this page, and it has to be an
+        // absolute URL. Left to the project's Site URL it does not: that is
+        // set to a bare host with no scheme, so Supabase builds the link
+        // with a path instead of an address and the browser lands on
+        // Supabase's own domain with a "requested path is invalid" page
+        // instead of here. Naming the destination fixes that, and means the
+        // panel does not depend on the Site URL being right.
+        emailRedirectTo: `${resolveAdminOrigin(req)}/superadmin/login`,
+      },
     })
 
     if (error) throw error
