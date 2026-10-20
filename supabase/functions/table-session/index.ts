@@ -116,16 +116,42 @@ async function validateTableSession(params: {
     };
   }
 
-  // Idle timeout.
+  // Close-detection with grace window + idle fallback.
   //
-  // The menu polls this endpoint every 1.5s while it is open, so a session we
-  // have not heard from in a while means the diner closed it — closing a tab
-  // sends no request of its own, and without this the session stayed ACTIVE
-  // until the six-hour age cap, showing up on the POS as a table that was not
-  // in service. Silence now ends it, so nothing needs clearing by hand.
+  // Closing a tab fires pagehide, which stamps closing_at (see /release). But
+  // pagehide also fires on a refresh, so we do not end the session there.
+  // Instead, a pagehide sets closing_at; if a heartbeat (this validate) arrives
+  // within the grace window, the tab is still alive and we clear closing_at.
+  // Only sessions whose closing_at has aged past the grace window end up
+  // ended — i.e. the tab really went away. The 3-minute idle rule stays as the
+  // fallback for browsers that never fire pagehide.
   const IDLE_MS = 3 * 60 * 1000;
+  const GRACE_MS = 3000;
+  const now = Date.now();
   const lastSeen = new Date(row.last_seen_at ?? row.created_at).getTime();
-  if (Date.now() - lastSeen > IDLE_MS) {
+  const closingAt = row.closing_at ? new Date(row.closing_at).getTime() : null;
+
+  // If the tab reported it was closing but is heartbeating again within the
+  // grace window, it was a refresh — clear the closing marker, stay alive.
+  if (closingAt !== null && now - closingAt < GRACE_MS) {
+    await admin()
+      .from("table_sessions")
+      .update({ closing_at: null, last_seen_at: new Date().toISOString() })
+      .eq("id", row.id);
+    // fall through to serve the menu
+  } else if (closingAt !== null && now - closingAt >= GRACE_MS) {
+    // Grace window elapsed with no heartbeat: the tab really closed.
+    await admin()
+      .from("table_sessions")
+      .update({ status: "ENDED", ended_at: new Date().toISOString() })
+      .eq("id", row.id);
+    return {
+      ok: false,
+      error: "Session ended. Please scan the table QR code again to continue.",
+      status: 403,
+    };
+  } else if (now - lastSeen > IDLE_MS) {
+    // Idle fallback: no heartbeat for 3 minutes.
     await admin()
       .from("table_sessions")
       .update({ status: "ENDED", ended_at: new Date().toISOString() })
@@ -139,7 +165,7 @@ async function validateTableSession(params: {
 
   // Record the heartbeat, but only when it has gone stale. Writing on every
   // poll would be a row update per diner per 1.5s for no extra information.
-  if (Date.now() - lastSeen > 20_000) {
+  if (now - lastSeen > 20_000) {
     await admin()
       .from("table_sessions")
       .update({ last_seen_at: new Date().toISOString() })
@@ -183,15 +209,19 @@ async function releaseSession(req: Request): Promise<Response> {
     .select("id", { count: "exact", head: true })
     .eq("table_session_id", mine.id);
   if ((count ?? 0) > 0) {
+    // A session with an order is genuinely in service — the diner may have
+    // closed the tab to eat. Never end it on a release; keep it ACTIVE and let
+    // the idle / closing grace rules handle it.
     return json(req, { success: true, ended: 0, kept: "session has an order" });
   }
 
+  // Stamp closing_at rather than ending synchronously. pagehide fires on both
+  // close and refresh; the grace window lets a refresh's heartbeat clear it.
   await db
     .from("table_sessions")
-    .update({ status: "ENDED", ended_at: new Date().toISOString() })
+    .update({ closing_at: new Date().toISOString() })
     .eq("id", mine.id);
-  publishSessionEnded(mine.tenant_id, { id: mine.id, tableId: mine.table_id });
-  return json(req, { success: true, ended: 1 });
+  return json(req, { success: true, ended: 0, closing: true });
 }
 
 /** Mirrors activateTableSession() from src/lib/table-session.ts. */
