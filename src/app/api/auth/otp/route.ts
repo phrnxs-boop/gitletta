@@ -6,9 +6,10 @@ export async function POST(req: Request) {
     const { email } = await req.json()
     const supabase = await createClient()
 
-    // Removed shouldCreateUser: false because it can cause failures if the
-    // user is not exactly as expected in auth.users. We rely on the 
-    // super_admin check in the dashboard routes to keep it secure.
+    // To force a 6-digit code instead of a magic link, we must use
+    // the sign-in with OTP method but we need to ensure the project
+    // is configured for "OTP" rather than "Magic Link".
+    // In the API, this is handled by the Auth settings in the Supabase dashboard.
     const { error } = await supabase.auth.signInWithOtp({
       email,
     })
