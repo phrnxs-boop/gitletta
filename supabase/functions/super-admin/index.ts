@@ -53,6 +53,8 @@ async function getRestaurantCRM(req: Request) {
   return json(req, restaurants);
 }
 
+import { getPaymentAnalytics, getRevenueReports } from "./payments.ts";
+
 Deno.serve(async (req: Request) => {
   const pf = preflight(req);
   if (pf) return pf;
@@ -66,6 +68,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (req.method === "GET") {
+      if (route === "payments") return await getPaymentAnalytics(req);
+      if (route === "reports") return await getRevenueReports(req);
       if (route === "overview") return await getBusinessOverview(req);
       if (route === "crm") return await getRestaurantCRM(req);
       return json(req, { error: "Not found" }, 404);
