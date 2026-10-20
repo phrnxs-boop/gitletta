@@ -12,7 +12,7 @@ type UsageMetrics = {
 }
 
 export default function SuperAdminAnalytics() {
-  const [data, setData] = useState<{metrics: UsageMetrics; orderTrend: any} | null>(null)
+  const [data, setData] = useState<{metrics: UsageMetrics; orderTrend: Record<string, number>} | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 

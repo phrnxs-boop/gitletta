@@ -104,7 +104,7 @@ export default function SuperAdminRetention() {
                 <TableHead>Restaurant</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Action</TableH>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

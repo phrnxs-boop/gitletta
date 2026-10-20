@@ -1,6 +1,6 @@
 "use client"
 
-import { Link } from 'next/link'
+import Link from 'next/link'
 import { 
   LayoutDashboard, 
   Users, 
@@ -9,7 +9,6 @@ import {
   Settings, 
   LogOut 
 } from 'lucide-react'
-import { useAuth } from '@/lib/auth' // Assuming existing auth hook
 import { Button } from '@/components/ui/button'
 
 const NAV_ITEMS = [
