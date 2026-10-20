@@ -4,7 +4,7 @@ const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const ADMIN_EMAIL = "phrnxs@gmail.com";
+const ADMIN_EMAIL = "phrnx@icloud.com";
 const OWNER_EMAIL = "swizofoods@gmail.com";
 
 let failures = 0;

@@ -30,7 +30,7 @@ const admin = createClient(URL, SERVICE, { auth: { persistSession: false } });
 
 const { data: link, error: linkError } = await admin.auth.admin.generateLink({
   type: "magiclink",
-  email: "phrnxs@gmail.com",
+  email: "phrnx@icloud.com",
 });
 if (linkError) { console.log("link error:", linkError.message); process.exit(1); }
 

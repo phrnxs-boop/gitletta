@@ -55,7 +55,7 @@ async function status(path: string, token?: string, init: RequestInit = {}) {
 }
 
 console.log("\n── the owner dashboard's edge functions ──");
-const owner = await sessionFor("phrnxs@gmail.com");
+const owner = await sessionFor("swizofoods@gmail.com");
 for (const path of [
   "bootstrap",
   "orders",
@@ -87,14 +87,26 @@ console.log("\n── the routes that need an argument ──");
   const { data: orders } = await admin
     .from("orders")
     .select("id")
-    .eq("tenant_id", (await admin.from("profiles").select("tenant_id").eq("email", "phrnxs@gmail.com").single()).data!.tenant_id)
+    .eq("tenant_id", (await admin.from("profiles").select("tenant_id").eq("email", "swizofoods@gmail.com").single()).data!.tenant_id)
     .limit(1);
   if (orders?.length) {
     check("bill for a real order", await status(`bill/${orders[0].id}`, owner), 200);
   } else {
     console.log("  --  no order to bill");
   }
-  const { data: tables } = await admin.from("tables").select("id").limit(1);
+  // The table has to belong to the owner's own tenant — asking for another
+  // restaurant's table is a cross-tenant request, and a 404 is the right
+  // answer to that.
+  const { data: ownerProfile } = await admin
+    .from("profiles")
+    .select("tenant_id")
+    .eq("email", "swizofoods@gmail.com")
+    .single();
+  const { data: tables } = await admin
+    .from("tables")
+    .select("id")
+    .eq("tenant_id", ownerProfile?.tenant_id ?? null)
+    .limit(1);
   if (tables?.length) {
     check("qr for a real table", await status(`qr/${tables[0].id}`, owner), 200);
   } else {
