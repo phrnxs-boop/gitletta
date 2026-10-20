@@ -19,7 +19,7 @@ const DESCRIPTION =
   "QR table ordering, staff PIN sessions, reservations, analytics and GST-compliant bills.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: {
     default: "Swixo — Restaurant POS & QR Ordering",
     template: "%s · Swixo",
