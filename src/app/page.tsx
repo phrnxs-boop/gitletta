@@ -11,6 +11,7 @@ import { LoginPage } from '@/components/auth/login-page'
 import { StaffLoginPage } from '@/components/staff/staff-login'
 import { StaffDashboard } from '@/components/staff/staff-dashboard'
 import { ResetPasswordView } from '@/components/auth/reset-password'
+import { MagicLinkForwarder } from '@/components/auth/magic-link-forwarder'
 
 // Views that require a logged-in owner session
 const PROTECTED_VIEWS = ['onboarding', 'dashboard', '']
@@ -99,6 +100,7 @@ export default function Home() {
       </div>
     }>
       <PageContent />
+      <MagicLinkForwarder />
     </Suspense>
   )
 }
