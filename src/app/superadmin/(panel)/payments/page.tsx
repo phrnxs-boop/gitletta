@@ -97,7 +97,7 @@ export default function SuperAdminPayments() {
               value={money(m?.mrrRealized ?? 0)}
               hint="what actually came in"
               icon={<Banknote className="size-4" />}
-              tone="indigo"
+              tone="orange"
             />
             <StatCard
               label="Verified revenue"
@@ -151,7 +151,7 @@ export default function SuperAdminPayments() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left">
                 <thead>
-                  <tr className="border-b border-slate-200 text-[11.5px] uppercase tracking-wider text-slate-500">
+                  <tr className="border-b border-admin-border text-[11.5px] uppercase tracking-wider text-admin-muted">
                     <th className="px-5 py-3 font-medium">Plan</th>
                     <th className="px-3 py-3 text-right font-medium">Monthly</th>
                     <th className="px-3 py-3 text-right font-medium">Yearly</th>
@@ -160,28 +160,28 @@ export default function SuperAdminPayments() {
                     <th className="px-5 py-3 font-medium">Included</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-admin-border-soft">
                   {(data?.plans ?? []).map((p) => (
-                    <tr key={p.id} className="transition hover:bg-slate-50/70">
+                    <tr key={p.id} className="transition hover:bg-admin-elevated">
                       <td className="px-5 py-3">
-                        <span className="text-[13.5px] font-medium text-slate-800">{p.name}</span>
-                        <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] capitalize text-slate-500">
+                        <span className="text-[13.5px] font-medium text-admin-fg">{p.name}</span>
+                        <span className="ml-2 rounded bg-admin-elevated px-1.5 py-0.5 text-[11px] capitalize text-admin-muted">
                           {p.id}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-slate-700">
+                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-admin-fg-body">
                         {money(p.priceMonthly)}
                       </td>
-                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-slate-700">
+                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-admin-fg-body">
                         {money(p.priceYearly)}
                       </td>
-                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-slate-600">
+                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-admin-fg-body">
                         {p.trialDays}d
                       </td>
-                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-slate-700">
+                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-admin-fg-body">
                         {p.subscribers}
                       </td>
-                      <td className="px-5 py-3 text-[12.5px] text-slate-500">
+                      <td className="px-5 py-3 text-[12.5px] text-admin-muted">
                         {p.features.join(' · ')}
                       </td>
                     </tr>
@@ -200,7 +200,7 @@ export default function SuperAdminPayments() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left">
                   <thead>
-                    <tr className="border-b border-slate-200 text-[11.5px] uppercase tracking-wider text-slate-500">
+                    <tr className="border-b border-admin-border text-[11.5px] uppercase tracking-wider text-admin-muted">
                       <th className="px-5 py-3 font-medium">Restaurant</th>
                       <th className="px-3 py-3 font-medium">Plan</th>
                       <th className="px-3 py-3 font-medium">Period</th>
@@ -209,25 +209,25 @@ export default function SuperAdminPayments() {
                       <th className="px-5 py-3 text-right font-medium">When</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-admin-border-soft">
                     {data.transactions.map((t) => (
-                      <tr key={t.id} className="transition hover:bg-slate-50/70">
-                        <td className="px-5 py-2.5 text-[13px] font-medium text-slate-800">
+                      <tr key={t.id} className="transition hover:bg-admin-elevated">
+                        <td className="px-5 py-2.5 text-[13px] font-medium text-admin-fg">
                           {t.tenantName}
                         </td>
-                        <td className="px-3 py-2.5 text-[13px] capitalize text-slate-600">
+                        <td className="px-3 py-2.5 text-[13px] capitalize text-admin-fg-body">
                           {t.plan_id}
                         </td>
-                        <td className="px-3 py-2.5 text-[13px] capitalize text-slate-600">
+                        <td className="px-3 py-2.5 text-[13px] capitalize text-admin-fg-body">
                           {t.billing_period}
                         </td>
                         <td className="px-3 py-2.5">
                           <Pill status={t.status}>{t.status}</Pill>
                         </td>
-                        <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-slate-800">
+                        <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-admin-fg">
                           {money(t.amount, t.currency === 'INR' ? '₹' : `${t.currency} `)}
                         </td>
-                        <td className="px-5 py-2.5 text-right text-[12.5px] text-slate-500">
+                        <td className="px-5 py-2.5 text-right text-[12.5px] text-admin-muted">
                           {relativeTime(t.created_at)}
                         </td>
                       </tr>
@@ -236,7 +236,7 @@ export default function SuperAdminPayments() {
                 </table>
               </div>
             ) : (
-              <p className="px-5 py-10 text-center text-[13px] text-slate-400">
+              <p className="px-5 py-10 text-center text-[13px] text-admin-faint">
                 No payments have been recorded yet.
               </p>
             )}

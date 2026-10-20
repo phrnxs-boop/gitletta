@@ -74,20 +74,20 @@ export function Sidebar({
     href === '/superadmin' ? pathname === '/superadmin' : pathname.startsWith(href)
 
   const nav = (
-    <div className="flex h-full flex-col bg-slate-900 text-slate-300">
+    <div className="flex h-full flex-col bg-admin-rail text-admin-rail-fg">
       <div className="flex items-center justify-between gap-3 px-5 pb-5 pt-6">
         <div className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-950/40">
+          <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-admin-accent to-admin-accent-hover text-white shadow-lg shadow-[rgba(234,88,12,0.30)]">
             <ShieldCheck className="size-4.5" />
           </span>
           <div className="leading-tight">
             <p className="text-[15px] font-semibold tracking-tight text-white">Swixo Admin</p>
-            <p className="text-[11px] text-slate-400">Global control panel</p>
+            <p className="text-[11px] text-admin-rail-fg">Global control panel</p>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white lg:hidden"
+          className="rounded-lg p-1.5 text-admin-rail-fg transition hover:bg-admin-rail-active hover:text-white lg:hidden"
           aria-label="Close navigation"
         >
           <X className="size-4" />
@@ -97,7 +97,7 @@ export function Sidebar({
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-4">
         {SECTIONS.map((section) => (
           <div key={section.label}>
-            <p className="px-3 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            <p className="px-3 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-admin-rail-fg">
               {section.label}
             </p>
             <ul className="space-y-0.5">
@@ -112,17 +112,17 @@ export function Sidebar({
                       className={cn(
                         'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-medium transition',
                         active
-                          ? 'bg-white/10 text-white'
-                          : 'text-slate-400 hover:bg-white/5 hover:text-slate-100',
+                          ? 'bg-admin-rail-active text-white'
+                          : 'text-admin-rail-fg hover:bg-admin-rail-hover hover:text-white',
                       )}
                     >
                       {active && (
-                        <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-indigo-400" />
+                        <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-admin-accent" />
                       )}
                       <item.icon
                         className={cn(
                           'size-4 shrink-0 transition',
-                          active ? 'text-indigo-300' : 'text-slate-500 group-hover:text-slate-300',
+                          active ? 'text-admin-accent' : 'text-admin-rail-fg group-hover:text-white',
                         )}
                       />
                       <span className="truncate">{item.name}</span>
@@ -135,12 +135,12 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className="border-t border-white/10 px-5 py-4">
-        <p className="truncate text-[12.5px] font-medium text-slate-200">{identity.label}</p>
-        <p className="truncate text-[11.5px] text-slate-500">{identity.email}</p>
+      <div className="border-t border-admin-rail-border px-5 py-4">
+        <p className="truncate text-[12.5px] font-medium text-admin-faint-3">{identity.label}</p>
+        <p className="truncate text-[11.5px] text-admin-rail-fg">{identity.email}</p>
         <button
           onClick={signOut}
-          className="mt-3 w-full rounded-lg border border-white/10 px-3 py-1.5 text-[12.5px] font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
+          className="mt-3 w-full rounded-lg border border-admin-rail-border px-3 py-1.5 text-[12.5px] font-medium text-admin-rail-fg transition hover:border-[rgba(255,255,255,0.16)] hover:bg-admin-rail-hover hover:text-white"
         >
           Sign out
         </button>
@@ -161,7 +161,7 @@ export function Sidebar({
           <button
             onClick={onClose}
             aria-label="Close navigation"
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
           <aside className="relative h-full w-[280px] max-w-[85vw] shadow-2xl">{nav}</aside>
         </div>

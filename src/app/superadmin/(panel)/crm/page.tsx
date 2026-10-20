@@ -128,7 +128,7 @@ export default function SuperAdminCrm() {
           <button
             onClick={exportCsv}
             disabled={!rows.length}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-admin-border bg-white px-3 py-2 text-[13px] font-medium text-admin-fg-body transition hover:bg-admin-bg disabled:opacity-50"
           >
             <Download className="size-3.5" />
             Export CSV
@@ -139,19 +139,19 @@ export default function SuperAdminCrm() {
       <Panel bodyClassName="px-3 py-3 sm:px-4">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[220px] flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-admin-faint" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by name, slug, owner or email…"
-              className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/60 pl-9 pr-3 text-[13.5px] outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white"
+              className="h-9 w-full rounded-lg border border-admin-border bg-admin-bg pl-9 pr-3 text-[13.5px] outline-none transition placeholder:text-admin-faint focus:border-admin-accent focus:bg-white"
             />
           </div>
 
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] text-slate-600 outline-none focus:border-indigo-300"
+            className="h-9 rounded-lg border border-admin-border bg-white px-2.5 text-[13px] text-admin-fg-body outline-none focus:border-admin-accent"
           >
             <option value="">All statuses</option>
             {statuses.map((s) => (
@@ -164,7 +164,7 @@ export default function SuperAdminCrm() {
           <select
             value={plan}
             onChange={(e) => setPlan(e.target.value)}
-            className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] text-slate-600 outline-none focus:border-indigo-300"
+            className="h-9 rounded-lg border border-admin-border bg-white px-2.5 text-[13px] text-admin-fg-body outline-none focus:border-admin-accent"
           >
             <option value="">All plans</option>
             {plans.map((p) => (
@@ -174,7 +174,7 @@ export default function SuperAdminCrm() {
             ))}
           </select>
 
-          <span className="ml-auto text-[12.5px] tabular-nums text-slate-500">
+          <span className="ml-auto text-[12.5px] tabular-nums text-admin-muted">
             {rows.length} restaurant{rows.length === 1 ? '' : 's'}
           </span>
         </div>
@@ -193,7 +193,7 @@ export default function SuperAdminCrm() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[880px] text-left">
                 <thead>
-                  <tr className="border-b border-slate-200 text-[11.5px] uppercase tracking-wider text-slate-500">
+                  <tr className="border-b border-admin-border text-[11.5px] uppercase tracking-wider text-admin-muted">
                     <th className="px-5 py-3 font-medium">Restaurant</th>
                     <th className="px-3 py-3 font-medium">Owner</th>
                     <th className="px-3 py-3 font-medium">Plan</th>
@@ -204,26 +204,26 @@ export default function SuperAdminCrm() {
                     <th className="px-5 py-3 text-right font-medium">Signed up</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-admin-border-soft">
                   {rows.map((r) => (
-                    <tr key={r.id} className="group transition hover:bg-slate-50/70">
+                    <tr key={r.id} className="group transition hover:bg-admin-elevated">
                       <td className="px-5 py-3">
                         <Link
                           href={`/superadmin/crm/${r.id}`}
                           className="flex items-center gap-2.5"
                         >
-                          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500 transition group-hover:bg-indigo-50 group-hover:text-indigo-600">
+                          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-admin-elevated text-admin-muted transition group-hover:bg-admin-accent-soft group-hover:text-admin-accent">
                             <Store className="size-4" />
                           </span>
                           <span className="min-w-0">
-                            <span className="block truncate text-[13.5px] font-medium text-slate-800">
+                            <span className="block truncate text-[13.5px] font-medium text-admin-fg">
                               {r.name}
                             </span>
-                            <span className="flex items-center gap-1.5 text-[12px] text-slate-500">
+                            <span className="flex items-center gap-1.5 text-[12px] text-admin-muted">
                               {r.slug}
-                              <span className="text-slate-300">·</span>
+                              <span className="text-admin-faint-2">·</span>
                               {r.menuItemCount} items
-                              <span className="text-slate-300">·</span>
+                              <span className="text-admin-faint-2">·</span>
                               <Users className="size-3" />
                               {r.staffCount}
                             </span>
@@ -231,15 +231,15 @@ export default function SuperAdminCrm() {
                         </Link>
                       </td>
                       <td className="px-3 py-3">
-                        <span className="block truncate text-[13px] text-slate-700">
+                        <span className="block truncate text-[13px] text-admin-fg-body">
                           {r.ownerName ?? '—'}
                         </span>
-                        <span className="block truncate text-[12px] text-slate-500">
+                        <span className="block truncate text-[12px] text-admin-muted">
                           {r.ownerEmail ?? '—'}
                         </span>
                       </td>
                       <td className="px-3 py-3">
-                        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[12px] capitalize text-slate-600">
+                        <span className="rounded-md bg-admin-elevated px-2 py-0.5 text-[12px] capitalize text-admin-fg-body">
                           {r.plan}
                         </span>
                       </td>
@@ -252,16 +252,16 @@ export default function SuperAdminCrm() {
                           <span className="ml-1.5 text-[11.5px] text-rose-600">disabled</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-slate-700">
+                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-admin-fg-body">
                         {r.orderCount}
                       </td>
-                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-slate-700">
+                      <td className="px-3 py-3 text-right text-[13px] tabular-nums text-admin-fg-body">
                         {compactMoney(r.orderValue)}
                       </td>
-                      <td className="px-3 py-3 text-[12.5px] text-slate-500">
+                      <td className="px-3 py-3 text-[12.5px] text-admin-muted">
                         {relativeTime(r.lastActivity)}
                       </td>
-                      <td className="px-5 py-3 text-right text-[12.5px] text-slate-500">
+                      <td className="px-5 py-3 text-right text-[12.5px] text-admin-muted">
                         {relativeTime(r.createdAt)}
                       </td>
                     </tr>

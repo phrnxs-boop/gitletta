@@ -130,11 +130,11 @@ function LoginInner() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-4 py-10">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-admin-rail px-4 py-10">
       {/* Ambient background */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-40 -top-40 size-[420px] rounded-full bg-indigo-600/25 blur-3xl" />
-        <div className="absolute -bottom-48 -right-24 size-[460px] rounded-full bg-violet-600/20 blur-3xl" />
+        <div className="absolute -left-40 -top-40 size-[420px] rounded-full bg-admin-accent/25 blur-3xl" />
+        <div className="absolute -bottom-48 -right-24 size-[460px] rounded-full bg-[#f59e0b]/20 blur-3xl" />
         <div
           className="absolute inset-0 opacity-[0.06]"
           style={{
@@ -147,18 +147,18 @@ function LoginInner() {
 
       <div className="relative w-full max-w-[420px]">
         <div className="mb-8 flex flex-col items-center text-center">
-          <span className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-950/50">
+          <span className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-admin-accent to-admin-accent-hover text-white shadow-lg shadow-[rgba(234,88,12,0.30)]">
             <ShieldCheck className="size-6" />
           </span>
           <h1 className="mt-4 text-[22px] font-semibold tracking-tight text-white">
             Swixo Admin
           </h1>
-          <p className="mt-1 text-[13.5px] text-slate-400">
+          <p className="mt-1 text-[13.5px] text-admin-rail-fg">
             Restricted access. Sign in with your administrator address.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-slate-950/40 backdrop-blur-xl">
+        <div className="rounded-2xl border border-admin-rail-border bg-white/[0.04] p-6 shadow-2xl shadow-black/40 backdrop-blur-xl">
           <form
             onSubmit={step === 'email' ? handleEmailSubmit : handleCodeSubmit}
             className="space-y-4"
@@ -167,12 +167,12 @@ function LoginInner() {
               <div className="space-y-1.5">
                 <label
                   htmlFor="admin-email"
-                  className="text-[12px] font-medium uppercase tracking-wider text-slate-400"
+                  className="text-[12px] font-medium uppercase tracking-wider text-admin-rail-fg"
                 >
                   Administrator email
                 </label>
                 <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-admin-rail-fg" />
                   <input
                     id="admin-email"
                     type="email"
@@ -181,7 +181,7 @@ function LoginInner() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@company.com"
                     required
-                    className="h-11 w-full rounded-lg border border-white/10 bg-white/5 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/60 focus:bg-white/[0.07]"
+                    className="h-11 w-full rounded-lg border border-admin-rail-border bg-white/5 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-admin-rail-fg focus:border-[rgba(249,115,22,0.55)] focus:bg-white/[0.07]"
                   />
                 </div>
               </div>
@@ -189,12 +189,12 @@ function LoginInner() {
               <div className="space-y-1.5">
                 <label
                   htmlFor="admin-code"
-                  className="text-[12px] font-medium uppercase tracking-wider text-slate-400"
+                  className="text-[12px] font-medium uppercase tracking-wider text-admin-rail-fg"
                 >
                   Sign-in code
                 </label>
                 <div className="relative">
-                  <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+                  <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-admin-rail-fg" />
                   <input
                     id="admin-code"
                     inputMode="numeric"
@@ -203,7 +203,7 @@ function LoginInner() {
                     onChange={(e) => setCode(e.target.value)}
                     placeholder="000000"
                     required
-                    className="h-11 w-full rounded-lg border border-white/10 bg-white/5 pl-10 pr-3 text-center font-mono text-lg tracking-[0.4em] text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-400/60 focus:bg-white/[0.07]"
+                    className="h-11 w-full rounded-lg border border-admin-rail-border bg-white/5 pl-10 pr-3 text-center font-mono text-lg tracking-[0.4em] text-white outline-none transition placeholder:text-admin-rail-fg focus:border-[rgba(249,115,22,0.55)] focus:bg-white/[0.07]"
                   />
                 </div>
                 <button
@@ -214,7 +214,7 @@ function LoginInner() {
                     setError(null)
                     setNotice(null)
                   }}
-                  className="flex items-center gap-1.5 pt-1 text-[12.5px] text-slate-400 transition hover:text-slate-200"
+                  className="flex items-center gap-1.5 pt-1 text-[12.5px] text-admin-rail-fg transition hover:text-white"
                 >
                   <ArrowLeft className="size-3.5" />
                   Use a different address
@@ -230,7 +230,7 @@ function LoginInner() {
             )}
 
             {notice && !error && (
-              <div className="rounded-lg border border-indigo-400/25 bg-indigo-500/10 px-3 py-2.5 text-[13px] text-indigo-200">
+              <div className="rounded-lg border border-admin-accent-ring bg-admin-accent-soft px-3 py-2.5 text-[13px] text-[#fed7aa]">
                 {notice}
               </div>
             )}
@@ -238,7 +238,7 @@ function LoginInner() {
             <button
               type="submit"
               disabled={loading}
-              className="h-11 w-full rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-semibold text-white shadow-lg shadow-indigo-950/40 transition hover:from-indigo-400 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-11 w-full rounded-lg bg-gradient-to-r from-admin-accent to-admin-accent-hover text-sm font-semibold text-white shadow-lg shadow-[rgba(234,88,12,0.22)] transition hover:from-[#fb923c] hover:to-admin-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">
@@ -254,7 +254,7 @@ function LoginInner() {
           </form>
         </div>
 
-        <p className="mt-6 text-center text-[11.5px] leading-relaxed text-slate-500">
+        <p className="mt-6 text-center text-[11.5px] leading-relaxed text-admin-rail-fg">
           Sessions are held in a secure server-side cookie and expire automatically.
           <br />
           Every access is written to the audit log.
@@ -268,8 +268,8 @@ export default function SuperAdminLogin() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-slate-950">
-          <Loader2 className="size-5 animate-spin text-slate-500" />
+        <div className="flex min-h-screen items-center justify-center bg-admin-rail">
+          <Loader2 className="size-5 animate-spin text-admin-rail-fg" />
         </div>
       }
     >

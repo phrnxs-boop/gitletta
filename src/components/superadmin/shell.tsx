@@ -21,7 +21,7 @@ export function AdminShell({
   const [navOpen, setNavOpen] = useState(false)
 
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900">
+    <div className="flex min-h-screen bg-admin-bg text-admin-fg">
       <Sidebar navOpen={navOpen} onClose={() => setNavOpen(false)} identity={identity} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onOpenNav={() => setNavOpen(true)} identity={identity} />

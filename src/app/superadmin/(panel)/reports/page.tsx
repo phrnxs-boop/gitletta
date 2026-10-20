@@ -82,7 +82,7 @@ export default function SuperAdminReports() {
         action={
           <button
             onClick={exportCsv}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-600 transition hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-admin-border bg-white px-3 py-2 text-[13px] font-medium text-admin-fg-body transition hover:bg-admin-bg"
           >
             <Download className="size-3.5" />
             Export CSV
@@ -93,7 +93,7 @@ export default function SuperAdminReports() {
       <Panel bodyClassName="px-4 py-3">
         <div className="flex flex-wrap items-end gap-3">
           <label className="block">
-            <span className="mb-1 block text-[11.5px] font-medium uppercase tracking-wider text-slate-500">
+            <span className="mb-1 block text-[11.5px] font-medium uppercase tracking-wider text-admin-muted">
               From
             </span>
             <input
@@ -101,12 +101,12 @@ export default function SuperAdminReports() {
               value={from}
               max={to}
               onChange={(e) => setFrom(e.target.value)}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] outline-none focus:border-indigo-300"
+              className="h-9 rounded-lg border border-admin-border bg-white px-2.5 text-[13px] outline-none focus:border-admin-accent"
             />
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-[11.5px] font-medium uppercase tracking-wider text-slate-500">
+            <span className="mb-1 block text-[11.5px] font-medium uppercase tracking-wider text-admin-muted">
               To
             </span>
             <input
@@ -114,18 +114,18 @@ export default function SuperAdminReports() {
               value={to}
               min={from}
               onChange={(e) => setTo(e.target.value)}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] outline-none focus:border-indigo-300"
+              className="h-9 rounded-lg border border-admin-border bg-white px-2.5 text-[13px] outline-none focus:border-admin-accent"
             />
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-[11.5px] font-medium uppercase tracking-wider text-slate-500">
+            <span className="mb-1 block text-[11.5px] font-medium uppercase tracking-wider text-admin-muted">
               Report
             </span>
             <select
               value={type}
               onChange={(e) => setType(e.target.value)}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] text-slate-600 outline-none focus:border-indigo-300"
+              className="h-9 rounded-lg border border-admin-border bg-white px-2.5 text-[13px] text-admin-fg-body outline-none focus:border-admin-accent"
             >
               <option value="revenue">Revenue by restaurant</option>
               <option value="orders">Every order</option>
@@ -137,7 +137,7 @@ export default function SuperAdminReports() {
           <button
             onClick={load}
             disabled={loading}
-            className="inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-[13px] font-medium text-white transition hover:bg-indigo-500 disabled:opacity-60"
+            className="inline-flex h-9 items-center gap-2 rounded-lg bg-admin-accent px-3 text-[13px] font-medium text-white transition hover:bg-admin-accent-hover disabled:opacity-60"
           >
             <CalendarRange className="size-3.5" />
             Run report
@@ -155,7 +155,7 @@ export default function SuperAdminReports() {
                   setFrom(daysAgo(r.days))
                   setTo(new Date().toISOString().slice(0, 10))
                 }}
-                className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[12.5px] font-medium text-slate-500 transition hover:bg-slate-50"
+                className="h-9 rounded-lg border border-admin-border bg-white px-2.5 text-[12.5px] font-medium text-admin-muted transition hover:bg-admin-bg"
               >
                 {r.label}
               </button>
@@ -168,7 +168,7 @@ export default function SuperAdminReports() {
         <DataState loading={loading} error={error} onRetry={load}>
           <div className="space-y-5">
             <div className="grid grid-cols-3 gap-3">
-              <StatCard label="Orders" value={data?.totals.orders ?? 0} tone="indigo" />
+              <StatCard label="Orders" value={data?.totals.orders ?? 0} tone="orange" />
               <StatCard
                 label="Revenue"
                 value={compactMoney(data?.totals.revenue ?? 0)}
@@ -196,7 +196,7 @@ export default function SuperAdminReports() {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[640px] text-left">
                     <thead>
-                      <tr className="border-b border-slate-200 text-[11.5px] uppercase tracking-wider text-slate-500">
+                      <tr className="border-b border-admin-border text-[11.5px] uppercase tracking-wider text-admin-muted">
                         <th className="px-5 py-3 font-medium">Restaurant</th>
                         <th className="px-3 py-3 text-right font-medium">Orders</th>
                         <th className="px-3 py-3 text-right font-medium">Completed</th>
@@ -204,22 +204,22 @@ export default function SuperAdminReports() {
                         <th className="px-5 py-3 text-right font-medium">Average order</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-admin-border-soft">
                       {data.rows.map((r) => (
-                        <tr key={r.tenantId} className="transition hover:bg-slate-50/70">
-                          <td className="px-5 py-2.5 text-[13px] font-medium text-slate-800">
+                        <tr key={r.tenantId} className="transition hover:bg-admin-elevated">
+                          <td className="px-5 py-2.5 text-[13px] font-medium text-admin-fg">
                             {r.restaurant}
                           </td>
-                          <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-slate-700">
+                          <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-admin-fg-body">
                             {r.orders}
                           </td>
-                          <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-slate-600">
+                          <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-admin-fg-body">
                             {r.completedOrders}
                           </td>
-                          <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-slate-800">
+                          <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-admin-fg">
                             {money(r.revenue)}
                           </td>
-                          <td className="px-5 py-2.5 text-right text-[13px] tabular-nums text-slate-600">
+                          <td className="px-5 py-2.5 text-right text-[13px] tabular-nums text-admin-fg-body">
                             {money(r.averageOrderValue)}
                           </td>
                         </tr>
@@ -228,7 +228,7 @@ export default function SuperAdminReports() {
                   </table>
                 </div>
               ) : (
-                <p className="px-5 py-10 text-center text-[13px] text-slate-400">
+                <p className="px-5 py-10 text-center text-[13px] text-admin-faint">
                   No activity in this window.
                 </p>
               )}

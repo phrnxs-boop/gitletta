@@ -50,11 +50,11 @@ function RestaurantRow({ t, trailing }: { t: Tenant; trailing?: React.ReactNode 
       <div className="min-w-0 flex-1">
         <Link
           href={`/superadmin/crm/${t.id}`}
-          className="block truncate text-[13.5px] font-medium text-slate-800 hover:text-indigo-600"
+          className="block truncate text-[13.5px] font-medium text-admin-fg hover:text-admin-accent"
         >
           {t.name}
         </Link>
-        <p className="truncate text-[12px] text-slate-500">
+        <p className="truncate text-[12px] text-admin-muted">
           {t.ownerEmail ?? 'no owner on file'} · {t.orderCount} orders ·{' '}
           {compactMoney(t.orderValue)}
         </p>
@@ -134,14 +134,14 @@ export default function SuperAdminRetention() {
               bodyClassName="px-0 py-0"
             >
               {data?.inactive?.length ? (
-                <ul className="divide-y divide-slate-100">
+                <ul className="divide-y divide-admin-border-soft">
                   {data.inactive.map((t) => (
                     <RestaurantRow
                       key={t.id}
                       t={t}
                       trailing={
                         <div className="flex shrink-0 items-center gap-2">
-                          <span className="text-[12px] tabular-nums text-slate-500">
+                          <span className="text-[12px] tabular-nums text-admin-muted">
                             {t.daysSinceActivity}d quiet
                           </span>
                           <Pill status={t.subscriptionStatus}>{t.subscriptionStatus}</Pill>
@@ -151,7 +151,7 @@ export default function SuperAdminRetention() {
                   ))}
                 </ul>
               ) : (
-                <p className="px-5 py-10 text-center text-[13px] text-slate-400">
+                <p className="px-5 py-10 text-center text-[13px] text-admin-faint">
                   Every restaurant has been active recently.
                 </p>
               )}
@@ -163,14 +163,14 @@ export default function SuperAdminRetention() {
               bodyClassName="px-0 py-0"
             >
               {data?.expiringTrials?.length || data?.expiredTrials?.length ? (
-                <ul className="divide-y divide-slate-100">
+                <ul className="divide-y divide-admin-border-soft">
                   {[...(data.expiredTrials ?? []), ...(data.expiringTrials ?? [])].map((t) => (
                     <RestaurantRow
                       key={t.id}
                       t={t}
                       trailing={
                         <div className="flex shrink-0 items-center gap-2">
-                          <span className="text-[12px] text-slate-500">
+                          <span className="text-[12px] text-admin-muted">
                             {t.trialEndsAt
                               ? new Date(t.trialEndsAt).toLocaleDateString('en-IN')
                               : '—'}
@@ -182,7 +182,7 @@ export default function SuperAdminRetention() {
                   ))}
                 </ul>
               ) : (
-                <p className="px-5 py-10 text-center text-[13px] text-slate-400">
+                <p className="px-5 py-10 text-center text-[13px] text-admin-faint">
                   No trials are ending soon.
                 </p>
               )}
@@ -195,14 +195,14 @@ export default function SuperAdminRetention() {
             bodyClassName="px-0 py-0"
           >
             {data?.prospects?.length ? (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-admin-border-soft">
                 {data.prospects.map((t) => (
                   <RestaurantRow
                     key={t.id}
                     t={t}
                     trailing={
                       <div className="flex shrink-0 items-center gap-2">
-                        <span className="text-[12px] text-slate-500">
+                        <span className="text-[12px] text-admin-muted">
                           last seen {relativeTime(t.lastActivity)}
                         </span>
                         <Pill status={t.subscriptionStatus}>{t.subscriptionStatus}</Pill>
@@ -212,7 +212,7 @@ export default function SuperAdminRetention() {
                 ))}
               </ul>
             ) : (
-              <p className="px-5 py-10 text-center text-[13px] text-slate-400">
+              <p className="px-5 py-10 text-center text-[13px] text-admin-faint">
                 No prospects right now.
               </p>
             )}

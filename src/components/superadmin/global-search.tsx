@@ -89,15 +89,15 @@ export function GlobalSearch({
       <button
         onClick={onClose}
         aria-label="Close search"
-        className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
       />
 
-      <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20">
-        <div className="flex items-center gap-3 border-b border-slate-100 px-4">
+      <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-admin-border bg-white shadow-2xl shadow-black/20">
+        <div className="flex items-center gap-3 border-b border-admin-border-soft px-4">
           {loading ? (
-            <Loader2 className="size-4 shrink-0 animate-spin text-slate-400" />
+            <Loader2 className="size-4 shrink-0 animate-spin text-admin-faint" />
           ) : (
-            <Search className="size-4 shrink-0 text-slate-400" />
+            <Search className="size-4 shrink-0 text-admin-faint" />
           )}
           <input
             ref={inputRef}
@@ -107,11 +107,11 @@ export function GlobalSearch({
               if (e.key === 'Escape') onClose()
             }}
             placeholder="Search restaurants, owners, email…"
-            className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+            className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-admin-faint"
           />
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-md p-1 text-admin-faint transition hover:bg-admin-elevated hover:text-admin-fg-body"
             aria-label="Close"
           >
             <X className="size-4" />
@@ -124,32 +124,32 @@ export function GlobalSearch({
           )}
 
           {nothing && (
-            <p className="px-3 py-6 text-center text-[13px] text-slate-500">
+            <p className="px-3 py-6 text-center text-[13px] text-admin-muted">
               Nothing matched “{query.trim()}”.
             </p>
           )}
 
           {restaurants.length > 0 && (
             <div className="mb-1">
-              <p className="px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              <p className="px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-admin-faint">
                 Restaurants
               </p>
               {restaurants.map((r) => (
                 <button
                   key={r.id}
                   onClick={() => go(`/superadmin/crm/${r.id}`)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition hover:bg-slate-50"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition hover:bg-admin-bg"
                 >
-                  <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-admin-elevated text-admin-muted">
                     <Building2 className="size-3.5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13.5px] font-medium text-slate-800">
+                    <span className="block truncate text-[13.5px] font-medium text-admin-fg">
                       {r.name}
                     </span>
-                    <span className="block truncate text-[12px] text-slate-500">{r.slug}</span>
+                    <span className="block truncate text-[12px] text-admin-muted">{r.slug}</span>
                   </span>
-                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] capitalize text-slate-600">
+                  <span className="shrink-0 rounded-full bg-admin-elevated px-2 py-0.5 text-[11px] capitalize text-admin-fg-body">
                     {r.plan}
                   </span>
                 </button>
@@ -159,23 +159,23 @@ export function GlobalSearch({
 
           {users.length > 0 && (
             <div>
-              <p className="px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              <p className="px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-admin-faint">
                 People
               </p>
               {users.map((u) => (
                 <button
                   key={u.id}
                   onClick={() => go(u.tenant_id ? `/superadmin/crm/${u.tenant_id}` : '/superadmin/crm')}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition hover:bg-slate-50"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition hover:bg-admin-bg"
                 >
-                  <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-admin-elevated text-admin-muted">
                     <User className="size-3.5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13.5px] font-medium text-slate-800">
+                    <span className="block truncate text-[13.5px] font-medium text-admin-fg">
                       {u.name || u.email}
                     </span>
-                    <span className="block truncate text-[12px] text-slate-500">{u.email}</span>
+                    <span className="block truncate text-[12px] text-admin-muted">{u.email}</span>
                   </span>
                 </button>
               ))}
@@ -183,13 +183,13 @@ export function GlobalSearch({
           )}
 
           {!query.trim() && (
-            <p className="px-3 py-6 text-center text-[13px] text-slate-400">
+            <p className="px-3 py-6 text-center text-[13px] text-admin-faint">
               Type to search across every restaurant on the platform.
             </p>
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-4 py-2 text-[11.5px] text-slate-500">
+        <div className="flex items-center justify-between border-t border-admin-border-soft bg-admin-elevated px-4 py-2 text-[11.5px] text-admin-muted">
           <span>Search is limited to super admins.</span>
           <span className={cn('hidden sm:inline')}>Esc to close</span>
         </div>

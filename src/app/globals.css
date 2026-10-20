@@ -43,6 +43,33 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
+
+  /* --- Super Admin panel ---------------------------------------------
+     The panel is its own surface, so it carries its own tokens rather
+     than inheriting the app's theme state. They are the restaurant app's
+     palette: the same orange primary, the same warm off-white, the same
+     deep slate for the navigation rail. One place to change it. */
+  --color-admin-accent: var(--admin-accent);
+  --color-admin-accent-hover: var(--admin-accent-hover);
+  --color-admin-accent-soft: var(--admin-accent-soft);
+  --color-admin-accent-ring: var(--admin-accent-ring);
+  --color-admin-surface: var(--admin-surface);
+  --color-admin-bg: var(--admin-bg);
+  --color-admin-elevated: var(--admin-elevated);
+  --color-admin-fg: var(--admin-fg);
+  --color-admin-fg-body: var(--admin-fg-body);
+  --color-admin-muted: var(--admin-muted);
+  --color-admin-faint: var(--admin-faint);
+  --color-admin-faint-2: var(--admin-faint-2);
+  --color-admin-faint-3: var(--admin-faint-3);
+  --color-admin-border: var(--admin-border);
+  --color-admin-border-soft: var(--admin-border-soft);
+  --color-admin-border-strong: var(--admin-border-strong);
+  --color-admin-rail: var(--admin-rail);
+  --color-admin-rail-fg: var(--admin-rail-fg);
+  --color-admin-rail-border: var(--admin-rail-border);
+  --color-admin-rail-hover: var(--admin-rail-hover);
+  --color-admin-rail-active: var(--admin-rail-active);
 }
 
 /* Light theme (default) — warm off-white with coral accent.
@@ -89,6 +116,30 @@
   --sidebar-accent-foreground: #f97316;
   --sidebar-border: rgba(0, 0, 0, 0.06);
   --sidebar-ring: #f97316;
+
+  /* Super Admin panel — the restaurant app's palette, pinned so the panel
+     looks the same whatever the app's own theme is doing. */
+  --admin-accent: #f97316;
+  --admin-accent-hover: #ea580c;
+  --admin-accent-soft: rgba(249, 115, 22, 0.10);
+  --admin-accent-ring: rgba(249, 115, 22, 0.28);
+  --admin-surface: #ffffff;
+  --admin-bg: #fafaf7;
+  --admin-elevated: #f0efe9;
+  --admin-fg: #1a1d29;
+  --admin-fg-body: #343846;
+  --admin-muted: #71778a;
+  --admin-faint: #949aa8;
+  --admin-faint-2: #b4b9c4;
+  --admin-faint-3: #e8e9ed;
+  --admin-border: rgba(0, 0, 0, 0.09);
+  --admin-border-soft: rgba(0, 0, 0, 0.06);
+  --admin-border-strong: rgba(0, 0, 0, 0.16);
+  --admin-rail: #11141d;
+  --admin-rail-fg: #9aa3b2;
+  --admin-rail-border: rgba(255, 255, 255, 0.07);
+  --admin-rail-hover: rgba(255, 255, 255, 0.05);
+  --admin-rail-active: rgba(255, 255, 255, 0.08);
 }
 
 /* Re-resolve the inherited colour inside a light subtree.

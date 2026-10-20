@@ -71,7 +71,7 @@ export default function SuperAdminUsage() {
               label="Orders placed"
               value={totalOrders}
               icon={<Package className="size-4" />}
-              tone="indigo"
+              tone="orange"
             />
             <StatCard
               label="Staff logins"
@@ -125,7 +125,7 @@ export default function SuperAdminUsage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px] text-left">
                 <thead>
-                  <tr className="border-b border-slate-200 text-[11.5px] uppercase tracking-wider text-slate-500">
+                  <tr className="border-b border-admin-border text-[11.5px] uppercase tracking-wider text-admin-muted">
                     <th className="px-5 py-3 font-medium">Restaurant</th>
                     <th className="px-3 py-3 text-right font-medium">Orders</th>
                     <th className="px-3 py-3 text-right font-medium">Value</th>
@@ -135,30 +135,30 @@ export default function SuperAdminUsage() {
                     <th className="px-5 py-3 text-right font-medium">Last order</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-admin-border-soft">
                   {(data?.perRestaurant ?? []).map((r) => (
-                    <tr key={r.id} className="transition hover:bg-slate-50/70">
+                    <tr key={r.id} className="transition hover:bg-admin-elevated">
                       <td className="px-5 py-2.5">
                         <Link
                           href={`/superadmin/crm/${r.id}`}
-                          className="text-[13px] font-medium text-slate-800 hover:text-indigo-600"
+                          className="text-[13px] font-medium text-admin-fg hover:text-admin-accent"
                         >
                           {r.name}
                         </Link>
-                        <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] capitalize text-slate-500">
+                        <span className="ml-2 rounded bg-admin-elevated px-1.5 py-0.5 text-[11px] capitalize text-admin-muted">
                           {r.plan}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-slate-700">
+                      <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-admin-fg-body">
                         {r.orders}
                       </td>
-                      <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-slate-700">
+                      <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-admin-fg-body">
                         {compactMoney(r.orderValue)}
                       </td>
-                      <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-slate-700">
+                      <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-admin-fg-body">
                         {r.logins}
                       </td>
-                      <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-slate-700">
+                      <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-admin-fg-body">
                         {r.menuEdits}
                       </td>
                       <td className="px-3 py-2.5">
@@ -167,17 +167,17 @@ export default function SuperAdminUsage() {
                             {r.features.map((f) => (
                               <span
                                 key={f}
-                                className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] capitalize text-slate-600"
+                                className="rounded bg-admin-elevated px-1.5 py-0.5 text-[11px] capitalize text-admin-fg-body"
                               >
                                 {f.replace(/_/g, ' ')}
                               </span>
                             ))}
                           </span>
                         ) : (
-                          <span className="text-[12.5px] text-slate-400">none</span>
+                          <span className="text-[12.5px] text-admin-faint">none</span>
                         )}
                       </td>
-                      <td className="px-5 py-2.5 text-right text-[12.5px] text-slate-500">
+                      <td className="px-5 py-2.5 text-right text-[12.5px] text-admin-muted">
                         {relativeTime(r.lastOrder)}
                       </td>
                     </tr>

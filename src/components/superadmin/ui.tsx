@@ -31,18 +31,18 @@ export function Panel({
   return (
     <section
       className={cn(
-        'rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)]',
+        'rounded-2xl border border-admin-border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)]',
         className,
       )}
     >
       {(title || action) && (
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-admin-border-soft px-5 py-4">
           <div className="min-w-0">
             {title && (
-              <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">{title}</h2>
+              <h2 className="text-[15px] font-semibold tracking-tight text-admin-fg">{title}</h2>
             )}
             {description && (
-              <p className="mt-0.5 text-[13px] text-slate-500">{description}</p>
+              <p className="mt-0.5 text-[13px] text-admin-muted">{description}</p>
             )}
           </div>
           {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
@@ -54,12 +54,15 @@ export function Panel({
 }
 
 const TONES = {
-  indigo: 'bg-indigo-50 text-indigo-600 ring-indigo-100',
+  /** The brand accent — the restaurant app's orange. */
+  orange: 'bg-admin-accent-soft text-admin-accent ring-admin-accent-soft',
   emerald: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
   amber: 'bg-amber-50 text-amber-600 ring-amber-100',
   rose: 'bg-rose-50 text-rose-600 ring-rose-100',
-  slate: 'bg-slate-100 text-slate-600 ring-slate-200',
+  slate: 'bg-admin-elevated text-admin-fg-body ring-admin-border',
   sky: 'bg-sky-50 text-sky-600 ring-sky-100',
+  /** A second accent, kept distinct from the brand so neighbouring cards
+      never look like the same tile. */
   violet: 'bg-violet-50 text-violet-600 ring-violet-100',
 } as const
 
@@ -70,7 +73,7 @@ export function StatCard({
   value,
   hint,
   icon,
-  tone = 'indigo',
+  tone = 'orange',
   delta,
   className,
 }: {
@@ -86,14 +89,14 @@ export function StatCard({
   return (
     <div
       className={cn(
-        'group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5',
+        'group relative overflow-hidden rounded-2xl border border-admin-border bg-white p-5',
         'shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-16px_rgba(15,23,42,0.16)]',
         'transition-shadow hover:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_12px_32px_-16px_rgba(15,23,42,0.22)]',
         className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[12px] font-medium uppercase tracking-wider text-slate-500">{label}</p>
+        <p className="text-[12px] font-medium uppercase tracking-wider text-admin-muted">{label}</p>
         {icon && (
           <span className={cn('grid size-9 place-items-center rounded-xl ring-1', TONES[tone])}>
             {icon}
@@ -101,11 +104,11 @@ export function StatCard({
         )}
       </div>
 
-      <p className="mt-3 text-[28px] font-semibold leading-none tracking-tight text-slate-900 tabular-nums">
+      <p className="mt-3 text-[28px] font-semibold leading-none tracking-tight text-admin-fg tabular-nums">
         {value}
       </p>
 
-      <div className="mt-2 flex items-center gap-2 text-[12.5px] text-slate-500">
+      <div className="mt-2 flex items-center gap-2 text-[12.5px] text-admin-muted">
         {typeof delta === 'number' && (
           <span
             className={cn(
@@ -170,7 +173,7 @@ export function Pill({
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse rounded-lg bg-slate-200/70', className)} />
+  return <div className={cn('animate-pulse rounded-lg bg-[rgba(0,0,0,0.06)]', className)} />
 }
 
 /**
@@ -229,11 +232,11 @@ export function DataState({
 
   if (empty) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-6 py-10 text-center">
-        <Inbox className="size-6 text-slate-400" />
-        <p className="text-sm font-medium text-slate-700">{emptyTitle}</p>
+      <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-admin-border bg-admin-bg px-6 py-10 text-center">
+        <Inbox className="size-6 text-admin-faint" />
+        <p className="text-sm font-medium text-admin-fg-body">{emptyTitle}</p>
         {emptyDescription && (
-          <p className="max-w-sm text-[13px] text-slate-500">{emptyDescription}</p>
+          <p className="max-w-sm text-[13px] text-admin-muted">{emptyDescription}</p>
         )}
       </div>
     )
@@ -244,7 +247,7 @@ export function DataState({
 
 export function Loading({ label = 'Loading' }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
+    <div className="flex items-center justify-center gap-2 py-16 text-sm text-admin-muted">
       <Loader2 className="size-4 animate-spin" />
       {label}…
     </div>
@@ -263,8 +266,8 @@ export function PageTitle({
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-900">{title}</h1>
-        {description && <p className="mt-1 text-[13.5px] text-slate-500">{description}</p>}
+        <h1 className="text-[22px] font-semibold tracking-tight text-admin-fg">{title}</h1>
+        {description && <p className="mt-1 text-[13.5px] text-admin-muted">{description}</p>}
       </div>
       {action}
     </div>

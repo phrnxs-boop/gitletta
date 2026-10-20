@@ -114,7 +114,7 @@ export default function RestaurantDetail({
     <div>
       <button
         onClick={() => router.push('/superadmin/crm')}
-        className="mb-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-slate-500 transition hover:text-slate-800"
+        className="mb-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-admin-muted transition hover:text-admin-fg"
       >
         <ArrowLeft className="size-3.5" />
         All restaurants
@@ -169,8 +169,8 @@ export default function RestaurantDetail({
                     { label: 'Account', value: tenant.active ? 'Active' : 'Disabled' },
                   ].map((row) => (
                     <div key={row.label} className="flex items-baseline justify-between gap-4">
-                      <dt className="text-slate-500">{row.label}</dt>
-                      <dd className="truncate text-right font-medium text-slate-800">{row.value}</dd>
+                      <dt className="text-admin-muted">{row.label}</dt>
+                      <dd className="truncate text-right font-medium text-admin-fg">{row.value}</dd>
                     </div>
                   ))}
                 </dl>
@@ -179,14 +179,14 @@ export default function RestaurantDetail({
               <Panel title="Subscription" description="Changes are written to the audit log.">
                 <div className="space-y-3">
                   <label className="block">
-                    <span className="mb-1 block text-[12px] font-medium uppercase tracking-wider text-slate-500">
+                    <span className="mb-1 block text-[12px] font-medium uppercase tracking-wider text-admin-muted">
                       Plan
                     </span>
                     <select
                       value={tenant.plan}
                       disabled={saving}
                       onChange={(e) => updateTenant({ plan: e.target.value })}
-                      className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] outline-none focus:border-indigo-300"
+                      className="h-9 w-full rounded-lg border border-admin-border bg-white px-2.5 text-[13px] outline-none focus:border-admin-accent"
                     >
                       {PLANS.map((p) => (
                         <option key={p} value={p}>
@@ -197,14 +197,14 @@ export default function RestaurantDetail({
                   </label>
 
                   <label className="block">
-                    <span className="mb-1 block text-[12px] font-medium uppercase tracking-wider text-slate-500">
+                    <span className="mb-1 block text-[12px] font-medium uppercase tracking-wider text-admin-muted">
                       Status
                     </span>
                     <select
                       value={tenant.subscription_status ?? 'trial'}
                       disabled={saving}
                       onChange={(e) => updateTenant({ subscriptionStatus: e.target.value })}
-                      className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] outline-none focus:border-indigo-300"
+                      className="h-9 w-full rounded-lg border border-admin-border bg-white px-2.5 text-[13px] outline-none focus:border-admin-accent"
                     >
                       {STATUSES.map((s) => (
                         <option key={s} value={s}>
@@ -215,7 +215,7 @@ export default function RestaurantDetail({
                   </label>
 
                   <label className="block">
-                    <span className="mb-1 block text-[12px] font-medium uppercase tracking-wider text-slate-500">
+                    <span className="mb-1 block text-[12px] font-medium uppercase tracking-wider text-admin-muted">
                       Trial ends
                     </span>
                     <input
@@ -227,7 +227,7 @@ export default function RestaurantDetail({
                           trialEndsAt: e.target.value ? new Date(e.target.value).toISOString() : null,
                         })
                       }
-                      className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] outline-none focus:border-indigo-300"
+                      className="h-9 w-full rounded-lg border border-admin-border bg-white px-2.5 text-[13px] outline-none focus:border-admin-accent"
                     />
                   </label>
 
@@ -254,11 +254,11 @@ export default function RestaurantDetail({
                     { label: 'Payments', value: String(data?.payments?.length ?? 0), icon: CreditCard },
                   ].map((row) => (
                     <div key={row.label}>
-                      <row.icon className="size-3.5 text-slate-400" />
-                      <p className="mt-1 text-[20px] font-semibold tabular-nums text-slate-900">
+                      <row.icon className="size-3.5 text-admin-faint" />
+                      <p className="mt-1 text-[20px] font-semibold tabular-nums text-admin-fg">
                         {row.value}
                       </p>
-                      <p className="text-[12px] text-slate-500">{row.label}</p>
+                      <p className="text-[12px] text-admin-muted">{row.label}</p>
                     </div>
                   ))}
                 </div>
@@ -273,7 +273,7 @@ export default function RestaurantDetail({
                   <button
                     onClick={addNote}
                     disabled={saving || !note.trim()}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[12.5px] font-medium text-white transition hover:bg-indigo-500 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-admin-accent px-2.5 py-1.5 text-[12.5px] font-medium text-white transition hover:bg-admin-accent-hover disabled:opacity-50"
                   >
                     <Plus className="size-3.5" />
                     Add note
@@ -288,16 +288,16 @@ export default function RestaurantDetail({
                       if (e.key === 'Enter') addNote()
                     }}
                     placeholder="Called about the trial ending…"
-                    className="h-9 flex-1 rounded-lg border border-slate-200 bg-slate-50/60 px-3 text-[13px] outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white"
+                    className="h-9 flex-1 rounded-lg border border-admin-border bg-admin-bg px-3 text-[13px] outline-none transition placeholder:text-admin-faint focus:border-admin-accent focus:bg-white"
                   />
                 </div>
 
                 {data?.notes?.length ? (
                   <ul className="space-y-2.5">
                     {data.notes.map((n: any) => (
-                      <li key={n.id} className="rounded-xl border border-slate-100 bg-slate-50/50 p-3">
-                        <p className="text-[13px] text-slate-700">{n.body}</p>
-                        <p className="mt-1 flex items-center gap-1.5 text-[11.5px] text-slate-400">
+                      <li key={n.id} className="rounded-xl border border-admin-border-soft bg-admin-bg p-3">
+                        <p className="text-[13px] text-admin-fg-body">{n.body}</p>
+                        <p className="mt-1 flex items-center gap-1.5 text-[11.5px] text-admin-faint">
                           <MessageSquare className="size-3" />
                           {n.kind} · {relativeTime(n.created_at)}
                         </p>
@@ -305,7 +305,7 @@ export default function RestaurantDetail({
                     ))}
                   </ul>
                 ) : (
-                  <p className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-[13px] text-slate-400">
+                  <p className="rounded-lg border border-dashed border-admin-border px-3 py-6 text-center text-[13px] text-admin-faint">
                     No notes on this restaurant yet.
                   </p>
                 )}
@@ -317,24 +317,24 @@ export default function RestaurantDetail({
                 bodyClassName="px-0 py-0"
               >
                 {data?.recentOrders?.length ? (
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-admin-border-soft">
                     {data.recentOrders.map((o: any) => (
                       <li key={o.id} className="flex items-center gap-3 px-5 py-2.5">
-                        <Receipt className="size-3.5 shrink-0 text-slate-400" />
-                        <span className="flex-1 truncate text-[13px] text-slate-700">
+                        <Receipt className="size-3.5 shrink-0 text-admin-faint" />
+                        <span className="flex-1 truncate text-[13px] text-admin-fg-body">
                           {o.order_type} · {o.status}
                         </span>
-                        <span className="text-[13px] tabular-nums text-slate-800">
+                        <span className="text-[13px] tabular-nums text-admin-fg">
                           {money(o.total)}
                         </span>
-                        <span className="w-20 text-right text-[11.5px] text-slate-400">
+                        <span className="w-20 text-right text-[11.5px] text-admin-faint">
                           {relativeTime(o.created_at)}
                         </span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="px-5 py-8 text-center text-[13px] text-slate-400">
+                  <p className="px-5 py-8 text-center text-[13px] text-admin-faint">
                     No orders yet.
                   </p>
                 )}
@@ -348,22 +348,22 @@ export default function RestaurantDetail({
                 bodyClassName="px-0 py-0"
               >
                 {data?.payments?.length ? (
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-admin-border-soft">
                     {data.payments.map((p: any) => (
                       <li key={p.id} className="flex items-center gap-3 px-5 py-2.5">
-                        <CreditCard className="size-3.5 shrink-0 text-slate-400" />
-                        <span className="flex-1 truncate text-[13px] text-slate-700">
+                        <CreditCard className="size-3.5 shrink-0 text-admin-faint" />
+                        <span className="flex-1 truncate text-[13px] text-admin-fg-body">
                           {p.plan_id} · {p.billing_period}
                         </span>
                         <Pill status={p.status}>{p.status}</Pill>
-                        <span className="w-24 text-right text-[13px] tabular-nums text-slate-800">
+                        <span className="w-24 text-right text-[13px] tabular-nums text-admin-fg">
                           {money(p.amount, p.currency === 'INR' ? '₹' : `${p.currency} `)}
                         </span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="px-5 py-8 text-center text-[13px] text-slate-400">
+                  <p className="px-5 py-8 text-center text-[13px] text-admin-faint">
                     No payments recorded.
                   </p>
                 )}
@@ -371,19 +371,19 @@ export default function RestaurantDetail({
 
               <Panel title="Support issues" bodyClassName="px-0 py-0">
                 {data?.issues?.length ? (
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-admin-border-soft">
                     {data.issues.map((i: any) => (
                       <li key={i.id} className="flex items-center gap-3 px-5 py-2.5">
-                        <span className="flex-1 truncate text-[13px] text-slate-700">{i.subject}</span>
+                        <span className="flex-1 truncate text-[13px] text-admin-fg-body">{i.subject}</span>
                         <Pill status={i.status}>{i.status}</Pill>
-                        <span className="w-20 text-right text-[11.5px] text-slate-400">
+                        <span className="w-20 text-right text-[11.5px] text-admin-faint">
                           {relativeTime(i.created_at)}
                         </span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="px-5 py-8 text-center text-[13px] text-slate-400">
+                  <p className="px-5 py-8 text-center text-[13px] text-admin-faint">
                     No support issues.
                   </p>
                 )}
@@ -399,27 +399,27 @@ export default function RestaurantDetail({
                   {data.dailyMetrics.slice(0, 12).map((d: any) => (
                     <li
                       key={d.date}
-                      className="flex items-center gap-2.5 rounded-lg border border-slate-100 px-3 py-2"
+                      className="flex items-center gap-2.5 rounded-lg border border-admin-border-soft px-3 py-2"
                     >
-                      <CalendarDays className="size-3.5 shrink-0 text-slate-400" />
-                      <span className="flex-1 text-[12.5px] text-slate-600">{d.date}</span>
-                      <span className="text-[12.5px] tabular-nums text-slate-500">
+                      <CalendarDays className="size-3.5 shrink-0 text-admin-faint" />
+                      <span className="flex-1 text-[12.5px] text-admin-fg-body">{d.date}</span>
+                      <span className="text-[12.5px] tabular-nums text-admin-muted">
                         {d.order_count} orders
                       </span>
-                      <span className="w-20 text-right text-[12.5px] font-medium tabular-nums text-slate-800">
+                      <span className="w-20 text-right text-[12.5px] font-medium tabular-nums text-admin-fg">
                         {compactMoney(d.order_value)}
                       </span>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-[13px] text-slate-400">No activity recorded yet.</p>
+                <p className="text-[13px] text-admin-faint">No activity recorded yet.</p>
               )}
             </Panel>
 
             <Link
               href="/superadmin/audit"
-              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-slate-500 transition hover:text-slate-800"
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-admin-muted transition hover:text-admin-fg"
             >
               <History className="size-3.5" />
               See everything that has been done to this account

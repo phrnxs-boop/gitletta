@@ -87,7 +87,7 @@ export default function SuperAdminOverview() {
           <button
             onClick={load}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg border border-admin-border bg-white px-3 py-2 text-[13px] font-medium text-admin-fg-body transition hover:bg-admin-bg disabled:opacity-60"
           >
             <RefreshCcw className={loading ? 'size-3.5 animate-spin' : 'size-3.5'} />
             Refresh
@@ -103,7 +103,7 @@ export default function SuperAdminOverview() {
               value={k?.totalRestaurants ?? 0}
               hint={`${k?.activeRestaurants ?? 0} active`}
               icon={<Store className="size-4" />}
-              tone="indigo"
+              tone="orange"
             />
             <StatCard
               label="New signups"
@@ -199,31 +199,31 @@ export default function SuperAdminOverview() {
               bodyClassName="px-2 py-2"
             >
               {(data?.recentActivity ?? []).length === 0 ? (
-                <p className="px-3 py-8 text-center text-[13px] text-slate-400">
+                <p className="px-3 py-8 text-center text-[13px] text-admin-faint">
                   Nothing has happened yet.
                 </p>
               ) : (
-                <ul className="divide-y divide-slate-100">
+                <ul className="divide-y divide-admin-border-soft">
                   {(data?.recentActivity ?? []).map((item, i) => (
                     <li key={`${item.type}-${item.at}-${i}`} className="flex items-center gap-3 px-3 py-2.5">
                       <span
                         className={`size-2 shrink-0 rounded-full ${
                           item.type === 'restaurant_signup'
-                            ? 'bg-indigo-500'
+                            ? 'bg-admin-accent'
                             : item.type === 'payment_succeeded'
                               ? 'bg-emerald-500'
                               : item.type === 'payment_failed'
                                 ? 'bg-rose-500'
-                                : 'bg-slate-300'
+                                : 'bg-[rgba(0,0,0,0.10)]'
                         }`}
                       />
-                      <span className="min-w-0 flex-1 truncate text-[13.5px] text-slate-700">
+                      <span className="min-w-0 flex-1 truncate text-[13.5px] text-admin-fg-body">
                         {item.label}
                       </span>
                       <Pill status={item.type.replace('payment_', '')}>
                         {item.type.replace('restaurant_', '').replace('payment_', '')}
                       </Pill>
-                      <span className="w-20 shrink-0 text-right text-[12px] text-slate-400">
+                      <span className="w-20 shrink-0 text-right text-[12px] text-admin-faint">
                         {relativeTime(item.at)}
                       </span>
                     </li>
@@ -242,10 +242,10 @@ export default function SuperAdminOverview() {
                 { label: 'Trials running', value: String(k?.trials ?? 0) },
               ].map((row) => (
                 <div key={row.label}>
-                  <p className="text-[12px] font-medium uppercase tracking-wider text-slate-500">
+                  <p className="text-[12px] font-medium uppercase tracking-wider text-admin-muted">
                     {row.label}
                   </p>
-                  <p className="mt-1.5 text-[20px] font-semibold tabular-nums text-slate-900">
+                  <p className="mt-1.5 text-[20px] font-semibold tabular-nums text-admin-fg">
                     {row.value}
                   </p>
                 </div>
