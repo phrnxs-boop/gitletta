@@ -18,11 +18,9 @@ import { DataState, PageTitle, Panel } from '@/components/superadmin/ui'
 
 type GoogleConfig = {
   configured: boolean
-  clientId: string
-  maskedSecret: string
+  source: string
   redirectUri: string
   defaultRedirectUri: string
-  source: 'database' | 'edge-function-secret' | 'none'
   scope: string
   updatedAt: string | null
 }
@@ -30,10 +28,10 @@ type GoogleConfig = {
 /**
  * Platform settings.
  *
- * The Google Business Profile credentials are the platform's, not a
- * restaurant's: one OAuth client, every restaurant connects through it. They
- * live in a table with no access policy for signed-in users, so no restaurant
- * owner or member of staff can read or change them.
+ * The Google client id and the client secret are **edge function secrets**,
+ * so there is no field for them here. This page tells the administrator
+ * whether one is configured, which redirect URI to register in the OAuth
+ * client, and what Google requires before the API will answer at all.
  */
 export default function SuperAdminSettings() {
   const [config, setConfig] = useState<GoogleConfig | null>(null)
@@ -41,8 +39,6 @@ export default function SuperAdminSettings() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const [clientId, setClientId] = useState('')
-  const [clientSecret, setClientSecret] = useState('')
   const [redirectUri, setRedirectUri] = useState('')
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -58,7 +54,6 @@ export default function SuperAdminSettings() {
     }
     setError(null)
     setConfig(res.data ?? null)
-    setClientId(res.data?.clientId ?? '')
     setRedirectUri(res.data?.redirectUri ?? '')
   }, [])
 
@@ -76,16 +71,14 @@ export default function SuperAdminSettings() {
     setError(null)
     const res = await superAdminFetch('google', {
       method: 'POST',
-      body: JSON.stringify({ clientId, clientSecret, redirectUri }),
+      body: JSON.stringify({ redirectUri }),
     })
     setSaving(false)
     if (!res.ok) {
       setError(res.error)
       return
     }
-    // The field is cleared, so the secret is not left sitting in the DOM.
-    setClientSecret('')
-    flash('Saved. The credentials are stored on the server and never sent to the browser.')
+    flash('The redirect URI was saved.')
     load()
   }
 
@@ -123,7 +116,7 @@ export default function SuperAdminSettings() {
     <div>
       <PageTitle
         title="Settings"
-        description="Platform configuration. The Google Business Profile credentials are the platform's — one OAuth client that every restaurant connects through."
+        description="Platform configuration. The Google credentials are edge function secrets — they are not stored here, and they never reach the browser."
         action={
           <div className="flex items-center gap-2">
             {notice && (
@@ -146,7 +139,7 @@ export default function SuperAdminSettings() {
               className="inline-flex items-center gap-2 rounded-lg bg-admin-accent px-3 py-2 text-[13px] font-medium text-white transition hover:bg-admin-accent-hover disabled:opacity-60"
             >
               {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-              {config?.configured ? 'Update' : 'Save'}
+              Save
             </button>
           </div>
         }
@@ -159,43 +152,34 @@ export default function SuperAdminSettings() {
             description="The OAuth client every restaurant connects with."
             bodyClassName="space-y-4"
           >
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-slate-500">
-                OAuth Client ID
-              </span>
-              <input
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                placeholder="1234567890-abc.apps.googleusercontent.com"
-                autoComplete="off"
-                spellCheck={false}
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 font-mono text-[13px] outline-none transition focus:border-admin-accent"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-slate-500">
-                OAuth Client Secret
-              </span>
-              <div className="relative">
-                <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="password"
-                  value={clientSecret}
-                  onChange={(e) => setClientSecret(e.target.value)}
-                  placeholder={config?.configured ? '••••••••' : 'GOCSPX-…'}
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-2.5 font-mono text-[13px] outline-none transition focus:border-admin-accent"
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-admin-bg px-3 py-2.5">
+              <div
+                className={
+                  config?.configured
+                    ? 'flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15'
+                    : 'flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15'
+                }
+              >
+                <KeyRound
+                  className={
+                    config?.configured ? 'size-4 text-emerald-600' : 'size-4 text-amber-600'
+                  }
                 />
               </div>
-              <span className="mt-1 block text-[11.5px] text-slate-400">
-                Leave it empty to keep the stored secret.
-              </span>
-            </label>
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-admin-fg">
+                  {config?.configured ? 'A client is configured' : 'No client is configured'}
+                </p>
+                <p className="text-[11.5px] text-admin-muted">
+                  {config?.configured
+                    ? 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set as edge function secrets.'
+                    : 'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as Supabase edge function secrets.'}
+                </p>
+              </div>
+            </div>
 
             <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-slate-500">
+              <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-admin-muted">
                 Redirect URI
               </span>
               <div className="flex items-center gap-1.5">
@@ -203,57 +187,39 @@ export default function SuperAdminSettings() {
                   value={redirectUri}
                   onChange={(e) => setRedirectUri(e.target.value)}
                   placeholder={config?.defaultRedirectUri}
-                  autoComplete="off"
                   spellCheck={false}
-                  className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 font-mono text-[12px] outline-none transition focus:border-admin-accent"
+                  className="h-9 w-full min-w-0 rounded-lg border border-admin-border bg-white px-2.5 font-mono text-[12px] text-admin-fg outline-none focus:border-admin-accent"
                 />
                 <button
                   onClick={() => copy(redirectUri || config?.defaultRedirectUri || '')}
-                  className="shrink-0 rounded-lg border border-slate-200 bg-white p-2.5 text-slate-500 transition hover:bg-slate-50"
+                  className="shrink-0 rounded-lg border border-admin-border bg-white p-2 text-admin-muted transition hover:bg-admin-elevated"
                   aria-label="Copy the redirect URI"
                 >
                   {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
                 </button>
               </div>
-              <span className="mt-1 block text-[11.5px] text-slate-400">
-                Must match a redirect URI registered in the OAuth client, exactly.
+              <span className="mt-1 block text-[11.5px] text-admin-faint">
+                Must match a redirect URI registered in the OAuth client, exactly. It is
+                configuration, not a credential, so it is kept here.
               </span>
             </label>
 
-            <div className="space-y-1.5 text-[12.5px] text-slate-500">
-              <p>
-                <span className="font-medium text-slate-700">Status:</span>{' '}
-                {config?.configured ? (
-                  <span className="text-emerald-700">
-                    configured
-                    {config.source === 'edge-function-secret' ? ' (from the function secret)' : ' (saved here)'}
-                  </span>
-                ) : (
-                  <span className="text-amber-700">no client configured</span>
-                )}
-              </p>
-              <p>
-                <span className="font-medium text-slate-700">Scope:</span>{' '}
-                <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11.5px] text-slate-600">
-                  {config?.scope}
-                </code>
-              </p>
-              {config?.updatedAt && (
-                <p>
-                  <span className="font-medium text-slate-700">Last updated:</span>{' '}
-                  {new Date(config.updatedAt).toLocaleString('en-IN')}
-                </p>
-              )}
-            </div>
+            <p className="text-[12.5px] text-admin-muted">
+              <span className="font-medium text-admin-fg">Scope:</span>{' '}
+              <code className="rounded bg-admin-elevated px-1.5 py-0.5 font-mono text-[11.5px] text-admin-fg-body">
+                {config?.scope}
+              </code>
+            </p>
 
             <div className="flex items-start gap-2.5 rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
               <div className="text-[12.5px] leading-relaxed text-emerald-800">
-                <p className="font-medium">The credentials stay on the server.</p>
+                <p className="font-medium">The credentials stay on the server</p>
                 <p className="mt-0.5 text-emerald-700/90">
                   Read only by the edge functions through the service role. No restaurant owner
                   or member of staff can read them, and a restaurant&rsquo;s own access and
-                  refresh tokens are never sent to their browser.
+                  refresh tokens are held in a table with no access policy at all — not even
+                  the owner can read those.
                 </p>
               </div>
             </div>
@@ -265,46 +231,46 @@ export default function SuperAdminSettings() {
               description="The Business Profile APIs are not self-service."
               bodyClassName="space-y-3"
             >
-              <ol className="space-y-2.5 text-[12.5px] leading-relaxed text-slate-600">
+              <ol className="space-y-2.5 text-[12.5px] leading-relaxed text-admin-muted">
                 <li className="flex gap-2.5">
-                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-600">
+                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-admin-elevated text-[10px] font-bold text-admin-fg-body">
                     1
                   </span>
                   <span>
                     Create a Google Cloud project and enable{' '}
-                    <strong className="font-semibold text-slate-700">My Business API v4</strong>,{' '}
-                    <strong className="font-semibold text-slate-700">Account Management</strong> and{' '}
-                    <strong className="font-semibold text-slate-700">Business Information</strong>.
+                    <strong className="font-semibold text-admin-fg-body">My Business API v4</strong>,{' '}
+                    <strong className="font-semibold text-admin-fg-body">Account Management</strong> and{' '}
+                    <strong className="font-semibold text-admin-fg-body">Business Information</strong>.
                   </span>
                 </li>
                 <li className="flex gap-2.5">
-                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-600">
+                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-admin-elevated text-[10px] font-bold text-admin-fg-body">
                     2
                   </span>
                   <span>
-                    Create an <strong className="font-semibold text-slate-700">OAuth client ID</strong> of
+                    Create an <strong className="font-semibold text-admin-fg-body">OAuth client ID</strong> of
                     type &ldquo;Web application&rdquo; and add the redirect URI above.
                   </span>
                 </li>
                 <li className="flex gap-2.5">
-                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-600">
+                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-admin-elevated text-[10px] font-bold text-admin-fg-body">
                     3
                   </span>
                   <span>
-                    <strong className="font-semibold text-slate-700">Request access to the API.</strong>{' '}
+                    <strong className="font-semibold text-admin-fg-body">Request access to the API.</strong>{' '}
                     Google approves per project, after an application, and only if you manage a
                     Business Profile that has been verified and active for 60+ days and has a
                     website listed on it. Reviews are about 14 working days.
                   </span>
                 </li>
                 <li className="flex gap-2.5">
-                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-600">
+                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-admin-elevated text-[10px] font-bold text-admin-fg-body">
                     4
                   </span>
                   <span>
                     Check the quota for the Business Profile APIs in the Cloud console:{' '}
-                    <strong className="font-semibold text-slate-700">0 QPM means not approved</strong>,{' '}
-                    <strong className="font-semibold text-slate-700">300 QPM means approved</strong>.
+                    <strong className="font-semibold text-admin-fg-body">0 QPM means not approved</strong>,{' '}
+                    <strong className="font-semibold text-admin-fg-body">300 QPM means approved</strong>.
                   </span>
                 </li>
               </ol>
@@ -320,21 +286,18 @@ export default function SuperAdminSettings() {
               </a>
             </Panel>
 
-            <Panel
-              title="One more thing to know"
-              bodyClassName="space-y-2.5"
-            >
-              <p className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-slate-600">
+            <Panel title="One more thing to know" bodyClassName="space-y-2.5">
+              <p className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-admin-muted">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />
                 <span>
                   A restaurant&rsquo;s Business Profile has to be{' '}
-                  <strong className="font-semibold text-slate-700">verified</strong> before its
+                  <strong className="font-semibold text-admin-fg-body">verified</strong> before its
                   reviews can be read, and its Google Workspace administrator must have Google
                   Search or Maps enabled for the account before replies will work.
                 </span>
               </p>
-              <p className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-slate-600">
-                <Store className="mt-0.5 size-4 shrink-0 text-slate-400" />
+              <p className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-admin-muted">
+                <Store className="mt-0.5 size-4 shrink-0 text-admin-faint" />
                 <span>
                   Each restaurant connects with its own Google account and picks its own location.
                   You only configure the shared client here.

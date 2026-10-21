@@ -35,12 +35,53 @@ level) because staff sessions and the diner QR flow carry no Supabase JWT.
 
 Set these secrets on the project first:
 
-| Secret | Value |
-|---|---|
-| `ALLOWED_ORIGINS` | your Vercel origin, e.g. `https://swixo.vercel.app` |
+| Secret | Value | Needed by |
+|---|---|---|
+| `ALLOWED_ORIGINS` | your Vercel origin, e.g. `https://swixo.vercel.app` | every function |
+| `GEMINI_API_KEY` | the Google AI Studio key | `ai-extract-menu`, `ai-generate-image` |
+| `GOOGLE_CLIENT_ID` | the OAuth client id of a **Web application** | `google-reviews` |
+| `GOOGLE_CLIENT_SECRET` | the matching client secret | `google-reviews` |
+| `RAZORPAY_KEY_ID` | the Razorpay key id (test mode first) | `subscriptions`, `razorpay-webhook` |
+| `RAZORPAY_KEY_SECRET` | the matching key secret | `subscriptions`, `razorpay-webhook` |
+| `RAZORPAY_WEBHOOK_SECRET` | optional; falls back to the key secret | `razorpay-webhook` |
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are injected
 into every edge function by the platform — do not set them yourself.
+
+### The credentials are secrets, not settings
+
+Every credential above is a **Supabase edge function secret**. None of them is
+stored in a table, and none of them is ever sent to the browser.
+
+The Super Admin dashboard has no field for any of them. It can tell you
+whether one is configured, which models to use, how the calls have been going
+and what has gone wrong — and that is all it can do. Setting a key means
+putting it in the secrets list above, not typing it into a page.
+
+What lives in the database instead:
+
+| Table | What it holds | Who can read it |
+|---|---|---|
+| `ai_provider_settings` | which Gemini models to use | the service role only |
+| `google_oauth_config` | the redirect URI to register | the service role only |
+| `google_oauth_tokens` | a restaurant's Google access and refresh tokens | the service role only |
+| `google_oauth_states` | single-use sign-in states | the service role only |
+| `ai_request_logs` | the shape of each AI call | the service role only |
+
+The last three have **no row level security policy at all**, so no signed-in
+user — restaurant owner or staff — can read them with PostgREST and their own
+session. A restaurant's refresh token is a credential for their Google
+account, and it is not theirs to read.
+
+### What else the dashboard needs
+
+- **Google**: create an OAuth client of type *Web application* and add the
+  redirect URI from Super Admin → Settings. The Business Profile APIs are not
+  self-service: request access per project, and approval needs a Business
+  Profile that has been verified and active for 60+ days.
+- **Razorpay**: create two recurring monthly plans and put their plan ids in
+  Super Admin → Payments → Plans. Point the webhook at
+  `https://<ref>.supabase.co/functions/v1/razorpay-webhook`.
 
 Then:
 

@@ -4,14 +4,15 @@ import { admin } from "./db.ts";
 /**
  * Google Gemini client, shared by the AI edge functions.
  *
- * The API key never leaves the server. It is read from
- * `public.ai_provider_settings`, which has no RLS policy for `anon` or
- * `authenticated` — so no signed-in user, owner or staff, can read it. The
- * `super-admin` edge function is the only thing that writes it, and it masks
- * the key in every response.
+ * The API key lives in the `GEMINI_API_KEY` **edge function secret** and
+ * nowhere else — not in a database table, not in a response, not in the
+ * browser. The Super Admin can see whether a key is configured and can change
+ * which model is used, but it cannot read the key, write the key, or see any
+ * part of it.
  *
- * The edge function's own `GEMINI_API_KEY` secret is honoured as a fallback,
- * so a deployment works without the table being filled in.
+ * The model names are the other way round: they are configuration, not
+ * credentials, so they live in `public.ai_provider_settings` and the Super
+ * Admin can change them.
  */
 
 export const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
@@ -20,7 +21,7 @@ export const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 export const DEFAULT_TEXT_MODEL = "gemini-3.8-flash";
 export const DEFAULT_IMAGE_MODEL = "gemini-nano-banana-2.1";
 
-export type GeminiSource = "database" | "edge-function-secret" | "none";
+export type GeminiSource = "edge-function-secret" | "none";
 
 export type GeminiConfig = {
   provider: string;
@@ -36,35 +37,37 @@ export type GeminiConfig = {
  * saved and falling back to the function's own secret.
  */
 export async function getGeminiConfig(provider = "gemini"): Promise<GeminiConfig> {
+  // The key comes from the edge function's own environment and from nowhere
+  // else. The table holds the model names, which are configuration.
   const { data } = await admin()
     .from("ai_provider_settings")
-    .select("provider, api_key, text_model, image_model, updated_at")
+    .select("provider, text_model, image_model, updated_at")
     .eq("provider", provider)
     .maybeSingle();
 
   const row = data as any;
-  const fromDb = typeof row?.api_key === "string" && row.api_key.trim() ? row.api_key.trim() : null;
   const fromEnv = (Deno.env.get("GEMINI_API_KEY") ?? "").trim() || null;
 
   return {
     provider,
-    apiKey: fromDb ?? fromEnv,
+    apiKey: fromEnv,
     textModel: row?.text_model || DEFAULT_TEXT_MODEL,
     imageModel: row?.image_model || DEFAULT_IMAGE_MODEL,
-    source: fromDb ? "database" : fromEnv ? "edge-function-secret" : "none",
+    source: fromEnv ? "edge-function-secret" : "none",
     updatedAt: row?.updated_at ?? null,
   };
 }
 
 /**
- * Never show more than the last four characters. The key is not returned to a
- * browser at all — this is for logs and for the admin's own confirmation.
+ * There is nothing to mask any more.
+ *
+ * The key was never returned to a browser — it was stored in a table and
+ * masked on the way out, which meant a mask of it travelled through the
+ * database and through every response. It now lives in the function's
+ * environment, and the dashboard is told only whether one is configured.
  */
-export function maskKey(key: string | null | undefined): string {
-  if (!key) return "";
-  const trimmed = key.trim();
-  if (trimmed.length <= 8) return "•".repeat(trimmed.length);
-  return `${"•".repeat(8)}${trimmed.slice(-4)}`;
+export function maskKey(_key: string | null | undefined): string {
+  return "";
 }
 
 /** Split a `data:<mime>;base64,<payload>` URL into its parts. */

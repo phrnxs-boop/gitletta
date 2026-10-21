@@ -88,76 +88,156 @@ console.log("\n── an ordinary owner is refused ──");
   check("an owner cannot change the credentials", res2.status === 403, `status ${res2.status}`);
 }
 
-console.log("\n── saving the credentials ──");
+console.log("\n── the credentials are not a setting any more ──");
 {
+  // The client id and the secret are edge function secrets now. The
+  // dashboard must refuse them rather than quietly accept them.
   const res = await call("super-admin/google", adminToken, {
     method: "POST",
     body: JSON.stringify({ clientId: FAKE_ID, clientSecret: FAKE_SECRET }),
   });
-  check("they save", res.status === 200, `status ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
+  check("the dashboard refuses to store them", res.status === 400, `status ${res.status}`);
+  check(
+    "it says where they belong now",
+    /edge function secret/i.test(String(res.body?.error ?? "")),
+    String(res.body?.error).slice(0, 140),
+  );
   check("the response does not contain the secret", !JSON.stringify(res.body ?? {}).includes(FAKE_SECRET));
-  check("the response carries a mask", typeof res.body?.maskedSecret === "string" && res.body.maskedSecret.length > 0);
+
+  // And nothing was written: the table has neither column any more.
+  const { data: rows } = await admin.from("google_oauth_config").select("*");
+  check(
+    "no credential is stored in the database",
+    !JSON.stringify(rows ?? []).includes(FAKE_SECRET) && !JSON.stringify(rows ?? []).includes(FAKE_ID),
+    JSON.stringify(rows ?? []).slice(0, 140),
+  );
 
   const read = await call("super-admin/google", adminToken);
-  check("reading it back does not contain the secret", !JSON.stringify(read.body ?? {}).includes(FAKE_SECRET));
-  check("the client id comes back in full", read.body?.clientId === FAKE_ID);
-  check("the row is marked as configured", read.body?.configured === true);
+  check("the response never carries a secret", !JSON.stringify(read.body ?? {}).includes(FAKE_SECRET));
+  check("the response says whether a client is configured", typeof read.body?.configured === "boolean", String(read.body?.configured));
+  check("there is no mask any more", read.body?.maskedSecret === undefined, String(read.body?.maskedSecret));
+}
+
+console.log("\n── the redirect URI is still a setting ──");
+{
+  const before = await call("super-admin/google", adminToken);
+  const res = await call("super-admin/google", adminToken, {
+    method: "POST",
+    body: JSON.stringify({ redirectUri: "https://www.restrofi.in/google/callback" }),
+  });
+  check("the redirect URI saves", res.status === 200, `status ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
+  const read = await call("super-admin/google", adminToken);
+  check("it is the one we set", read.body?.redirectUri === "https://www.restrofi.in/google/callback", String(read.body?.redirectUri));
+  check("it was changed", read.body?.redirectUri !== before.body?.redirectUri);
+  // put it back
+  await call("super-admin/google", adminToken, {
+    method: "POST",
+    body: JSON.stringify({ redirectUri: before.body?.redirectUri }),
+  });
+}
+
+console.log("\n── the token table is unreachable from the browser ──");
+{
+  for (const table of ["google_oauth_tokens", "google_oauth_config"]) {
+    const res = await fetch(`${SB}/rest/v1/${table}?select=*`, {
+      headers: { apikey: ANON, authorization: `Bearer ${ownerToken}` },
+    });
+    const body = await res.text().catch(() => "");
+    check(`${table} is not readable by a signed-in user`, res.status >= 400 || body === "[]", `status ${res.status} ${body.slice(0, 80)}`);
+  }
 }
 
 console.log("\n── testing the credentials against Google ──");
 {
   const res = await call("super-admin/google/test", adminToken, { method: "POST" });
   const message = String(res.body?.message ?? res.body?.error ?? "");
-  check("the check reaches Google", res.status === 200 || res.status === 400, `status ${res.status}`);
+  check("the check answers", res.status === 200 || res.status === 400, `status ${res.status}`);
   check("the response does not contain the secret", !JSON.stringify(res.body ?? {}).includes(FAKE_SECRET));
-  console.log(`        Google said: ${message.slice(0, 150) || "(no message)"}`);
-  check("Google rejected the fake credentials", /rejected|invalid/i.test(message), message.slice(0, 160));
+  console.log(`        it said: ${message.slice(0, 150) || "(no message)"}`);
+  // With the credentials in the environment this reaches Google; without
+  // them it has to say which secrets are missing.
+  check(
+    "it either reached Google or says which secret is missing",
+    /rejected|invalid/i.test(message) || /GOOGLE_CLIENT_ID/.test(message),
+    message.slice(0, 160),
+  );
 }
 
 console.log("\n── the sign-in URL a restaurant gets ──");
 {
   const res = await call("google-reviews/connect", ownerToken);
   check("the connect route answers", res.status === 200, `status ${res.status}`);
-  check("it is not demo mode now that a client is configured", res.body?.demoMode === false);
 
-  const authUrl = new URL(String(res.body?.authUrl));
-  check("it points at Google", authUrl.hostname === "accounts.google.com", authUrl.hostname);
-  check("the scope is the Business Profile one", authUrl.searchParams.get("scope") === "https://www.googleapis.com/auth/business.manage", String(authUrl.searchParams.get("scope")));
-  check("it asks for offline access", authUrl.searchParams.get("access_type") === "offline", String(authUrl.searchParams.get("access_type")));
-  check("the redirect URI is the callback", String(authUrl.searchParams.get("redirect_uri")).endsWith("/functions/v1/google-reviews/callback"), String(authUrl.searchParams.get("redirect_uri")));
+  if (res.body?.demoMode) {
+    // No client is configured on the server, so the platform falls back to the
+    // sample connection. That is the correct behaviour, and it is what the
+    // dashboard says.
+    check("with no client configured it falls back to the sample connection", res.body?.demoMode === true);
+    console.log("        (no Google client is configured on the server, so the OAuth URL cannot be built here)");
+  } else {
+    const authUrl = new URL(String(res.body?.authUrl));
+    check("it points at Google", authUrl.hostname === "accounts.google.com", authUrl.hostname);
+    check("the scope is the Business Profile one", authUrl.searchParams.get("scope") === "https://www.googleapis.com/auth/business.manage", String(authUrl.searchParams.get("scope")));
+    check("it asks for offline access", authUrl.searchParams.get("access_type") === "offline", String(authUrl.searchParams.get("access_type")));
+    check("the redirect URI is the callback", String(authUrl.searchParams.get("redirect_uri")).endsWith("/functions/v1/google-reviews/callback"), String(authUrl.searchParams.get("redirect_uri")));
+  }
 
-  const state = authUrl.searchParams.get("state") ?? "";
-  check("the state is signed, not a bare tenant id", state !== "" && !state.startsWith("swizofoods"), state.slice(0, 40));
-
-  // The state is base64url(payload).hmac, and the payload carries the
-  // tenant id and an expiry.
-  const [encoded] = state.split(".");
-  const payload = Buffer.from(encoded.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString();
-  const [carriedTenant, expiryText] = payload.split(".");
-  const expiry = Number(expiryText);
-
-  // The state carries the restaurant's id, signed. The id is a uuid, and the
-  // whole state is longer than it, because the signature is appended.
+  // The state is a row now, and it is spent the moment it is used. The test
+  // can therefore make a genuine one — and prove that it only works once.
+  console.log("\n── the state is single-use ──");
   const { data: profile } = await admin
     .from("profiles")
     .select("tenant_id")
     .eq("email", "swizofoods@gmail.com")
     .maybeSingle();
-  check("the state carries the restaurant", carriedTenant === profile?.tenant_id, `${carriedTenant} vs ${profile?.tenant_id}`);
-  check("the state is more than the bare id", state.length > carriedTenant.length);
-  check("the state expires", Number.isFinite(expiry) && expiry > Date.now(), String(expiry));
+  const tenantId = profile!.tenant_id;
 
-  console.log("\n── a tampered state is refused ──");
-  const tampered = state.slice(0, -4) + "AAAA";
-  const bad = await call(`google-reviews/callback?code=fake&state=${encodeURIComponent(tampered)}`, adminToken);
-  check("a tampered state is refused", bad.status === 400, `status ${bad.status}`);
+  const issue = async () => {
+    const id = crypto.randomUUID();
+    const { error } = await admin.from("google_oauth_states").insert({
+      id,
+      tenant_id: tenantId,
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+    });
+    if (error) throw error;
+    return id;
+  };
+
+  // A state that was never issued is refused.
+  const unknown = crypto.randomUUID();
+  const bad = await call(`google-reviews/callback?code=fake&state=${encodeURIComponent(unknown)}`, adminToken);
+  check("a state that was never issued is refused", bad.status === 400, `status ${bad.status}`);
   check("it says the request could not be verified", /verified/i.test(String(bad.body?.error ?? "")), String(bad.body?.error));
 
   // A state this server issued, but a code that is no good: the state is
   // accepted and the code is what fails. That is the difference between a
   // broken state and a broken sign-in.
-  const good = await call(`google-reviews/callback?code=fake&state=${encodeURIComponent(state)}`, adminToken);
+  const genuine = await issue();
+  const good = await call(`google-reviews/callback?code=fake&state=${encodeURIComponent(genuine)}`, adminToken);
   check("a genuine state is accepted", !/verified/i.test(String(good.body?.error ?? "")), String(good.body?.error));
+
+  // And it cannot be used twice.
+  const replay = await call(`google-reviews/callback?code=fake&state=${encodeURIComponent(genuine)}`, adminToken);
+  check("a state cannot be used twice", /verified/i.test(String(replay.body?.error ?? "")), String(replay.body?.error));
+
+  // An expired state is refused too.
+  const expiredId = crypto.randomUUID();
+  await admin.from("google_oauth_states").insert({
+    id: expiredId,
+    tenant_id: tenantId,
+    created_at: new Date(Date.now() - 60 * 60_000).toISOString(),
+    expires_at: new Date(Date.now() - 1000).toISOString(),
+  });
+  const expired = await call(`google-reviews/callback?code=fake&state=${encodeURIComponent(expiredId)}`, adminToken);
+  check("an expired state is refused", /verified/i.test(String(expired.body?.error ?? "")), String(expired.body?.error));
+
+  // The states are not readable from the browser.
+  const stateRes = await fetch(`${SB}/rest/v1/google_oauth_states?select=*`, {
+    headers: { apikey: ANON, authorization: `Bearer ${ownerToken}` },
+  });
+  const stateBody = await stateRes.text().catch(() => "");
+  check("the states are not readable by a signed-in user", stateRes.status >= 400 || stateBody === "[]", `status ${stateRes.status} ${stateBody.slice(0, 60)}`);
 }
 
 console.log("\n── a restaurant's own tokens stay on the server ──");

@@ -1067,57 +1067,96 @@ async function updateTenant(req: Request, tenantId: string, adminId: string) {
  * from and the model names, which is everything it needs to show and nothing
  * it could leak.
  */
+/**
+ * The AI provider, as the dashboard sees it.
+ *
+ * The key is an edge function secret, so there is nothing to show and nothing
+ * to change. What the dashboard gets is whether a key is configured, which
+ * models are in use, how the calls have been going and what has gone wrong.
+ */
 async function getAiProvider(req: Request) {
-  const config = await getGeminiConfig("gemini");
+  const config = await getGeminiConfig();
+
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const { data: logs } = await admin()
+    .from("ai_request_logs")
+    .select("id, model, action, status, duration_ms, error_message, created_at, tenant_id")
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  const all = logs ?? [];
+  const errors = all.filter((l: any) => l.status === "error");
+  const byModel = new Map<string, { calls: number; errors: number }>();
+  for (const l of all) {
+    const key = l.model ?? "unknown";
+    const cur = byModel.get(key) ?? { calls: 0, errors: 0 };
+    cur.calls += 1;
+    if (l.status === "error") cur.errors += 1;
+    byModel.set(key, cur);
+  }
+  const durations = all
+    .map((l: any) => l.duration_ms)
+    .filter((d: any): d is number => typeof d === "number");
+
   return json(req, {
     provider: config.provider,
+    // Whether a key is configured, and nothing else about it.
     configured: Boolean(config.apiKey),
-    maskedKey: maskKey(config.apiKey),
     source: config.source,
     textModel: config.textModel,
     imageModel: config.imageModel,
     updatedAt: config.updatedAt,
-    defaultTextModel: DEFAULT_TEXT_MODEL,
-    defaultImageModel: DEFAULT_IMAGE_MODEL,
+    defaults: { textModel: DEFAULT_TEXT_MODEL, imageModel: DEFAULT_IMAGE_MODEL },
+    usage: {
+      windowDays: 30,
+      calls: all.length,
+      errors: errors.length,
+      errorRate: all.length ? +((errors.length / all.length) * 100).toFixed(1) : 0,
+      averageMs: durations.length
+        ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+        : null,
+      byModel: [...byModel.entries()].map(([model, v]) => ({ model, ...v })),
+    },
+    recentErrors: errors.slice(0, 10).map((l: any) => ({
+      id: l.id,
+      model: l.model,
+      action: l.action,
+      message: l.error_message,
+      at: l.created_at,
+    })),
   });
 }
 
 /**
- * Save or update the provider settings.
+ * Change which model is used.
  *
- * An empty key means "leave the key alone" — the dashboard sends the masked
- * value back unchanged most of the time, and writing that masked value over
- * the real key would break it. A key is only replaced when a new one is
- * actually supplied.
+ * The key is not accepted here: it lives in the edge function's environment,
+ * and a key in a database is a key in every backup of it. The request is
+ * refused with an explanation rather than silently ignored.
  */
 async function saveAiProvider(req: Request, adminId: string) {
   const b = await req.json().catch(() => ({})) as any;
 
-  const provider = String(b.provider ?? "gemini").trim() || "gemini";
-  if (provider !== "gemini") {
-    return json(req, { error: `Unknown provider "${provider}"` }, 400);
+  if (b.apiKey || b.api_key) {
+    return json(
+      req,
+      {
+        error:
+          "The API key is an edge function secret now, not a setting. Set GEMINI_API_KEY as a Supabase edge function secret.",
+      },
+      400,
+    );
   }
 
   const textModel = String(b.textModel ?? "").trim() || DEFAULT_TEXT_MODEL;
   const imageModel = String(b.imageModel ?? "").trim() || DEFAULT_IMAGE_MODEL;
 
-  const incoming = typeof b.apiKey === "string" ? b.apiKey.trim() : "";
-  const current = await getGeminiConfig(provider);
-
-  // The dashboard sends the masked key back when the field is untouched. That
-  // is not a new key and must not overwrite the real one.
-  const isMasked = incoming.length > 0 && incoming.includes("\u2022");
-  // An empty field means "keep the key" — the dashboard sends the masked
-  // value back untouched most of the time, and writing that over the real
-  // key would break it. Removing a key is an explicit action.
-  const nextKey = b.clearKey === true ? null : incoming && !isMasked ? incoming : current.apiKey;
-
   const { data, error } = await admin()
     .from("ai_provider_settings")
     .upsert(
       {
-        provider,
-        api_key: nextKey,
+        provider: "gemini",
         text_model: textModel,
         image_model: imageModel,
         enabled: b.enabled === false ? false : true,
@@ -1126,37 +1165,30 @@ async function saveAiProvider(req: Request, adminId: string) {
       },
       { onConflict: "provider" },
     )
-    .select("provider, updated_at")
+    .select("provider, text_model, image_model, updated_at")
     .single();
   if (error) return json(req, { error: error.message }, 500);
 
-  await logAdminAction(
-    adminId,
-    "ai_provider.updated",
-    { provider, textModel, imageModel, keyChanged: Boolean(incoming && !isMasked) },
-  );
+  await logAdminAction(adminId, "ai_provider.models_updated", { textModel, imageModel });
 
   return json(req, {
     ok: true,
     provider: data.provider,
-    configured: Boolean(nextKey),
-    maskedKey: maskKey(nextKey),
-    source: nextKey ? "database" : "none",
-    textModel,
-    imageModel,
+    textModel: data.text_model,
+    imageModel: data.image_model,
     updatedAt: data.updated_at,
   });
 }
 
-/**
- * Prove the stored key works, without ever showing it.
- */
 async function testAiProvider(req: Request) {
   const config = await getGeminiConfig("gemini");
   if (!config.apiKey) {
     return json(
       req,
-      { error: "No API key is configured. Save one first." },
+      {
+        error:
+          "No API key is configured. Set GEMINI_API_KEY as a Supabase edge function secret.",
+      },
       400,
     );
   }
@@ -1188,44 +1220,50 @@ async function testAiProvider(req: Request) {
  * redirect URI are shown in full, because the administrator has to copy them
  * into the Google Cloud console, and neither is a secret.
  */
+/**
+ * The Google Business Profile configuration, as the dashboard sees it.
+ *
+ * The client id and the client secret are edge function secrets, so there is
+ * nothing to show and nothing to change — only whether one is configured and
+ * which redirect URI to register. The redirect URI is not a credential: it is
+ * the address Google sends the owner back to, and it has to match the OAuth
+ * client exactly.
+ */
 async function getGoogleConfigSettings(req: Request) {
   const config = await getGoogleConfig();
   return json(req, {
     configured: Boolean(config.clientId && config.clientSecret),
-    clientId: config.clientId ?? "",
-    maskedSecret: maskSecret(config.clientSecret),
+    source: config.source,
     redirectUri: config.redirectUri ?? defaultRedirectUri(),
     defaultRedirectUri: defaultRedirectUri(),
-    source: config.source,
     scope: GBP_SCOPE,
     updatedAt: config.updatedAt,
   });
 }
 
 /**
- * Save or update the Google OAuth configuration.
+ * Change the redirect URI.
  *
- * The secret is only replaced when a new one is actually supplied; the
- * dashboard sends the masked value back untouched most of the time, and
- * writing that over the real secret would break the connection.
+ * The client id and the client secret are not accepted here — they are edge
+ * function secrets. The request is refused with an explanation rather than
+ * silently ignored.
  */
 async function saveGoogleConfig(req: Request, adminId: string) {
   const b = await req.json().catch(() => ({})) as any;
-  const current = await getGoogleConfig();
 
-  const clientId = String(b.clientId ?? "").trim();
-  const redirectUri = String(b.redirectUri ?? "").trim();
-  const incoming = typeof b.clientSecret === "string" ? b.clientSecret.trim() : "";
-
-  // The dashboard sends the masked value back when the field is untouched.
-  const isMasked = incoming.length > 0 && incoming.includes("\u2022");
-  const nextSecret = incoming && !isMasked ? incoming : current.clientSecret;
-  const nextClientId = clientId || current.clientId;
-
-  if (!nextClientId || !nextSecret) {
-    return json(req, { error: "A client id and a client secret are both needed." }, 400);
+  if (b.clientId || b.client_id || b.clientSecret || b.client_secret) {
+    return json(
+      req,
+      {
+        error:
+          "The client id and secret are edge function secrets now, not settings. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as Supabase edge function secrets.",
+      },
+      400,
+    );
   }
-  if (redirectUri && !/^https:\/\//i.test(redirectUri)) {
+
+  const redirectUri = String(b.redirectUri ?? "").trim() || defaultRedirectUri();
+  if (!/^https:\/\//i.test(redirectUri)) {
     return json(req, { error: "The redirect URI must start with https://" }, 400);
   }
 
@@ -1234,42 +1272,33 @@ async function saveGoogleConfig(req: Request, adminId: string) {
     .upsert(
       {
         id: GOOGLE_CONFIG_ID,
-        client_id: nextClientId,
-        client_secret: nextSecret,
-        redirect_uri: redirectUri || defaultRedirectUri(),
+        redirect_uri: redirectUri,
         updated_at: new Date().toISOString(),
         updated_by: adminId,
       },
       { onConflict: "id" },
     )
-    .select("id, updated_at")
+    .select("id, redirect_uri, updated_at")
     .single();
   if (error) return json(req, { error: error.message }, 500);
 
-  await logAdminAction(adminId, "google_oauth.updated", {
-    clientId: nextClientId,
-    redirectUri: redirectUri || defaultRedirectUri(),
-    secretChanged: Boolean(incoming && !isMasked),
-  });
+  await logAdminAction(adminId, "google_oauth.redirect_updated", { redirectUri });
 
-  return json(req, {
-    ok: true,
-    configured: true,
-    clientId: nextClientId,
-    maskedSecret: maskSecret(nextSecret),
-    redirectUri: redirectUri || defaultRedirectUri(),
-    source: "database",
-    updatedAt: data.updated_at,
-  });
+  return json(req, { ok: true, redirectUri: data.redirect_uri, updatedAt: data.updated_at });
 }
 
-/**
- * Check the configured credentials against Google.
- */
 async function testGoogleConfig(req: Request) {
   const config = await getGoogleConfig();
   if (!config.clientId || !config.clientSecret) {
-    return json(req, { ok: false, error: "No client id or client secret is configured. Save one first." }, 400);
+    return json(
+      req,
+      {
+        ok: false,
+        error:
+          "No client id or client secret is configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as Supabase edge function secrets.",
+      },
+      400,
+    );
   }
 
   const result = await testGoogleCredentials(config);

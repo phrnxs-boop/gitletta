@@ -3,8 +3,8 @@
  *
  * What this proves, and what it cannot:
  *
- *   - the key is stored server-side, comes back masked, and never reaches the
- *     browser in full
+ *   - the key is an edge function secret: the dashboard refuses to store one,
+ *     the database has no column for one, and no response ever carries one in full
  *   - only the super admin can read or change it — an ordinary restaurant
  *     owner is refused
  *   - the AI functions return an actionable error when no key is configured,
@@ -88,20 +88,64 @@ console.log("\n── an ordinary owner is refused ──");
   check("an owner cannot write the settings", res2.status === 403, `status ${res2.status}`);
 }
 
-console.log("\n── saving a key ──");
+console.log("\n── the key is not a setting any more ──");
 {
+  // The key is an edge function secret now. The dashboard must refuse it
+  // rather than quietly accept it and pretend.
   const res = await callFn("super-admin/ai-provider", adminToken, {
     method: "POST",
     body: JSON.stringify({ provider: "gemini", apiKey: BOGUS_KEY }),
   });
-  check("the key saves", res.status === 200, `status ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
+  check("the dashboard refuses to store a key", res.status === 400, `status ${res.status}`);
+  check(
+    "it says where the key belongs now",
+    /edge function secret/i.test(String(res.body?.error ?? "")),
+    String(res.body?.error).slice(0, 140),
+  );
   check("the response does not contain the key", !JSON.stringify(res.body ?? {}).includes(BOGUS_KEY));
-  check("the response carries a mask", typeof res.body?.maskedKey === "string" && res.body.maskedKey.length > 0);
+
+  // And nothing was written: the table has no key column at all.
+  const { data: rows } = await admin
+    .from("ai_provider_settings")
+    .select("*")
+    .eq("provider", "gemini");
+  check(
+    "no key is stored in the database",
+    !JSON.stringify(rows ?? []).includes(BOGUS_KEY),
+    JSON.stringify(rows ?? []).slice(0, 140),
+  );
 
   const read = await callFn("super-admin/ai-provider", adminToken);
-  check("reading it back does not contain the key", !JSON.stringify(read.body ?? {}).includes(BOGUS_KEY));
-  check("the stored key is masked", String(read.body?.maskedKey ?? "").endsWith("0000"), String(read.body?.maskedKey));
-  check("the row is marked as configured", read.body?.configured === true);
+  check("the response never carries a key", !JSON.stringify(read.body ?? {}).includes(BOGUS_KEY));
+  check("the response says whether a key is configured", typeof read.body?.configured === "boolean", String(read.body?.configured));
+  check("there is no mask any more", read.body?.maskedKey === undefined, String(read.body?.maskedKey));
+}
+
+console.log("\n── the models can still be chosen ──");
+{
+  const before = await callFn("super-admin/ai-provider", adminToken);
+  const res = await callFn("super-admin/ai-provider", adminToken, {
+    method: "POST",
+    body: JSON.stringify({ textModel: "gemini-3.8-flash", imageModel: "gemini-nano-banana-2.1" }),
+  });
+  check("the models save", res.status === 200, `status ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
+  const read = await callFn("super-admin/ai-provider", adminToken);
+  check("the text model is the one we chose", read.body?.textModel === "gemini-3.8-flash", String(read.body?.textModel));
+  check("the image model is the one we chose", read.body?.imageModel === "gemini-nano-banana-2.1", String(read.body?.imageModel));
+  check("the models are unchanged from before", read.body?.textModel === before.body?.textModel);
+}
+
+console.log("\n── the configuration tables are unreadable from the browser ──");
+{
+  // The tables have no access policy for a signed-in user, so PostgREST with
+  // the owner's own token gets nothing.
+  for (const table of ["ai_provider_settings", "ai_request_logs"]) {
+    const res = await fetch(`${SB}/rest/v1/${table}?select=*`, {
+      headers: { apikey: ANON, authorization: `Bearer ${ownerToken}` },
+    });
+    const body = await res.text().catch(() => "");
+    check(`${table} is not readable by a signed-in user`, res.status >= 400 || body === "[]", `status ${res.status} ${body.slice(0, 80)}`);
+  }
 }
 
 console.log("\n── testing the connection reaches Google ──");
@@ -158,20 +202,22 @@ console.log("\n── the AI functions need permission ──");
   console.log(`        an owner was allowed through (status ${res.status})`);
 }
 
-console.log("\n── clearing the key again ──");
+console.log("\n── nothing was left behind ──");
 {
-  // An empty field means "keep the key", so removing it is explicit. The
-  // test has to use that, or it leaves its own test key behind.
-  const res = await callFn("super-admin/ai-provider", adminToken, {
+  // There is no key to clear: there is no key in the database. The models are
+  // put back the way they were, and the table is checked for a key column.
+  await callFn("super-admin/ai-provider", adminToken, {
     method: "POST",
-    body: JSON.stringify({ provider: "gemini", clearKey: true }),
+    body: JSON.stringify({ textModel: "gemini-3.8-flash", imageModel: "gemini-nano-banana-2.1" }),
   });
-  check("the key can be removed", res.status === 200, `status ${res.status}`);
-  check("the removal is reported", res.body?.configured === false, JSON.stringify(res.body).slice(0, 120));
-
   const read = await callFn("super-admin/ai-provider", adminToken);
-  check("the key really is gone", read.body?.configured === false, `configured: ${read.body?.configured}`);
-  check("the masked key is empty", !read.body?.maskedKey, String(read.body?.maskedKey));
+  check("the models are as they were", read.body?.textModel === "gemini-3.8-flash", String(read.body?.textModel));
+
+  const { data: cols } = await admin.rpc("noop" as any).then(() => ({ data: null })).catch(() => ({ data: null }));
+  const { data: rows } = await admin.from("ai_provider_settings").select("*").eq("provider", "gemini");
+  const columns = Object.keys((rows ?? [])[0] ?? {});
+  check("the table has no key column", !columns.includes("api_key"), columns.join(","));
+  check("nothing in the row is a key", !JSON.stringify(rows ?? []).includes("AIza"), JSON.stringify(rows ?? []).slice(0, 120));
 }
 
 console.log(`\n${checks - failures}/${checks} passed`);

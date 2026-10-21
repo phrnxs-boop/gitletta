@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import {
+  Activity,
+  AlertTriangle,
   Check,
-  Eye,
-  EyeOff,
+  Clock,
   KeyRound,
   Loader2,
   Plug,
@@ -15,34 +16,51 @@ import {
 import { superAdminFetch } from '@/lib/superadmin'
 import { DataState, PageTitle, Panel } from '@/components/superadmin/ui'
 
-type ProviderConfig = {
+type Usage = {
+  windowDays: number
+  calls: number
+  errors: number
+  errorRate: number
+  averageMs: number | null
+  byModel: { model: string; calls: number; errors: number }[]
+}
+
+type RecentError = {
+  id: string
+  model: string | null
+  action: string | null
+  message: string | null
+  at: string
+}
+
+type Provider = {
   provider: string
   configured: boolean
-  maskedKey: string
-  source: 'database' | 'edge-function-secret' | 'none'
+  source: string
   textModel: string
   imageModel: string
   updatedAt: string | null
-  defaultTextModel: string
-  defaultImageModel: string
+  defaults: { textModel: string; imageModel: string }
+  usage: Usage
+  recentErrors: RecentError[]
 }
 
 /**
- * AI Provider settings.
+ * The AI provider.
  *
- * The key is write-only from this page's point of view: the server returns a
- * mask, and the field is only replaced when a new key is actually typed.
- * Nothing here ever holds the whole key after a save — the masked value
- * comes back from the server and the field is cleared.
+ * There is no key field here, and there is not going to be one. The key is a
+ * **Supabase edge function secret**: it lives in the function's environment,
+ * it is never in a table, never in a response and never in the browser. This
+ * page can tell the administrator whether a key is configured, which models
+ * are in use, how the calls have been going and what has gone wrong — and
+ * that is all it needs to do.
  */
 export default function SuperAdminAiProvider() {
-  const [config, setConfig] = useState<ProviderConfig | null>(null)
+  const [data, setData] = useState<Provider | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const [apiKey, setApiKey] = useState('')
-  const [revealed, setRevealed] = useState(false)
   const [textModel, setTextModel] = useState('')
   const [imageModel, setImageModel] = useState('')
   const [saving, setSaving] = useState(false)
@@ -50,14 +68,14 @@ export default function SuperAdminAiProvider() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await superAdminFetch<ProviderConfig>('ai-provider')
+    const res = await superAdminFetch<Provider>('ai-provider')
     setLoading(false)
     if (!res.ok) {
       setError(res.error)
       return
     }
     setError(null)
-    setConfig(res.data ?? null)
+    setData(res.data ?? null)
     setTextModel(res.data?.textModel ?? '')
     setImageModel(res.data?.imageModel ?? '')
   }, [])
@@ -68,7 +86,7 @@ export default function SuperAdminAiProvider() {
 
   const flash = (message: string) => {
     setNotice(message)
-    window.setTimeout(() => setNotice(null), 4000)
+    window.setTimeout(() => setNotice(null), 5000)
   }
 
   const save = async () => {
@@ -76,68 +94,45 @@ export default function SuperAdminAiProvider() {
     setError(null)
     const res = await superAdminFetch('ai-provider', {
       method: 'POST',
-      body: JSON.stringify({
-        provider: 'gemini',
-        apiKey: apiKey.trim() || undefined,
-        textModel: textModel.trim(),
-        imageModel: imageModel.trim(),
-      }),
+      body: JSON.stringify({ textModel, imageModel }),
     })
     setSaving(false)
     if (!res.ok) {
       setError(res.error)
       return
     }
-    // The field is cleared, so the key never sits in the DOM after a save.
-    setApiKey('')
-    flash('Saved. The key is stored on the server and never sent to the browser.')
+    flash('The models were saved.')
     load()
   }
 
-  const removeKey = async () => {
-    setSaving(true)
-    setError(null)
-    const res = await superAdminFetch('ai-provider', {
-      method: 'POST',
-      body: JSON.stringify({ provider: 'gemini', clearKey: true }),
-    })
-    setSaving(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
-    }
-    setApiKey('')
-    flash('The stored key was removed.')
-    load()
-  }
-
-  const test = async () => {    setTesting(true)
+  const test = async () => {
+    setTesting(true)
     setError(null)
     setNotice(null)
-    const res = await superAdminFetch<{
-      ok: boolean
-      model: string
-      reply?: string
-      message?: string
-      error?: string
-    }>('ai-provider/test', { method: 'POST' })
+    const res = await superAdminFetch<{ ok: boolean; message?: string; error?: string }>(
+      'ai-provider/test',
+      { method: 'POST' },
+    )
     setTesting(false)
     if (!res.ok) {
       setError(res.error)
       return
     }
     if (res.data?.ok) {
-      flash(`Connected. ${res.data.model} replied "${res.data.reply ?? ''}".`)
+      flash(res.data.message ?? 'Google accepted the credentials.')
     } else {
-      setError(res.data?.error ?? 'The provider did not accept the key.')
+      setError(res.data?.error ?? 'The provider did not accept the credentials.')
     }
   }
+
+  const usage = data?.usage
+  const recent = data?.recentErrors ?? []
 
   return (
     <div>
       <PageTitle
         title="AI Provider"
-        description="The model that reads menus and draws dish photographs. The key is stored on the server and never reaches the browser."
+        description="The model that reads menus and draws dish photographs. The API key is an edge function secret — it is not stored here, and it is never sent to the browser."
         action={
           <div className="flex items-center gap-2">
             {notice && (
@@ -148,7 +143,7 @@ export default function SuperAdminAiProvider() {
             )}
             <button
               onClick={test}
-              disabled={testing || !config?.configured}
+              disabled={testing || !data?.configured}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
             >
               {testing ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
@@ -160,7 +155,7 @@ export default function SuperAdminAiProvider() {
               className="inline-flex items-center gap-2 rounded-lg bg-admin-accent px-3 py-2 text-[13px] font-medium text-white transition hover:bg-admin-accent-hover disabled:opacity-60"
             >
               {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-              {config?.configured ? 'Update' : 'Save'}
+              Save models
             </button>
           </div>
         }
@@ -168,144 +163,215 @@ export default function SuperAdminAiProvider() {
 
       <DataState loading={loading} error={error && !notice ? error : null} onRetry={load}>
         <div className="grid gap-5 lg:grid-cols-2">
-          <Panel
-            title="Provider"
-            description="Which service answers the AI requests."
-            bodyClassName="space-y-4"
-          >
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-slate-500">
-                Provider
-              </span>
-              <select
-                value={config?.provider ?? 'gemini'}
-                onChange={() => {}}
-                disabled
-                className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-[13px] text-slate-600"
-              >
-                <option value="gemini">Google Gemini</option>
-              </select>
-            </label>
-
-            <div className="flex items-start gap-2.5 rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3">
-              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-              <div className="text-[12.5px] leading-relaxed text-emerald-800">
-                <p className="font-medium">The key stays on the server.</p>
-                <p className="mt-0.5 text-emerald-700/90">
-                  It is written by this edge function and read by the AI functions through
-                  the service role. No restaurant owner or member of staff can read or
-                  change it — the table has no access policy for signed-in users at all.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-1.5 text-[12.5px] text-slate-500">
-              <p>
-                <span className="font-medium text-slate-700">Status:</span>{' '}
-                {config?.configured ? (
-                  <span className="text-emerald-700">
-                    configured
-                    {config.source === 'edge-function-secret' ? ' (from the function secret)' : ' (saved here)'}
-                  </span>
-                ) : (
-                  <span className="text-amber-700">no key set</span>
-                )}
-              </p>
-              {config?.maskedKey && (
-                <p>
-                  <span className="font-medium text-slate-700">Key:</span>{' '}
-                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[12px] text-slate-600">
-                    {config.maskedKey}
-                  </code>
-                </p>
-              )}
-              {config?.updatedAt && (
-                <p>
-                  <span className="font-medium text-slate-700">Last updated:</span>{' '}
-                  {new Date(config.updatedAt).toLocaleString('en-IN')}
-                </p>
-              )}
-              {config?.configured && (
-                <button
-                  onClick={removeKey}
-                  disabled={saving}
-                  className="text-[12px] font-medium text-destructive underline-offset-2 hover:underline disabled:opacity-50"
+          <div className="space-y-5">
+            <Panel
+              title="Connection"
+              description="Whether a key is configured on the server."
+              bodyClassName="space-y-4"
+            >
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-admin-bg px-3 py-2.5">
+                <div
+                  className={
+                    data?.configured
+                      ? 'flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15'
+                      : 'flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15'
+                  }
                 >
-                  Remove the stored key
-                </button>
-              )}
-            </div>
-          </Panel>
+                  <KeyRound
+                    className={
+                      data?.configured ? 'size-4 text-emerald-600' : 'size-4 text-amber-600'
+                    }
+                  />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-admin-fg">
+                    {data?.configured ? 'A key is configured' : 'No key is configured'}
+                  </p>
+                  <p className="text-[11.5px] text-admin-muted">
+                    {data?.configured
+                      ? 'The key is an edge function secret. It is not in the database and not in this page.'
+                      : 'Set GEMINI_API_KEY as a Supabase edge function secret, then redeploy the AI functions.'}
+                  </p>
+                </div>
+              </div>
 
-          <Panel
-            title="API key"
-            description="Paste a new key to replace the stored one. Leave it empty to keep the current key."
-            bodyClassName="space-y-4"
-          >
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-slate-500">
-                Gemini API key
-              </span>
-              <div className="relative">
-                <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <div className="flex items-start gap-2.5 rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                <div className="text-[12.5px] leading-relaxed text-emerald-800">
+                  <p className="font-medium">Why there is no key field here</p>
+                  <p className="mt-0.5 text-emerald-700/90">
+                    A key in a database is a key in every backup of it, and it is one table away
+                    from every signed-in user. As an edge function secret it is read by the AI
+                    functions and by nothing else — and this page is told only whether one is
+                    there.
+                  </p>
+                </div>
+              </div>
+            </Panel>
+
+            <Panel
+              title="Models"
+              description="Which model does which job."
+              bodyClassName="space-y-4"
+            >
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-admin-muted">
+                  Menu reading and OCR
+                </span>
                 <input
-                  type={revealed ? 'text' : 'password'}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={config?.configured ? '••••••••' : 'AIza…'}
-                  autoComplete="off"
+                  value={textModel}
+                  onChange={(e) => setTextModel(e.target.value)}
+                  placeholder={data?.defaults?.textModel}
                   spellCheck={false}
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-10 font-mono text-[13px] outline-none transition focus:border-admin-accent"
+                  className="h-9 w-full rounded-lg border border-admin-border bg-white px-2.5 font-mono text-[12.5px] text-admin-fg outline-none focus:border-admin-accent"
                 />
-                <button
-                  type="button"
-                  onClick={() => setRevealed((r) => !r)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                  aria-label={revealed ? 'Hide the key' : 'Show the key'}
-                >
-                  {revealed ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
+                <span className="mt-1 block text-[11.5px] text-admin-faint">
+                  Used to read a menu image or a PDF and pull out the items.
+                </span>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-admin-muted">
+                  Dish photographs
+                </span>
+                <input
+                  value={imageModel}
+                  onChange={(e) => setImageModel(e.target.value)}
+                  placeholder={data?.defaults?.imageModel}
+                  spellCheck={false}
+                  className="h-9 w-full rounded-lg border border-admin-border bg-white px-2.5 font-mono text-[12.5px] text-admin-fg outline-none focus:border-admin-accent"
+                />
+                <span className="mt-1 block text-[11.5px] text-admin-faint">
+                  Used to draw a photograph of a dish. It is never asked to read a menu.
+                </span>
+              </label>
+            </Panel>
+          </div>
+
+          <div className="space-y-5">
+            <Panel
+              title="Usage"
+              description={`The last ${usage?.windowDays ?? 30} days.`}
+              bodyClassName="space-y-3"
+            >
+              <div className="grid grid-cols-3 gap-2">
+                <Stat label="Calls" value={String(usage?.calls ?? 0)} />
+                <Stat
+                  label="Errors"
+                  value={String(usage?.errors ?? 0)}
+                  tone={usage?.errors ? 'red' : undefined}
+                />
+                <Stat
+                  label="Average"
+                  value={usage?.averageMs === null || usage?.averageMs === undefined
+                    ? '—'
+                    : `${usage.averageMs}ms`}
+                />
               </div>
-            </label>
 
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-slate-500">
-                Menu reading model
-              </span>
-              <input
-                value={textModel}
-                onChange={(e) => setTextModel(e.target.value)}
-                placeholder={config?.defaultTextModel}
-                className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 font-mono text-[13px] outline-none transition focus:border-admin-accent"
-              />
-              <span className="mt-1 block text-[11.5px] text-slate-400">
-                Used for menu scanning and OCR.
-              </span>
-            </label>
+              {usage && usage.byModel.length > 0 && (
+                <div className="overflow-hidden rounded-lg border border-admin-border">
+                  <table className="w-full text-left text-[12.5px]">
+                    <thead className="bg-admin-elevated text-[11px] uppercase tracking-wider text-admin-muted">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Model</th>
+                        <th className="px-3 py-2 text-right font-medium">Calls</th>
+                        <th className="px-3 py-2 text-right font-medium">Errors</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-admin-border-soft">
+                      {usage.byModel.map((m) => (
+                        <tr key={m.model}>
+                          <td className="px-3 py-2 font-mono text-[11.5px] text-admin-fg-body">
+                            {m.model}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-admin-fg-body">
+                            {m.calls}
+                          </td>
+                          <td
+                            className={
+                              m.errors
+                                ? 'px-3 py-2 text-right tabular-nums text-red-600'
+                                : 'px-3 py-2 text-right tabular-nums text-admin-fg-body'
+                            }
+                          >
+                            {m.errors}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-slate-500">
-                Image model
-              </span>
-              <input
-                value={imageModel}
-                onChange={(e) => setImageModel(e.target.value)}
-                placeholder={config?.defaultImageModel}
-                className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 font-mono text-[13px] outline-none transition focus:border-admin-accent"
-              />
-              <span className="mt-1 block text-[11.5px] text-[11.5px] text-slate-400">
-                Used only for generating dish photographs.
-              </span>
-            </label>
+              {(!usage || usage.calls === 0) && (
+                <p className="rounded-lg bg-admin-elevated px-3 py-3 text-[12.5px] leading-relaxed text-admin-muted">
+                  No AI calls have been made in the last {usage?.windowDays ?? 30} days. A menu scan
+                  or a dish photograph will show up here.
+                </p>
+              )}
+            </Panel>
 
-            <p className="flex items-start gap-2 text-[12px] leading-relaxed text-slate-500">
-              <Sparkles className="mt-0.5 size-3.5 shrink-0 text-admin-accent" />
-              The two models are kept apart on purpose: the image model is never asked to
-              read a menu, and the text model is never asked to draw.
-            </p>
-          </Panel>
+            <Panel
+              title="Recent errors"
+              description="What went wrong, and when."
+              bodyClassName="space-y-2"
+            >
+              {recent.length === 0 ? (
+                <p className="rounded-lg bg-admin-elevated px-3 py-3 text-[12.5px] text-admin-muted">
+                  No errors recorded.
+                </p>
+              ) : (
+                recent.map((e) => (
+                  <div
+                    key={e.id}
+                    className="flex items-start gap-2.5 rounded-lg border border-red-200/70 bg-red-50/60 px-3 py-2.5"
+                  >
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-600" />
+                    <div className="min-w-0">
+                      <p className="text-[12.5px] font-medium text-red-900">
+                        {e.action ?? 'call'} · {e.model ?? 'unknown model'}
+                      </p>
+                      <p className="mt-0.5 break-words text-[12px] leading-relaxed text-red-800/90">
+                        {e.message ?? 'No message'}
+                      </p>
+                      <p className="mt-1 flex items-center gap-1 text-[11px] text-red-700/70">
+                        <Clock className="size-3" />
+                        {new Date(e.at).toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </Panel>
+          </div>
         </div>
       </DataState>
+    </div>
+  )
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone?: 'red'
+}) {
+  return (
+    <div className="rounded-lg border border-admin-border bg-admin-bg px-3 py-2.5">
+      <p className="text-[11px] uppercase tracking-wider text-admin-muted">{label}</p>
+      <p
+        className={
+          tone === 'red'
+            ? 'mt-0.5 text-lg font-bold tabular-nums text-red-600'
+            : 'mt-0.5 text-lg font-bold tabular-nums text-admin-fg'
+        }
+      >
+        {value}
+      </p>
     </div>
   )
 }

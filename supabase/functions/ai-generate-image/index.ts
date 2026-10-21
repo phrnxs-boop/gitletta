@@ -8,6 +8,7 @@ import {
   geminiGenerateImage,
   parseDataUrl,
 } from "../_shared/gemini.ts";
+import { withAiLog } from "../_shared/ai-log.ts";
 
 /**
  * POST /functions/v1/ai-generate-image  (menu.manage)
@@ -82,7 +83,7 @@ async function generate(req: Request, tenantId: string): Promise<Response> {
       req,
       {
         error:
-          "Image generation is not configured. Add a Gemini API key in Super Admin → AI Provider.",
+          "Image generation is not configured. The Super Admin has to set the GEMINI_API_KEY edge function secret.",
       },
       503,
     );
@@ -94,13 +95,17 @@ async function generate(req: Request, tenantId: string): Promise<Response> {
     .replace("{name}", name)
     .replace("{description}", description ? `${description}. ` : "");
 
-  const image = await geminiGenerateImage({
-    model: config.imageModel,
-    apiKey: config.apiKey,
-    prompt,
-    timeoutMs: 120_000,
-    retries: 1,
-  });
+  const image = await withAiLog(
+    { provider: "gemini", model: config.imageModel, action: "image", tenantId },
+    () =>
+      geminiGenerateImage({
+        model: config.imageModel,
+        apiKey: config.apiKey!,
+        prompt,
+        timeoutMs: 120_000,
+        retries: 1,
+      }),
+  );
 
   // Store the file in the existing public bucket, under the restaurant's own
   // folder, so the path says whose image it is.

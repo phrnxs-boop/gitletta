@@ -12,8 +12,8 @@ import {
   listAccounts,
   listLocations,
   refreshAccessToken as refreshGoogleToken,
-  signState,
-  verifyState,
+  issueState,
+  consumeState,
   type GoogleTokens,
 } from "../_shared/google.ts";
 
@@ -50,6 +50,49 @@ async function hasGoogleCreds(): Promise<boolean> {
 }
 
 /** Refresh a token using whichever client is currently configured. */
+/**
+ * The restaurant's Google tokens.
+ *
+ * They live in their own table with no access policy, so the only thing that
+ * can read them is the service role. They used to sit in
+ * `google_connections`, whose policy let the restaurant owner read them
+ * straight out of the table — a refresh token is a credential for their
+ * Google account.
+ */
+async function readTokens(connectionId: string): Promise<{
+  access_token: string | null;
+  refresh_token: string | null;
+  token_expires_at: string | null;
+} | null> {
+  const { data, error } = await admin()
+    .from("google_oauth_tokens")
+    .select("access_token, refresh_token, token_expires_at")
+    .eq("connection_id", connectionId)
+    .maybeSingle();
+  if (error) {
+    console.error("google-reviews: could not read the tokens", error.message);
+    return null;
+  }
+  return (data as any) ?? null;
+}
+
+async function writeTokens(
+  connectionId: string,
+  tokens: { access_token: string; refresh_token?: string | null; token_expires_at: string | null },
+): Promise<void> {
+  const { error } = await admin().from("google_oauth_tokens").upsert(
+    {
+      connection_id: connectionId,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token ?? null,
+      token_expires_at: tokens.token_expires_at,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "connection_id" },
+  );
+  if (error) console.error("google-reviews: could not save the tokens", error.message);
+}
+
 async function refreshAccessToken(refreshToken: string): Promise<GoogleTokens | { error: string }> {
   const config = await getGoogleConfig();
   return refreshGoogleToken(config, refreshToken);
@@ -74,29 +117,32 @@ async function getValidAccessToken(connectionId: string): Promise<{ token: strin
   if (!conn) return { error: "Google connection not found" };
   if (!conn.enabled) return { error: "Google connection is disabled" };
 
+  const stored = await readTokens(connectionId);
+  if (!stored?.access_token) {
+    return { error: "Google is not connected for this restaurant" };
+  }
+
   const now = Date.now();
-  const expiresAt = conn.token_expires_at ? new Date(conn.token_expires_at).getTime() : 0;
+  const expiresAt = stored.token_expires_at ? new Date(stored.token_expires_at).getTime() : 0;
 
-  if (expiresAt - now > 60000) return { token: conn.access_token };
+  if (expiresAt - now > 60000) return { token: stored.access_token };
 
-  if (!conn.refresh_token) {
+  if (!stored.refresh_token) {
     return { error: "Refresh token missing — re-connect Google Business Profile" };
   }
 
-  const refreshed = await refreshAccessToken(conn.refresh_token);
+  const refreshed = await refreshAccessToken(stored.refresh_token);
   if ("error" in refreshed) {
     await db.from("google_connections").update({ last_sync_error: refreshed.error }).eq("id", connectionId);
     return { error: refreshed.error };
   }
 
-  await db
-    .from("google_connections")
-    .update({
-      access_token: refreshed.access_token,
-      token_expires_at: new Date(refreshed.expires_at).toISOString(),
-      last_sync_error: null,
-    })
-    .eq("id", connectionId);
+  await writeTokens(connectionId, {
+    access_token: refreshed.access_token,
+    refresh_token: stored.refresh_token,
+    token_expires_at: new Date(refreshed.expires_at).toISOString(),
+  });
+  await db.from("google_connections").update({ last_sync_error: null }).eq("id", connectionId);
 
   return { token: refreshed.access_token };
 }
@@ -128,7 +174,7 @@ async function syncReviews(connectionId: string): Promise<{ synced: number; erro
   // when no Google client is configured at all. A real connection that has
   // not chosen a location yet must not silently come back with sample
   // reviews; that would look like the restaurant's own reviews.
-  if (conn.access_token === "demo-token") {
+  if ((await readTokens(conn.id))?.access_token === "demo-token") {
     return seedDemoReviews(conn.tenant_id, connectionId);
   }
 
@@ -228,7 +274,7 @@ async function replyToReview(
   if (reviewError) return { ok: false, error: reviewError.message };
   if (!review) return { ok: false, error: "Review not found" };
 
-  if (conn.access_token === "demo-token") {
+  if ((await readTokens(conn.id))?.access_token === "demo-token") {
     const { error: updateError } = await db
       .from("google_reviews")
       .update({ reply: replyText, reply_time: new Date().toISOString() })
@@ -378,7 +424,7 @@ function mapConnection(c: any) {
     // Whether the owner still has to choose which of their locations this
     // restaurant is. A real connection with no location cannot sync anything.
     // The demo connection never had a location and does not need one.
-    needsLocation: !c.location_id && c.access_token !== "demo-token",
+    needsLocation: !c.location_id,
     accountName: c.account_name,
     locationName: c.location_name,
     locationId: c.location_id,
@@ -461,7 +507,8 @@ async function locationsGet(req: Request): Promise<Response> {
   if (!conn) {
     return json(req, { error: "Connect Google Business Profile first." }, 400);
   }
-  if (!conn.access_token || conn.access_token === "demo-token") {
+  const stored = await readTokens(conn.id);
+  if (!stored?.access_token || stored.access_token === "demo-token") {
     return json(req, { error: "Google is not connected yet." }, 400);
   }
 
@@ -673,9 +720,6 @@ async function connectGet(req: Request): Promise<Response> {
         .from("google_connections")
         .insert({
           tenant_id: tenantId,
-          access_token: "demo-token",
-          refresh_token: "demo-refresh",
-          token_expires_at: new Date(Date.now() + 86400000).toISOString(),
           location_name: "Jaegar Resto (Demo)",
           enabled: true,
           auto_sync: true,
@@ -688,6 +732,12 @@ async function connectGet(req: Request): Promise<Response> {
       if (error) return json(req, { error: error.message }, 500);
       conn = data;
     }
+    // The demo connection's token lives in the token table like any other.
+    await writeTokens(conn.id, {
+      access_token: "demo-token",
+      refresh_token: "demo-refresh",
+      token_expires_at: new Date(Date.now() + 86400000).toISOString(),
+    });
     return json(req, { demoMode: true, connected: true, connectionId: conn.id });
   }
 
@@ -695,7 +745,7 @@ async function connectGet(req: Request): Promise<Response> {
   // which meant anybody could craft a callback that attached their own
   // Google account to somebody else's restaurant.
   const config = await getGoogleConfig();
-  const state = await signState(tenantId);
+  const state = await issueState(tenantId);
   const authUrl = buildAuthUrl(config, state);
 
   if (!authUrl) {
@@ -785,7 +835,7 @@ async function callbackGet(req: Request): Promise<Response> {
 
   // The state carries the tenant id, signed by this server and expiring in
   // fifteen minutes. A state this server did not issue is refused.
-  const tenantId = await verifyState(state);
+  const tenantId = await consumeState(state);
   if (!tenantId) {
     return json(req, { error: "The sign-in request could not be verified. Start again from the app." }, 400);
   }
@@ -809,12 +859,7 @@ async function callbackGet(req: Request): Promise<Response> {
   if (existing) {
     const { data, error: updateError } = await db
       .from("google_connections")
-      .update({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token || existing.refresh_token,
-        token_expires_at: new Date(tokens.expires_at).toISOString(),
-        enabled: true,
-      })
+      .update({ enabled: true })
       .eq("id", existing.id)
       .eq("tenant_id", tenantId)
       .select()
@@ -826,9 +871,6 @@ async function callbackGet(req: Request): Promise<Response> {
       .from("google_connections")
       .insert({
         tenant_id: tenantId,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        token_expires_at: new Date(tokens.expires_at).toISOString(),
         enabled: true,
       })
       .select()
@@ -836,6 +878,14 @@ async function callbackGet(req: Request): Promise<Response> {
     if (insertError) return json(req, { error: insertError.message }, 500);
     conn = data;
   }
+
+  // The tokens go in their own table, where only the service role can reach
+  // them.
+  await writeTokens(conn.id, {
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    token_expires_at: new Date(tokens.expires_at).toISOString(),
+  });
 
   // The account and the location are not known yet — the owner chooses
   // which of their locations this restaurant is. Syncing now would build a

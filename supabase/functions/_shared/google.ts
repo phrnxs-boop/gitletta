@@ -39,10 +39,11 @@ export const GBP_SCOPE = "https://www.googleapis.com/auth/business.manage";
 export const GOOGLE_CONFIG_ID = "google_business_profile";
 
 export type GoogleConfig = {
+  /** From the edge function secret. Never from a table, never in a response. */
   clientId: string | null;
   clientSecret: string | null;
   redirectUri: string | null;
-  source: "database" | "edge-function-secret" | "none";
+  source: "edge-function-secret" | "none";
   updatedAt: string | null;
 };
 
@@ -60,26 +61,29 @@ export function defaultRedirectUri(): string {
 }
 
 /**
- * Resolve the Google configuration, preferring what the Super Admin saved.
+ * Resolve the Google configuration. The credentials come from the edge
+ * function's environment; the redirect URI comes from the table, because
+ * which callback a deployment uses is configuration rather than a secret.
  */
 export async function getGoogleConfig(): Promise<GoogleConfig> {
+  // The client id and the client secret come from the edge function's own
+  // environment and nowhere else. The table holds the redirect URI, which is
+  // configuration and not a credential.
   const { data } = await admin()
     .from("google_oauth_config")
-    .select("client_id, client_secret, redirect_uri, updated_at")
+    .select("redirect_uri, updated_at")
     .eq("id", GOOGLE_CONFIG_ID)
     .maybeSingle();
 
   const row = data as any;
-  const dbId = typeof row?.client_id === "string" && row.client_id.trim() ? row.client_id.trim() : null;
-  const dbSecret = typeof row?.client_secret === "string" && row.client_secret.trim() ? row.client_secret.trim() : null;
   const envId = (Deno.env.get("GOOGLE_CLIENT_ID") ?? "").trim() || null;
   const envSecret = (Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "").trim() || null;
 
   return {
-    clientId: dbId ?? envId,
-    clientSecret: dbSecret ?? envSecret,
+    clientId: envId,
+    clientSecret: envSecret,
     redirectUri: (typeof row?.redirect_uri === "string" && row.redirect_uri.trim() ? row.redirect_uri.trim() : null) ?? defaultRedirectUri(),
-    source: dbId ? "database" : envId ? "edge-function-secret" : "none",
+    source: envId && envSecret ? "edge-function-secret" : "none",
     updatedAt: row?.updated_at ?? null,
   };
 }
@@ -89,11 +93,12 @@ export function hasGoogleCreds(config: GoogleConfig): boolean {
 }
 
 /** Never show more than the last four characters of a secret. */
-export function maskSecret(value: string | null | undefined): string {
-  if (!value) return "";
-  const trimmed = value.trim();
-  if (trimmed.length <= 8) return "•".repeat(trimmed.length);
-  return `${"•".repeat(8)}${trimmed.slice(-4)}`;
+export function maskSecret(_value: string | null | undefined): string {
+  // There is nothing to mask any more. The secret was stored in a table and
+  // masked on the way out, which meant a mask of it travelled through the
+  // database and through every response. It now lives in the function's
+  // environment, and the dashboard is told only whether one is configured.
+  return "";
 }
 
 // ---------------------------------------------------------------------------
@@ -101,78 +106,76 @@ export function maskSecret(value: string | null | undefined): string {
 // ---------------------------------------------------------------------------
 
 /**
- * The state is signed, not just encoded.
+ * The sign-in state.
  *
- * The old state was the tenant id in the clear, which meant anyone could
- * craft a callback that attached their Google account to somebody else's
- * restaurant. The signature means a callback that did not come from a
- * connect request this server started is refused.
+ * It used to be an HMAC over the tenant id, signed with the service role
+ * key. That was replayable for the fifteen minutes it was valid, and it was
+ * tied to whichever key the platform happened to inject, so a rotation
+ * invalidated every sign-in in flight.
  *
- * The signing key never leaves the server. The service role key is used
- * because it is always present in the function's environment.
+ * A state is a row now. It names the restaurant it is for, it expires, and
+ * it is **spent** the moment it is used. The table has no access policy, so
+ * only the service role can read or write it.
  */
-function stateSecret(): string {
-  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "swixo-google-state";
+const STATE_TTL_MS = 15 * 60_000;
+
+export async function issueState(tenantId: string): Promise<string> {
+  const id = crypto.randomUUID();
+  const { error } = await admin().from("google_oauth_states").insert({
+    id,
+    tenant_id: tenantId,
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString(),
+  });
+  if (error) {
+    console.error("google: could not issue a sign-in state", error.message);
+    throw new Error("Could not start the sign-in. Please try again.");
+  }
+  return id;
 }
 
-function toBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
+/**
+ * Spend a state and return the restaurant it was for.
+ *
+ * A state that does not exist, has expired, or has already been used is
+ * refused, and a refused state is not spent — there is nothing to spend.
+ */
+export async function consumeState(stateId: string): Promise<string | null> {
+  if (!stateId) return null;
 
-async function hmac(message: string, secret: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  return toBase64Url(new Uint8Array(sig));
-}
+  const { data, error } = await admin()
+    .from("google_oauth_states")
+    .select("id, tenant_id, expires_at, used_at")
+    .eq("id", stateId)
+    .maybeSingle();
+  if (error) {
+    console.error("google: could not read the sign-in state", error.message);
+    return null;
+  }
+  if (!data) return null;
+  if (data.used_at) return null;
+  if (new Date(data.expires_at).getTime() < Date.now()) return null;
 
-/** Build a signed, expiring state that carries the tenant id. */
-export async function signState(tenantId: string, ttlMs = 15 * 60_000): Promise<string> {
-  const payload = `${tenantId}.${Date.now() + ttlMs}`;
-  const encoded = toBase64Url(new TextEncoder().encode(payload));
-  const signature = await hmac(encoded, stateSecret());
-  return `${encoded}.${signature}`;
-}
-
-/** Verify a state and return the tenant id, or null if it is not ours or is stale. */
-export async function verifyState(state: string): Promise<string | null> {
-  const [encoded, signature] = state.split(".");
-  if (!encoded || !signature) return null;
-
-  const expected = await hmac(encoded, stateSecret());
-  if (!timingSafeEqual(signature, expected)) return null;
-
-  let payload: string;
-  try {
-    const binary = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
-    payload = new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)));
-  } catch {
+  const { error: spendError } = await admin()
+    .from("google_oauth_states")
+    .update({ used_at: new Date().toISOString() })
+    .eq("id", stateId)
+    .is("used_at", null);
+  if (spendError) {
+    console.error("google: could not spend the sign-in state", spendError.message);
     return null;
   }
 
-  const [tenantId, expiry] = payload.split(".");
-  if (!tenantId || !expiry) return null;
-  if (Number(expiry) < Date.now()) return null;
-  return tenantId;
+  return data.tenant_id as string;
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
+/** Clear the states that have expired. */
+export async function pruneStates(): Promise<void> {
+  await admin()
+    .from("google_oauth_states")
+    .delete()
+    .lt("expires_at", new Date(Date.now() - 60 * 60_000).toISOString());
 }
-
-// ---------------------------------------------------------------------------
-// OAuth
-// ---------------------------------------------------------------------------
 
 export function buildAuthUrl(config: GoogleConfig, state: string): string {
   if (!config.clientId) return "";
@@ -347,7 +350,11 @@ export async function testGoogleCredentials(
   config: GoogleConfig,
 ): Promise<{ ok: boolean; message: string }> {
   if (!config.clientId || !config.clientSecret) {
-    return { ok: false, message: "No client id or client secret is configured." };
+    return {
+      ok: false,
+      message:
+        "No client id or client secret is configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as Supabase edge function secrets.",
+    };
   }
 
   const payload = new URLSearchParams({

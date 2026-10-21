@@ -7,6 +7,7 @@ import {
   geminiGenerateText,
   parseDataUrl,
 } from "../_shared/gemini.ts";
+import { withAiLog } from "../_shared/ai-log.ts";
 
 /**
  * POST /functions/v1/ai-extract-menu  (menu.manage)
@@ -83,14 +84,14 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
 
   try {
-    return await extract(req);
+    return await extract(req, g.session.tenantId);
   } catch (e: any) {
     console.error("AI menu extraction error:", e);
     return json(req, { error: e?.message || "AI extraction failed" }, 500);
   }
 });
 
-async function extract(req: Request): Promise<Response> {
+async function extract(req: Request, tenantId: string): Promise<Response> {
   const b = await body(req);
   const images = b.images as string[] | undefined;
 
@@ -108,7 +109,7 @@ async function extract(req: Request): Promise<Response> {
       req,
       {
         error:
-          "AI extraction is not configured. Add a Gemini API key in Super Admin → AI Provider.",
+          "AI extraction is not configured. The Super Admin has to set the GEMINI_API_KEY edge function secret.",
       },
       503,
     );
@@ -126,15 +127,19 @@ async function extract(req: Request): Promise<Response> {
     parts.push({ inline_data: { mime_type: parsed.mimeType, data: parsed.data } });
   }
 
-  const rawContent = await geminiGenerateText({
-    model: config.textModel,
-    apiKey: config.apiKey,
-    parts,
-    responseMimeType: "application/json",
-    temperature: 0.1,
-    timeoutMs: 120_000,
-    retries: 1,
-  });
+  const rawContent = await withAiLog(
+    { provider: "gemini", model: config.textModel, action: "extract", tenantId },
+    () =>
+      geminiGenerateText({
+        model: config.textModel,
+        apiKey: config.apiKey!,
+        parts,
+        responseMimeType: "application/json",
+        temperature: 0.1,
+        timeoutMs: 120_000,
+        retries: 1,
+      }),
+  );
 
   // Parse the JSON response (handle markdown-wrapped JSON)
   let cleaned = rawContent.trim();
