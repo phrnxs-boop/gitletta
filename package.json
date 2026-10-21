@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test:promo": "tsx scripts/test-promo.mts",
     "test:superadmin": "tsx scripts/test-superadmin-security.mts && tsx scripts/test-superadmin-api.mts",
+    "test:gemini": "tsx scripts/test-gemini.mts",
     "test:qr": "tsx scripts/test-qr-flow.mts",
     "test:smoke": "tsx scripts/test-smoke.mts"
   },
@@ -73,7 +74,6 @@
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
-    "z-ai-web-dev-sdk": "^0.0.18",
     "zod": "^4.0.2",
     "zustand": "^5.0.6"
   },

@@ -50,6 +50,8 @@ import {
   CheckCircle2,
   BadgeIndianRupee,
   ListOrdered,
+  Sparkles,
+  Wand2,
 } from 'lucide-react'
 
 interface MenuFormState {
@@ -121,6 +123,8 @@ export function MenuView() {
   const [deleteTarget, setDeleteTarget] = useState<MenuItem | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
 
   const selectedTagList = useMemo(() => {
     return (form.tags || '')
@@ -268,6 +272,40 @@ export function MenuView() {
       toast.error('Something went wrong')
     } finally {
       setSaving(false)
+    }
+  }
+
+  /**
+   * Draw a dish photograph with Gemini and attach it to this item.
+   *
+   * The edge function generates the image, saves it in the restaurant's own
+   * folder in the menu-images bucket, and points the item at it. The form is
+   * updated with the returned URL so the preview shows it straight away.
+   */
+  const handleGenerateImage = async () => {
+    if (!editingItem) return
+    setGenerating(true)
+    setGenError(null)
+    try {
+      const res = await edgeFetch('/api/ai-generate-image', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-tenant-id': tenant.id },
+        body: JSON.stringify({ itemId: editingItem.id }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setGenError(body?.error || `Could not generate an image (${res.status})`)
+        return
+      }
+      if (body?.url) {
+        setField('image', body.url)
+        toast.success('Dish photo generated')
+        await refresh()
+      }
+    } catch {
+      setGenError('Could not generate an image. Check your connection and try again.')
+    } finally {
+      setGenerating(false)
     }
   }
 
@@ -702,7 +740,7 @@ export function MenuView() {
               </div>
             </div>
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 space-y-2">
               <ImageUpload
                 value={form.image}
                 onChange={(v) => setField('image', v)}
@@ -711,6 +749,29 @@ export function MenuView() {
                 size={88}
                 fallback="🍽️"
               />
+
+              {editingItem && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 w-full gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                  disabled={generating}
+                  onClick={handleGenerateImage}
+                >
+                  {generating ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-3.5 w-3.5" />
+                  )}
+                  {generating ? 'Drawing the dish photo…' : 'Draw a dish photo with AI'}
+                </Button>
+              )}
+
+              {genError && (
+                <p className="rounded-lg border border-destructive/25 bg-destructive/5 px-2.5 py-1.5 text-[11.5px] leading-relaxed text-destructive">
+                  {genError}
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-2 flex items-center justify-between rounded-xl bg-secondary/40 px-4 py-3">

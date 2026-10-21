@@ -1,0 +1,270 @@
+// deno-lint-ignore-file no-explicit-any
+import { admin } from "./db.ts";
+
+/**
+ * Google Gemini client, shared by the AI edge functions.
+ *
+ * The API key never leaves the server. It is read from
+ * `public.ai_provider_settings`, which has no RLS policy for `anon` or
+ * `authenticated` — so no signed-in user, owner or staff, can read it. The
+ * `super-admin` edge function is the only thing that writes it, and it masks
+ * the key in every response.
+ *
+ * The edge function's own `GEMINI_API_KEY` secret is honoured as a fallback,
+ * so a deployment works without the table being filled in.
+ */
+
+export const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
+
+/** Defaults, matching the model's names the dashboard writes into the table. */
+export const DEFAULT_TEXT_MODEL = "gemini-3.8-flash";
+export const DEFAULT_IMAGE_MODEL = "gemini-nano-banana-2.1";
+
+export type GeminiSource = "database" | "edge-function-secret" | "none";
+
+export type GeminiConfig = {
+  provider: string;
+  apiKey: string | null;
+  textModel: string;
+  imageModel: string;
+  source: GeminiSource;
+  updatedAt: string | null;
+};
+
+/**
+ * Resolve the Gemini configuration, preferring the value the Super Admin
+ * saved and falling back to the function's own secret.
+ */
+export async function getGeminiConfig(provider = "gemini"): Promise<GeminiConfig> {
+  const { data } = await admin()
+    .from("ai_provider_settings")
+    .select("provider, api_key, text_model, image_model, updated_at")
+    .eq("provider", provider)
+    .maybeSingle();
+
+  const row = data as any;
+  const fromDb = typeof row?.api_key === "string" && row.api_key.trim() ? row.api_key.trim() : null;
+  const fromEnv = (Deno.env.get("GEMINI_API_KEY") ?? "").trim() || null;
+
+  return {
+    provider,
+    apiKey: fromDb ?? fromEnv,
+    textModel: row?.text_model || DEFAULT_TEXT_MODEL,
+    imageModel: row?.image_model || DEFAULT_IMAGE_MODEL,
+    source: fromDb ? "database" : fromEnv ? "edge-function-secret" : "none",
+    updatedAt: row?.updated_at ?? null,
+  };
+}
+
+/**
+ * Never show more than the last four characters. The key is not returned to a
+ * browser at all — this is for logs and for the admin's own confirmation.
+ */
+export function maskKey(key: string | null | undefined): string {
+  if (!key) return "";
+  const trimmed = key.trim();
+  if (trimmed.length <= 8) return "•".repeat(trimmed.length);
+  return `${"•".repeat(8)}${trimmed.slice(-4)}`;
+}
+
+/** Split a `data:<mime>;base64,<payload>` URL into its parts. */
+export function parseDataUrl(dataUrl: string): { mimeType: string; data: string } | null {
+  const match = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(dataUrl);
+  if (!match) return null;
+  return {
+    mimeType: match[1] || "image/jpeg",
+    data: match[3] || "",
+  };
+}
+
+type GeminiErrorBody = {
+  error?: { code?: number; message?: string; status?: string };
+};
+
+function describeGeminiError(status: number, body: GeminiErrorBody, model: string): string {
+  const message = body?.error?.message?.trim();
+  if (status === 400) {
+    if (/api key not valid/i.test(message ?? "")) {
+      return "The Gemini API key was rejected. Check it in Super Admin → AI Provider and save it again.";
+    }
+    if (/model/i.test(message ?? "") && /not found|not supported/i.test(message ?? "")) {
+      return `Gemini does not recognise the model "${model}". Change the model name in Super Admin → AI Provider.`;
+    }
+    return `Gemini rejected the request (${message ?? "bad request"}).`;
+  }
+  if (status === 401 || status === 403) {
+    return "The Gemini API key was rejected. Check it in Super Admin → AI Provider and save it again.";
+  }
+  if (status === 404) {
+    return `Gemini does not recognise the model "${model}". Change the model name in Super Admin → AI Provider.`;
+  }
+  if (status === 429) {
+    return "Gemini is rate limiting this key. Wait a moment and try again.";
+  }
+  if (status >= 500) {
+    return `Gemini had a server error (${status}). Try again in a moment.`;
+  }
+  return `Gemini request failed (${status})${message ? `: ${message}` : ""}.`;
+}
+
+async function geminiFetch(
+  url: string,
+  apiKey: string,
+  body: unknown,
+  timeoutMs: number,
+  retries: number,
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok) return res;
+
+      const text = await res.text().catch(() => "");
+      let parsed: GeminiErrorBody = {};
+      try { parsed = JSON.parse(text); } catch { /* not JSON */ }
+
+      // Retry only what is worth retrying: a rate limit or a server fault.
+      const retryable = res.status === 429 || res.status >= 500;
+      if (retryable && attempt < retries) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+        continue;
+      }
+      throw new Error(describeGeminiError(res.status, parsed, String((body as any)?.model ?? "")));
+    } catch (e) {
+      clearTimeout(timer);
+      lastError = e as Error;
+      if (e instanceof Error && e.name === "AbortError") {
+        throw new Error(`Gemini did not respond within ${Math.round(timeoutMs / 1000)}s.`);
+      }
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastError ?? new Error("Gemini request failed.");
+}
+
+/**
+ * Call Gemini's generateContent and return the text it produced.
+ *
+ * `parts` is the Gemini content shape: `{ text }` for text and
+ * `{ inline_data: { mime_type, data } }` for an image.
+ */
+export async function geminiGenerateText(opts: {
+  model: string;
+  apiKey: string;
+  parts: any[];
+  responseMimeType?: string;
+  temperature?: number;
+  timeoutMs?: number;
+  retries?: number;
+}): Promise<string> {
+  const body: any = {
+    contents: [{ role: "user", parts: opts.parts }],
+    generationConfig: {
+      temperature: opts.temperature ?? 0.2,
+      // camelCase, which is what the REST API expects — Google rejects
+      // `response_mime_type` with "Unknown name".
+      ...(opts.responseMimeType ? { responseMimeType: opts.responseMimeType } : {}),
+    },
+  };
+
+  const res = await geminiFetch(
+    `${GEMINI_BASE}/models/${encodeURIComponent(opts.model)}:generateContent`,
+    opts.apiKey,
+    body,
+    opts.timeoutMs ?? 90_000,
+    opts.retries ?? 1,
+  );
+
+  const json: any = await res.json().catch(() => null);
+  const text: string | undefined = json?.candidates?.[0]?.content?.parts
+    ?.map((p: any) => (typeof p?.text === "string" ? p.text : ""))
+    .join("");
+
+  if (!text) {
+    const block = json?.candidates?.[0]?.content?.parts?.[0];
+    if (block?.text) return String(block.text);
+    const reason = json?.promptFeedback?.blockReason ?? json?.candidates?.[0]?.finishReason;
+    throw new Error(
+      reason
+        ? `Gemini returned no text (${reason}).`
+        : "Gemini returned an empty response.",
+    );
+  }
+  return text;
+}
+
+/**
+ * Call Gemini's image model and return the base64 image it produced.
+ */
+export async function geminiGenerateImage(opts: {
+  model: string;
+  apiKey: string;
+  prompt: string;
+  timeoutMs?: number;
+  retries?: number;
+}): Promise<{ data: string; mimeType: string }> {
+  const body: any = {
+    contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+    generationConfig: { responseModalities: ["IMAGE"] },
+  };
+
+  const res = await geminiFetch(
+    `${GEMINI_BASE}/models/${encodeURIComponent(opts.model)}:generateContent`,
+    opts.apiKey,
+    body,
+    opts.timeoutMs ?? 120_000,
+    opts.retries ?? 1,
+  );
+
+  const json: any = await res.json().catch(() => null);
+  const parts: any[] = json?.candidates?.[0]?.content?.parts ?? [];
+  for (const part of parts) {
+    const inline = part?.inlineData ?? part?.inline_data;
+    if (inline?.data) {
+      return { data: String(inline.data), mimeType: String(inline.mimeType ?? inline.mime_type ?? "image/png") };
+    }
+  }
+  const reason = json?.promptFeedback?.blockReason ?? json?.candidates?.[0]?.finishReason;
+  throw new Error(
+    reason
+      ? `Gemini did not return an image (${reason}).`
+      : "Gemini returned no image.",
+  );
+}
+
+/**
+ * A cheap call that proves the key works, used by the dashboard's Test
+ * Connection button.
+ */
+export async function testGeminiConnection(opts: {
+  model: string;
+  apiKey: string;
+  timeoutMs?: number;
+}): Promise<{ ok: true; model: string; reply: string }> {
+  const text = await geminiGenerateText({
+    model: opts.model,
+    apiKey: opts.apiKey,
+    parts: [{ text: "Reply with the single word: ok" }],
+    temperature: 0,
+    timeoutMs: opts.timeoutMs ?? 30_000,
+    retries: 0,
+  });
+  return { ok: true, model: opts.model, reply: text.trim().slice(0, 40) };
+}

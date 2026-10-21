@@ -2,19 +2,26 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { guard } from "../_shared/auth.ts";
 import { body, json, preflight } from "../_shared/http.ts";
+import {
+  getGeminiConfig,
+  geminiGenerateText,
+  parseDataUrl,
+} from "../_shared/gemini.ts";
 
 /**
  * POST /functions/v1/ai-extract-menu  (menu.manage)
  *
- * Accepts menu images (base64 data URLs) and uses the VLM to extract structured
- * menu data. Ported from src/app/api/ai-extract-menu/route.ts.
+ * Accepts menu images (base64 data URLs) and uses Google Gemini to extract
+ * structured menu data.
  *
- * The Next route used the `z-ai-web-dev-sdk`, whose config lives in a
- * `.z-ai-config` file — unavailable in Deno. We therefore call the same HTTP
- * endpoint the SDK calls (`POST {baseUrl}/chat/completions/vision`) directly,
- * reading the base URL + key from the `Z_AI_BASE_URL` / `Z_AI_API_KEY` secrets
- * (falling back to `ZAI_BASE_URL` / `ZAI_API_KEY`). The prompt, parsing and
- * normalization are byte-identical to the Next version.
+ * This used to call Z AI's `chat/completions/vision`. The prompt, the
+ * normalisation and the response shape are unchanged, so the onboarding
+ * upload → preview → edit → approve → import workflow works exactly as it
+ * did; only the provider behind it changed.
+ *
+ * The API key is read on the server, from `public.ai_provider_settings` (or
+ * the function's own secret). It is never sent to the browser and never
+ * appears in a response.
  */
 
 const PROMPT = `You are an expert at reading restaurant menus from photos/scans. Analyze the menu image(s) and extract ALL menu items into a structured JSON format.
@@ -23,9 +30,12 @@ IMPORTANT INSTRUCTIONS:
 - Handle blurry, rotated, multi-page, and differently formatted menus.
 - For each item, extract: category, name, description (if present), price, veg/non-veg indicator (if visible), variants/sizes (if present), and add-ons (if present).
 - If a field is unclear or you're uncertain, set its "confidence" to "low". Otherwise "high".
+- An item is "low" confidence if ANY of its fields is uncertain or unreadable, not just one.
+- NEVER invent a price. If a price cannot be read, set "price" to null and mark the item "low" confidence. The same applies to the name, the description, the variants and the add-ons: if you cannot read them, leave them out or set them to null rather than guessing.
 - Prices should be numbers (without currency symbols).
 - If the menu is in a non-English language, still extract in the original language but provide an English translation of the name if possible.
 - Group items by their category as shown on the menu. If no category is visible, use "Main Menu".
+- If several images are given they are pages of the same menu. Merge the pages, keep the categories from each page, and never invent an item that is not on any page.
 - Return ONLY valid JSON, no markdown, no explanation.
 
 Return this exact JSON structure:
@@ -92,38 +102,39 @@ async function extract(req: Request): Promise<Response> {
     return json(req, { error: "Maximum 10 images allowed" }, 400);
   }
 
-  const baseUrl = Deno.env.get("Z_AI_BASE_URL") ?? Deno.env.get("ZAI_BASE_URL");
-  const apiKey = Deno.env.get("Z_AI_API_KEY") ?? Deno.env.get("ZAI_API_KEY");
-  if (!baseUrl || !apiKey) {
-    throw new Error("AI extraction is not configured (missing Z_AI_BASE_URL / Z_AI_API_KEY)");
+  const config = await getGeminiConfig("gemini");
+  if (!config.apiKey) {
+    return json(
+      req,
+      {
+        error:
+          "AI extraction is not configured. Add a Gemini API key in Super Admin → AI Provider.",
+      },
+      503,
+    );
   }
 
-  // Build the content array with all images
-  const content: any[] = [{ type: "text", text: PROMPT }];
+  // Build the Gemini content parts: the prompt, then one inline image per
+  // page. A data URL that will not parse is rejected here rather than sent to
+  // Gemini, so the caller gets a clear error rather than a confusing one.
+  const parts: any[] = [{ text: PROMPT }];
   for (const img of images) {
-    content.push({ type: "image_url", image_url: { url: img } });
+    const parsed = parseDataUrl(img);
+    if (!parsed || !parsed.data) {
+      return json(req, { error: "One of the images could not be read" }, 400);
+    }
+    parts.push({ inline_data: { mime_type: parsed.mimeType, data: parsed.data } });
   }
 
-  const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions/vision`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      "X-Z-AI-From": "Z",
-    },
-    body: JSON.stringify({
-      messages: [{ role: "user", content }],
-      thinking: { type: "disabled" },
-    }),
+  const rawContent = await geminiGenerateText({
+    model: config.textModel,
+    apiKey: config.apiKey,
+    parts,
+    responseMimeType: "application/json",
+    temperature: 0.1,
+    timeoutMs: 120_000,
+    retries: 1,
   });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`API request failed with status ${res.status}: ${errText}`);
-  }
-
-  const response = await res.json();
-  const rawContent = response.choices?.[0]?.message?.content || "";
 
   // Parse the JSON response (handle markdown-wrapped JSON)
   let cleaned = rawContent.trim();
@@ -156,29 +167,62 @@ async function extract(req: Request): Promise<Response> {
       name: String(cat.name || "Uncategorized"),
       icon: String(cat.icon || "🍽️"),
       items: (cat.items || [])
-        .map((item: any) => ({
-          name: String(item.name || ""),
-          description: item.description ? String(item.description) : null,
-          price: typeof item.price === "number" ? item.price : parseFloat(String(item.price || 0)),
-          veg: item.veg === true ? true : item.veg === false ? false : null,
-          confidence: item.confidence === "low" ? "low" : "high",
-          variants: Array.isArray(item.variants)
+        .map((item: any) => {
+          const price = toPrice(item.price);
+          const variants = Array.isArray(item.variants)
             ? item.variants.map((v: any) => ({
                 name: String(v.name || ""),
-                price: typeof v.price === "number" ? v.price : parseFloat(String(v.price || 0)),
+                price: toPrice(v.price) ?? 0,
               }))
-            : [],
-          addOns: Array.isArray(item.addOns)
+            : [];
+          const addOns = Array.isArray(item.addOns)
             ? item.addOns.map((a: any) => ({
                 name: String(a.name || ""),
-                price: typeof a.price === "number" ? a.price : parseFloat(String(a.price || 0)),
+                price: toPrice(a.price) ?? 0,
               }))
-            : [],
-          tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
-        }))
+            : [];
+          const veg = item.veg === true ? true : item.veg === false ? false : null;
+
+          // Anything we could not read makes the whole item uncertain, and an
+          // uncertain item is flagged for review rather than imported on faith.
+          const lowConfidence =
+            item.confidence === "low" ||
+            price === null ||
+            !item.name ||
+            variants.some((v: any) => v.price === null) ||
+            addOns.some((a: any) => a.price === null) ||
+            (item.veg === undefined);
+
+          return {
+            name: String(item.name || ""),
+            description: item.description ? String(item.description) : null,
+            // A price we could not read stays null — it is never guessed. The
+            // preview shows it for review before anything is imported.
+            price: price ?? 0,
+            priceUnreadable: price === null,
+            veg,
+            confidence: lowConfidence ? "low" : "high",
+            variants,
+            addOns,
+            tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
+          };
+        })
         .filter((item: any) => item.name),
     })),
   };
 
   return json(req, normalized);
+}
+
+/**
+ * A price is a number or null. It is never a guess: a price that came back
+ * as a word, or not at all, is null so the item can be flagged.
+ */
+function toPrice(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = parseFloat(value.replace(/[^\d.]/g, ""));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }

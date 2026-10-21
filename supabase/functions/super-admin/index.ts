@@ -3,6 +3,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { json, preflight, subPath } from "../_shared/http.ts";
 import { admin } from "../_shared/db.ts";
 import { superGuard, logAdminAction } from "../_shared/super_admin.ts";
+import {
+  getGeminiConfig,
+  maskKey,
+  testGeminiConnection,
+  DEFAULT_TEXT_MODEL,
+  DEFAULT_IMAGE_MODEL,
+} from "../_shared/gemini.ts";
 
 /**
  * /functions/v1/super-admin
@@ -24,7 +31,9 @@ import { superGuard, logAdminAction } from "../_shared/super_admin.ts";
  *   GET    audit                administrative audit log
  *   GET    search?q=            restaurants and people
  *   GET    issues               support issues
- *   POST   issues               open a support issue
+ *   GET    ai-provider          the AI provider settings, key masked
+ *   POST   ai-provider          save or update the provider settings
+ *   POST   ai-provider/test     test the stored key against the provider
  *   PATCH  issues/:id           change an issue's status
  *   PATCH  tenants/:id          plan, subscription status, active flag
  *
@@ -998,6 +1007,127 @@ async function updateTenant(req: Request, tenantId: string, adminId: string) {
 
 // --- Router -----------------------------------------------------------------
 
+/**
+ * The AI provider settings, as the dashboard sees them.
+ *
+ * The key is never returned. The dashboard gets a mask, the source it came
+ * from and the model names, which is everything it needs to show and nothing
+ * it could leak.
+ */
+async function getAiProvider(req: Request) {
+  const config = await getGeminiConfig("gemini");
+  return json(req, {
+    provider: config.provider,
+    configured: Boolean(config.apiKey),
+    maskedKey: maskKey(config.apiKey),
+    source: config.source,
+    textModel: config.textModel,
+    imageModel: config.imageModel,
+    updatedAt: config.updatedAt,
+    defaultTextModel: DEFAULT_TEXT_MODEL,
+    defaultImageModel: DEFAULT_IMAGE_MODEL,
+  });
+}
+
+/**
+ * Save or update the provider settings.
+ *
+ * An empty key means "leave the key alone" — the dashboard sends the masked
+ * value back unchanged most of the time, and writing that masked value over
+ * the real key would break it. A key is only replaced when a new one is
+ * actually supplied.
+ */
+async function saveAiProvider(req: Request, adminId: string) {
+  const b = await req.json().catch(() => ({})) as any;
+
+  const provider = String(b.provider ?? "gemini").trim() || "gemini";
+  if (provider !== "gemini") {
+    return json(req, { error: `Unknown provider "${provider}"` }, 400);
+  }
+
+  const textModel = String(b.textModel ?? "").trim() || DEFAULT_TEXT_MODEL;
+  const imageModel = String(b.imageModel ?? "").trim() || DEFAULT_IMAGE_MODEL;
+
+  const incoming = typeof b.apiKey === "string" ? b.apiKey.trim() : "";
+  const current = await getGeminiConfig(provider);
+
+  // The dashboard sends the masked key back when the field is untouched. That
+  // is not a new key and must not overwrite the real one.
+  const isMasked = incoming.length > 0 && incoming.includes("\u2022");
+  // An empty field means "keep the key" — the dashboard sends the masked
+  // value back untouched most of the time, and writing that over the real
+  // key would break it. Removing a key is an explicit action.
+  const nextKey = b.clearKey === true ? null : incoming && !isMasked ? incoming : current.apiKey;
+
+  const { data, error } = await admin()
+    .from("ai_provider_settings")
+    .upsert(
+      {
+        provider,
+        api_key: nextKey,
+        text_model: textModel,
+        image_model: imageModel,
+        enabled: b.enabled === false ? false : true,
+        updated_at: new Date().toISOString(),
+        updated_by: adminId,
+      },
+      { onConflict: "provider" },
+    )
+    .select("provider, updated_at")
+    .single();
+  if (error) return json(req, { error: error.message }, 500);
+
+  await logAdminAction(
+    adminId,
+    "ai_provider.updated",
+    { provider, textModel, imageModel, keyChanged: Boolean(incoming && !isMasked) },
+  );
+
+  return json(req, {
+    ok: true,
+    provider: data.provider,
+    configured: Boolean(nextKey),
+    maskedKey: maskKey(nextKey),
+    source: nextKey ? "database" : "none",
+    textModel,
+    imageModel,
+    updatedAt: data.updated_at,
+  });
+}
+
+/**
+ * Prove the stored key works, without ever showing it.
+ */
+async function testAiProvider(req: Request) {
+  const config = await getGeminiConfig("gemini");
+  if (!config.apiKey) {
+    return json(
+      req,
+      { error: "No API key is configured. Save one first." },
+      400,
+    );
+  }
+
+  try {
+    const result = await testGeminiConnection({
+      model: config.textModel,
+      apiKey: config.apiKey,
+    });
+    return json(req, {
+      ok: true,
+      model: result.model,
+      reply: result.reply,
+      message: "Connected. The API key works.",
+    });
+  } catch (e: any) {
+    return json(req, {
+      ok: false,
+      model: config.textModel,
+      error: e?.message || "Could not reach the provider.",
+    }, 400);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   const pf = preflight(req);
   if (pf) return pf;
@@ -1035,6 +1165,8 @@ Deno.serve(async (req: Request) => {
           return await getSearch(req);
         case "issues":
           return await getIssues(req);
+        case "ai-provider":
+          return await getAiProvider(req);
         default:
           return json(req, { error: "Not found" }, 404);
       }
@@ -1045,6 +1177,13 @@ Deno.serve(async (req: Request) => {
         return await addNote(req, segments[1], adminId);
       }
       if (route === "issues") return await createIssue(req, adminId);
+      if (route === "ai-provider") {
+        // POST /ai-provider/test is the Test Connection button. Without this
+        // branch the test would silently save the settings instead of
+        // testing them.
+        if (segments[1] === "test") return await testAiProvider(req);
+        return await saveAiProvider(req, adminId);
+      }
       return json(req, { error: "Not found" }, 404);
     }
 
