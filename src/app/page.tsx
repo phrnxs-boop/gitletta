@@ -61,7 +61,22 @@ function PageContent() {
   if (view === '' && (searchParams.has('code') || searchParams.get('type') === 'recovery')) {
     return <ResetPasswordView />
   }
-  if (view === 'public-menu' || searchParams.has('table')) return <PublicMenu />
+  // A scan is keyed by its token, so a new scan remounts the menu.
+  //
+  // Without this, scanning a second table's QR while the menu was already
+  // open changed the URL but not the component: React keeps the same
+  // element, the session effect does not re-run, and the diner was left
+  // looking at the previous table's menu — or at the "session ended" screen
+  // with a fresh QR code in their hand. A scan has to be treated as a new
+  // event every time, and a remount is the honest way to say that.
+  //
+  // The key comes from the router's own view of the URL. The menu strips
+  // `?table=` from the address bar with history.replaceState, which does not
+  // touch the router state, so the key stays put for the life of the scan and
+  // only changes when a genuinely different QR is opened.
+  if (view === 'public-menu' || searchParams.has('table')) {
+    return <PublicMenu key={searchParams.get('table') ?? 'session'} />
+  }
   if (view === 'landing') return <LandingPage />
   if (view === 'login') return <LoginPage />
   if (view === 'staff-login') return <StaffLoginPage />

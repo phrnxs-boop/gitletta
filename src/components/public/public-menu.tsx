@@ -219,13 +219,18 @@ function clearCachedSession() {
 // below would run on the first pass and the second pass would see no scan token
 // at all — locking the diner out of a session that had just been created.
 let pendingScanToken: string | null = null
-let mintInFlight: Promise<CachedDinerSession | null> | null = null
+let mintInFlight: Promise<CachedDinerSession> | null = null
 
 /**
  * Exchange a scanned QR token for a session. Concurrent callers share one
  * request, so a remount can never mint two sessions for a single scan.
+ *
+ * Throws with the server's own message when the scan is refused — "Invalid QR
+ * code", "This restaurant is currently unavailable" — because those are the
+ * only things the diner can act on. Swallowing them into a null return is what
+ * left the diner staring at a wall with no idea why.
  */
-function mintDinerSession(qrToken: string): Promise<CachedDinerSession | null> {
+function mintDinerSession(qrToken: string): Promise<CachedDinerSession> {
   if (!mintInFlight) {
     mintInFlight = (async () => {
       try {
@@ -234,7 +239,12 @@ function mintDinerSession(qrToken: string): Promise<CachedDinerSession | null> {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ qrToken }),
         })
-        if (!res.ok) return null
+        if (!res.ok) {
+          const payload = await res.json().catch(() => null)
+          throw new Error(
+            payload?.error || 'Could not start your table session. Please scan again.',
+          )
+        }
         const data = await res.json()
         const session: CachedDinerSession = {
           token: data.sessionToken,
@@ -245,8 +255,12 @@ function mintDinerSession(qrToken: string): Promise<CachedDinerSession | null> {
         // Consumed: a later load must be authorised by the session alone.
         pendingScanToken = null
         return session
-      } catch {
-        return null
+      } catch (e) {
+        // A refused scan is spent. Leaving the token behind would make the
+        // next mount retry the same bad token forever, and the diner could
+        // never recover without a full page reload.
+        pendingScanToken = null
+        throw e
       } finally {
         mintInFlight = null
       }
@@ -373,14 +387,19 @@ export function PublicMenu() {
         }
 
         // A scan always opens a brand new session for that table.
-        const session = await mintDinerSession(qrToken as string)
-        if (cancelled) return
-        if (!session) {
-          setError('Failed to activate table session')
+        let session: CachedDinerSession
+        try {
+          session = await mintDinerSession(qrToken as string)
+        } catch (e: any) {
+          if (cancelled) return
+          // The server's reason — "Invalid QR code", "This restaurant is
+          // currently unavailable" — is what the diner can act on.
+          setError(e?.message || 'Could not start your table session. Please scan again.')
           setSessionState('invalid')
           setLoading(false)
           return
         }
+        if (cancelled) return
 
         const data = await validateSession(session)
         if (cancelled) return
@@ -801,6 +820,15 @@ export function PublicMenu() {
               ? 'Please scan the QR code on your table to continue viewing the menu and placing orders.'
               : 'This menu is only accessible by scanning the QR code on your restaurant table.'}
           </p>
+
+          {/* When a scan was refused, say why. The server's reason is the only
+              thing the diner can act on — an invalid code, a restaurant that
+              is closed, a table that has been taken out of service. */}
+          {!ended && error && (
+            <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-[13px] font-medium leading-snug text-red-700">
+              {error}
+            </p>
+          )}
 
           {ended && (
             <SessionReviewCard
