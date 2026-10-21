@@ -160,13 +160,18 @@ console.log("\n── the AI functions need permission ──");
 
 console.log("\n── clearing the key again ──");
 {
+  // An empty field means "keep the key", so removing it is explicit. The
+  // test has to use that, or it leaves its own test key behind.
   const res = await callFn("super-admin/ai-provider", adminToken, {
     method: "POST",
-    body: JSON.stringify({ provider: "gemini", apiKey: "" }),
+    body: JSON.stringify({ provider: "gemini", clearKey: true }),
   });
-  check("the settings still save", res.status === 200, `status ${res.status}`);
+  check("the key can be removed", res.status === 200, `status ${res.status}`);
+  check("the removal is reported", res.body?.configured === false, JSON.stringify(res.body).slice(0, 120));
+
   const read = await callFn("super-admin/ai-provider", adminToken);
-  console.log(`        configured now: ${read.body?.configured} (the stored key is left alone unless a new one is supplied)`);
+  check("the key really is gone", read.body?.configured === false, `configured: ${read.body?.configured}`);
+  check("the masked key is empty", !read.body?.maskedKey, String(read.body?.maskedKey));
 }
 
 console.log(`\n${checks - failures}/${checks} passed`);

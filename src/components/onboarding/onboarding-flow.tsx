@@ -89,6 +89,8 @@ interface MenuItemDraft {
   name: string
   description: string | null
   price: number
+  /** The price was not readable in the scan, so this is a placeholder, not a price. */
+  priceUnreadable: boolean
   veg: boolean | null
   confidence: Confidence
   variants: ExtractedVariant[]
@@ -234,6 +236,7 @@ function hydrate(stored: Partial<OnboardingData> | null): OnboardingData {
                   name: i.name || '',
                   description: i.description ?? null,
                   price: typeof i.price === 'number' ? i.price : 0,
+                  priceUnreadable: i.priceUnreadable === true,
                   veg: i.veg ?? null,
                   confidence: i.confidence === 'low' ? 'low' : 'high',
                   variants: Array.isArray(i.variants) ? i.variants : [],
@@ -949,6 +952,7 @@ function MenuAiUploader({
             name: string
             description: string | null
             price: number
+            priceUnreadable?: boolean
             veg: boolean | null
             confidence: Confidence
             variants: ExtractedVariant[]
@@ -972,6 +976,7 @@ function MenuAiUploader({
               typeof i.price === 'number'
                 ? i.price
                 : parseFloat(String(i.price || 0)) || 0,
+            priceUnreadable: i.priceUnreadable === true,
             veg: i.veg ?? null,
             confidence: i.confidence === 'low' ? 'low' : 'high',
             variants: Array.isArray(i.variants) ? i.variants : [],
@@ -1180,6 +1185,7 @@ function MenuReview({
                   name: '',
                   description: null,
                   price: 0,
+                  priceUnreadable: false,
                   veg: null,
                   confidence: 'high',
                   variants: [],
@@ -1499,9 +1505,19 @@ function ItemReviewRow({
               </p>
             )}
             <div className="flex items-center gap-3 mt-1.5">
-              <span className="text-sm font-semibold text-primary">
+              <span
+                className={cn(
+                  'text-sm font-semibold',
+                  item.priceUnreadable ? 'text-amber-500 line-through' : 'text-primary',
+                )}
+              >
                 ${Number.isNaN(item.price) ? '0.00' : item.price.toFixed(2)}
               </span>
+              {item.priceUnreadable && (
+                <span className="text-[11px] font-medium text-amber-500">
+                  price not read — enter it
+                </span>
+              )}
               {item.variants.length > 0 && (
                 <span className="text-[11px] text-muted-foreground">
                   {item.variants.length} size option{item.variants.length === 1 ? '' : 's'}
