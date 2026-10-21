@@ -6,6 +6,7 @@ import { guard } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
 import { embedCount, toCamel } from "../_shared/case.ts";
 import { body, json, preflight, subPath } from "../_shared/http.ts";
+import { checkWriteLimit } from "../_shared/plans.ts";
 
 /**
  * /functions/v1/staff/<sub>
@@ -586,6 +587,11 @@ async function manageCreate(req: Request): Promise<Response> {
 
   const roleError = await ownerRoleError(tenantId, roleId);
   if (roleError) return json(req, { error: roleError }, 400);
+
+  // The plan's limit, checked before the write. A Starter restaurant has
+  // five staff members; a Pro one has no limit.
+  const limit = await checkWriteLimit(tenantId, "staff");
+  if (!limit.ok) return json(req, { error: limit.error }, 402);
 
   const { hash, salt } = hashPin(pin);
 

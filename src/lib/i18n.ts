@@ -45,6 +45,8 @@ const DICT: Record<string, Entry> = {
   'nav.roles.desc': { en: 'Staff & permissions', hi: 'स्टाफ और अनुमतियाँ' },
   'nav.security': { en: 'Security', hi: 'सुरक्षा' },
   'nav.security.desc': { en: 'Sessions & logs', hi: 'सेशन और लॉग' },
+  'nav.billing': { en: 'Billing', hi: 'बिलिंग' },
+  'nav.billing.desc': { en: 'Plan & payments', hi: 'प्लान और भुगतान' },
   'nav.settings': { en: 'Settings', hi: 'सेटिंग्स' },
   'nav.settings.desc': { en: 'Restaurant config', hi: 'रेस्टोरेंट सेटिंग्स' },
   'nav.signOut': { en: 'Sign out', hi: 'साइन आउट' },

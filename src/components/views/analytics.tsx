@@ -10,6 +10,7 @@ import { edgeFetch } from '@/lib/edge'
 import { cn } from '@/lib/utils'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
 import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -19,7 +20,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   TrendingUp, TrendingDown, IndianRupee, ShoppingBag, ClipboardList, CalendarDays,
   ArrowUpRight, ArrowDownRight, Download, Clock, Users, Utensils, Trophy,
-  CalendarIcon, ChevronDown,
+  CalendarIcon, ChevronDown, Lock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -42,6 +43,8 @@ interface AnalyticsPayload {
   typeBreakdown: TypeBreak[]
   topTables: TopTable[]
   hourly: number[]
+  /** False when the restaurant is not on Pro — the advanced panels are empty. */
+  advanced?: boolean
   categoryBreakdown: CatBreak[]
 }
 
@@ -362,8 +365,20 @@ export function AnalyticsView() {
                 <h3 className="font-semibold">Order Types</h3>
                 <p className="text-xs text-muted-foreground">Revenue share</p>
               </div>
-              <Utensils className="h-4 w-4 text-muted-foreground" />
+              {analytics?.advanced === false ? (
+                <Badge className="bg-amber-500/15 text-[10px] text-amber-600 gap-1">
+                  <Lock className="h-2.5 w-2.5" /> Pro
+                </Badge>
+              ) : (
+                <Utensils className="h-4 w-4 text-muted-foreground" />
+              )}
             </div>
+            {analytics?.advanced === false && (
+              <p className="mb-3 rounded-lg border border-amber-200/70 bg-amber-50/60 px-2.5 py-2 text-[11.5px] leading-relaxed text-amber-900">
+                Advanced analytics is a Pro feature. Upgrade to see how your revenue splits by order
+                type.
+              </p>
+            )}
             {loading ? (
               <ChartSkeleton className="h-[200px]" />
             ) : (
@@ -407,8 +422,20 @@ export function AnalyticsView() {
                 <h3 className="font-semibold">Sales by Hour</h3>
                 <p className="text-xs text-muted-foreground">Order volume per hour</p>
               </div>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              {analytics?.advanced === false ? (
+                <Badge className="bg-amber-500/15 text-[10px] text-amber-600 gap-1">
+                  <Lock className="h-2.5 w-2.5" /> Pro
+                </Badge>
+              ) : (
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              )}
             </div>
+            {analytics?.advanced === false && (
+              <p className="mb-3 rounded-lg border border-amber-200/70 bg-amber-50/60 px-2.5 py-2 text-[11.5px] leading-relaxed text-amber-900">
+                Advanced analytics is a Pro feature. Upgrade to see which hours your restaurant is
+                busiest.
+              </p>
+            )}
             {loading ? (
               <ChartSkeleton className="h-[240px]" />
             ) : (

@@ -3,6 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { guard } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
 import { json, preflight } from "../_shared/http.ts";
+import { checkFeature, resolvePlan } from "../_shared/plans.ts";
 
 /**
  * /functions/v1/analytics
@@ -228,23 +229,34 @@ async function get(req: Request): Promise<Response> {
   const yestRevenue = yestOrders.reduce((s: number, o: any) => s + o.total, 0);
   const revenueChange = yestRevenue ? ((todaysRevenue - yestRevenue) / yestRevenue) * 100 : 0;
 
+  // Advanced analytics is a Pro feature. The keys are still in the answer,
+  // empty rather than absent, so the screen keeps working and the restaurant
+  // simply sees nothing to look at until they upgrade.
+  const plan = await resolvePlan(tenantId);
+  const advanced = checkFeature(plan, "advanced_analytics").ok;
+
   return json(req, {
     range: { from: fromStr, to: toStr, days: dailyRevenue.length, timezone: timeZone },
+    // Basic analytics — every plan gets this.
     totalRevenue: +totalRevenue.toFixed(2),
     totalOrders: orders.length,
     avgOrder: +avgOrder.toFixed(2),
-    todaysRevenue: +todaysRevenue.toFixed(2),
-    todaysOrders: todaysOrders.length,
-    revenueChange: +revenueChange.toFixed(1),
     dailyRevenue,
     topItems: topItems.map((t) => ({ ...t, revenue: +t.revenue.toFixed(2) })),
-    typeBreakdown: Object.entries(typeBreakdown).map(([type, v]) => ({
-      type,
-      ...v,
-      revenue: +v.revenue.toFixed(2),
-    })),
-    topTables: topTables.map((t) => ({ ...t, revenue: +t.revenue.toFixed(2) })),
-    hourly,
     categoryBreakdown,
+    // Advanced analytics — Pro only.
+    advanced,
+    todaysRevenue: advanced ? +todaysRevenue.toFixed(2) : 0,
+    todaysOrders: advanced ? todaysOrders.length : 0,
+    revenueChange: advanced ? +revenueChange.toFixed(1) : 0,
+    typeBreakdown: advanced
+      ? Object.entries(typeBreakdown).map(([type, v]) => ({
+          type,
+          ...v,
+          revenue: +v.revenue.toFixed(2),
+        }))
+      : [],
+    topTables: advanced ? topTables.map((t) => ({ ...t, revenue: +t.revenue.toFixed(2) })) : [],
+    hourly: advanced ? hourly : [],
   });
 }

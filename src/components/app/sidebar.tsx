@@ -5,7 +5,7 @@ import { useApp } from './data-context'
 import { cn } from '@/lib/utils'
 import {
   LayoutGrid, ClipboardList, BarChart3, BookOpen,
-  QrCode, Ticket, ShieldCheck, Users, Settings,
+  QrCode, Ticket, ShieldCheck, Users, Settings, CreditCard,
   LogOut, UtensilsCrossed,
 } from 'lucide-react'
 import { edgeFetch } from '@/lib/edge'
@@ -30,6 +30,7 @@ const NAV: { key: ViewKey; label: string; short: string; icon: any; desc: string
   { key: 'promos', label: 'nav.promos', short: 'Promos', icon: Ticket, desc: 'nav.promos.desc' },
   { key: 'roles', label: 'nav.roles', short: 'Roles', icon: Users, desc: 'nav.roles.desc' },
   { key: 'security', label: 'nav.security', short: 'Secure', icon: ShieldCheck, desc: 'nav.security.desc' },
+  { key: 'billing', label: 'nav.billing', short: 'Billing', icon: CreditCard, desc: 'nav.billing.desc' },
   { key: 'settings', label: 'nav.settings', short: 'Settings', icon: Settings, desc: 'nav.settings.desc' },
 ]
 

@@ -4,7 +4,7 @@ import { create } from 'zustand'
 
 export type ViewKey =
   | 'dashboard' | 'orders' | 'analytics' | 'promos' | 'qr'
-  | 'menu' | 'settings' | 'security' | 'roles'
+  | 'menu' | 'settings' | 'security' | 'roles' | 'billing'
 
 export interface CartItem {
   menuItemId: string

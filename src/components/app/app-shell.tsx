@@ -16,6 +16,8 @@ import { PromosView } from '@/components/views/promos'
 import { RolesView } from '@/components/views/roles'
 import { SecurityView } from '@/components/views/security'
 import { SettingsView } from '@/components/views/settings'
+import { BillingView } from '@/components/views/billing'
+import { TrialBanner } from '@/components/app/trial-banner'
 
 function ViewRouter() {
   const { view } = useStore()
@@ -29,13 +31,14 @@ function ViewRouter() {
     case 'roles': return <RolesView />
     case 'security': return <SecurityView />
     case 'settings': return <SettingsView />
+    case 'billing': return <BillingView />
     default: return <DashboardView />
   }
 }
 
 const VIEW_KEYS = new Set<string>([
   'dashboard', 'orders', 'analytics', 'promos', 'qr',
-  'menu', 'settings', 'security', 'roles',
+  'menu', 'settings', 'security', 'roles', 'billing',
 ])
 
 function ShellContent() {
@@ -97,6 +100,7 @@ function ShellContent() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Header />
+        <TrialBanner />
         {/* main fills remaining height — navigation is via the hamburger menu in the header */}
         <main className="flex-1 overflow-hidden min-h-0">
           <ViewRouter />

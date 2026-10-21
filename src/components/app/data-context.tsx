@@ -176,8 +176,29 @@ export interface SecurityLog {
   user?: { id: string; name: string; email: string } | null
 }
 
+export interface SubscriptionState {
+  planId: string
+  planName: string
+  status: string
+  isPaid: boolean
+  isTrial: boolean
+  /** The trial is over and there is no paid subscription. */
+  isRestricted: boolean
+  trialStartedAt: string | null
+  trialEndsAt: string | null
+  trialDaysRemaining: number | null
+  currentPeriodEnd: string | null
+  cancelAtPeriodEnd: boolean
+  limits: { locations: number | null; staff: number | null; menuItems: number | null }
+  features: string[]
+  priceMonthly: number
+  currency: string
+}
+
 export interface AppData {
   tenant: Tenant
+  /** The plan in force. Absent only if the server could not work it out. */
+  subscription?: SubscriptionState
   settings: Record<string, string>
   currentUser: User
   currentStaff?: {

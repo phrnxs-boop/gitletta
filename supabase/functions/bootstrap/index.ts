@@ -4,6 +4,7 @@ import { guard } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
 import { toCamel } from "../_shared/case.ts";
 import { json, preflight } from "../_shared/http.ts";
+import { resolvePlan } from "../_shared/plans.ts";
 import { PERMISSION_KEYS } from "../_shared/permissions.ts";
 
 /**
@@ -210,8 +211,29 @@ Deno.serve(async (req: Request) => {
         }
         : null);
 
+    // The plan in force, so the app knows whether to show the trial
+    // countdown, the upgrade screen or nothing at all.
+    const plan = await resolvePlan(tenantId);
+
     return json(req, {
       tenant,
+      subscription: {
+        planId: plan.planId,
+        planName: plan.planName,
+        status: plan.status,
+        isPaid: plan.isPaid,
+        isTrial: plan.isTrial,
+        isRestricted: plan.isRestricted,
+        trialStartedAt: plan.trialStartedAt,
+        trialEndsAt: plan.trialEndsAt,
+        trialDaysRemaining: plan.trialDaysRemaining,
+        currentPeriodEnd: plan.currentPeriodEnd,
+        cancelAtPeriodEnd: plan.cancelAtPeriodEnd,
+        limits: plan.limits,
+        features: plan.features,
+        priceMonthly: plan.priceMonthly,
+        currency: plan.currency,
+      },
       settings: settingsMap,
       currentUser,
       currentStaff,

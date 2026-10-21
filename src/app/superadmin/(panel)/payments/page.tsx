@@ -49,6 +49,8 @@ type Payments = {
     features: string[]
     isActive: boolean
     subscribers: number
+    razorpayPlanId: string | null
+    limits: { locations: number | null; staff: number | null; menuItems: number | null }
   }[]
 }
 
@@ -56,6 +58,30 @@ export default function SuperAdminPayments() {
   const [data, setData] = useState<Payments | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // The Razorpay plan id being edited, and the value in the field.
+  const [editingPlan, setEditingPlan] = useState<string | null>(null)
+  const [planIdValue, setPlanIdValue] = useState('')
+  const [savingPlan, setSavingPlan] = useState(false)
+
+  const startEditingPlan = (planId: string, current: string | null) => {
+    setEditingPlan(planId)
+    setPlanIdValue(current ?? '')
+  }
+
+  const savePlan = async (planId: string) => {
+    setSavingPlan(true)
+    const res = await superAdminFetch(`plans/${planId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ razorpayPlanId: planIdValue.trim() }),
+    })
+    setSavingPlan(false)
+    if (!res.ok) {
+      setError(res.error)
+      return
+    }
+    setEditingPlan(null)
+    await load()
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -157,6 +183,7 @@ export default function SuperAdminPayments() {
                     <th className="px-3 py-3 text-right font-medium">Yearly</th>
                     <th className="px-3 py-3 text-right font-medium">Trial</th>
                     <th className="px-3 py-3 text-right font-medium">Subscribers</th>
+                    <th className="px-3 py-3 font-medium">Razorpay plan</th>
                     <th className="px-5 py-3 font-medium">Included</th>
                   </tr>
                 </thead>
@@ -180,6 +207,47 @@ export default function SuperAdminPayments() {
                       </td>
                       <td className="px-3 py-3 text-right text-[13px] tabular-nums text-admin-fg-body">
                         {p.subscribers}
+                      </td>
+                      <td className="px-3 py-3">
+                        {editingPlan === p.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              value={planIdValue}
+                              onChange={(e) => setPlanIdValue(e.target.value)}
+                              placeholder="plan_…"
+                              autoComplete="off"
+                              spellCheck={false}
+                              className="h-7 w-40 rounded-md border border-admin-border bg-admin-bg px-2 font-mono text-[11.5px] text-admin-fg outline-none focus:border-admin-accent"
+                            />
+                            <button
+                              onClick={() => savePlan(p.id)}
+                              disabled={savingPlan}
+                              className="rounded-md bg-admin-accent px-2 py-1 text-[11.5px] font-medium text-white disabled:opacity-60"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingPlan(null)}
+                              className="rounded-md px-1.5 py-1 text-[11.5px] text-admin-muted hover:text-admin-fg"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => startEditingPlan(p.id, p.razorpayPlanId)}
+                            className="flex items-center gap-1.5 text-left font-mono text-[11.5px] text-admin-muted transition hover:text-admin-fg"
+                          >
+                            {p.razorpayPlanId ? (
+                              <span className="text-admin-fg-body">{p.razorpayPlanId}</span>
+                            ) : (
+                              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-sans text-[10.5px] text-amber-600">
+                                not set
+                              </span>
+                            )}
+                            <span className="text-[10.5px] underline underline-offset-2">edit</span>
+                          </button>
+                        )}
                       </td>
                       <td className="px-5 py-3 text-[12.5px] text-admin-muted">
                         {p.features.join(' · ')}

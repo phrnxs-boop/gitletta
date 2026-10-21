@@ -544,6 +544,14 @@ async function getPayments(req: Request) {
       trialDays: p.trial_days,
       features: p.features,
       isActive: p.is_active,
+      // The Razorpay plan id. The Super Admin sets it, because only they
+      // can see the Razorpay dashboard.
+      razorpayPlanId: p.razorpay_plan_id ?? null,
+      limits: {
+        locations: p.max_locations ?? null,
+        staff: p.max_staff ?? null,
+        menuItems: p.max_menu_items ?? null,
+      },
       subscribers: tenants.filter((t) => t.plan === p.id).length,
     })),
   });
@@ -1238,6 +1246,48 @@ async function testGoogleConfig(req: Request) {
   });
 }
 
+/**
+ * Set the Razorpay plan id for a plan.
+ *
+ * The id comes from the Razorpay dashboard and is the one thing the
+ * platform cannot invent for itself. It is not a secret — Razorpay's plan
+ * ids are public — but it is only ever set by the Super Admin.
+ */
+async function updatePlan(req: Request, adminId: string, planId: string) {
+  const b = await req.json().catch(() => ({})) as any;
+
+  const patch: Record<string, unknown> = {};
+  if (b.razorpayPlanId !== undefined) {
+    const value = String(b.razorpayPlanId ?? "").trim();
+    // Razorpay plan ids look like plan_xxxxxxxxxxxxxxxx.
+    if (value && !/^plan_[A-Za-z0-9]+$/.test(value)) {
+      return json(
+        req,
+        { error: "That does not look like a Razorpay plan id. It starts with plan_ and nothing else." },
+        400,
+      );
+    }
+    patch.razorpay_plan_id = value || null;
+  }
+  if (b.isActive !== undefined) patch.is_active = Boolean(b.isActive);
+
+  if (Object.keys(patch).length === 0) {
+    return json(req, { error: "Nothing to change" }, 400);
+  }
+
+  const { data, error } = await admin()
+    .from("subscription_plans")
+    .update(patch)
+    .eq("id", planId)
+    .select("id, name, razorpay_plan_id, is_active")
+    .single();
+  if (error) return json(req, { error: error.message }, 500);
+
+  await logAdminAction(adminId, "plan.updated", { planId, ...patch });
+
+  return json(req, { ok: true, plan: data });
+}
+
 Deno.serve(async (req: Request) => {
   const pf = preflight(req);
   if (pf) return pf;
@@ -1289,6 +1339,9 @@ Deno.serve(async (req: Request) => {
         return await addNote(req, segments[1], adminId);
       }
       if (route === "issues") return await createIssue(req, adminId);
+      if (route === "plans" && segments[1]) {
+        return await updatePlan(req, adminId, segments[1]);
+      }
       if (route === "google") {
         if (segments[1] === "test") return await testGoogleConfig(req);
         return await saveGoogleConfig(req, adminId);

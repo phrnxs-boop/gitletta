@@ -4,6 +4,7 @@ import { guard } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
 import { toCamel } from "../_shared/case.ts";
 import { body, json, preflight, subPath } from "../_shared/http.ts";
+import { checkWriteLimit } from "../_shared/plans.ts";
 
 /**
  * /functions/v1/menu
@@ -80,6 +81,11 @@ async function create(req: Request): Promise<Response> {
   if (!String(b.name ?? "").trim() || !b.categoryId) {
     return json(req, { error: "Name and category are required" }, 400);
   }
+
+  // The plan's limit, checked before the write. A Starter restaurant has a
+  // hundred menu items; a Pro one has no limit.
+  const limit = await checkWriteLimit(g.session.tenantId, "menuItems");
+  if (!limit.ok) return json(req, { error: limit.error }, 402);
 
   const { data, error } = await admin()
     .from("menu_items")
