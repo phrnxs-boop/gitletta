@@ -10,6 +10,14 @@ import {
   DEFAULT_TEXT_MODEL,
   DEFAULT_IMAGE_MODEL,
 } from "../_shared/gemini.ts";
+import {
+  getGoogleConfig,
+  maskSecret,
+  defaultRedirectUri,
+  testGoogleCredentials,
+  GOOGLE_CONFIG_ID,
+  GBP_SCOPE,
+} from "../_shared/google.ts";
 
 /**
  * /functions/v1/super-admin
@@ -32,6 +40,9 @@ import {
  *   GET    search?q=            restaurants and people
  *   GET    issues               support issues
  *   GET    ai-provider          the AI provider settings, key masked
+ *   GET    google               the Google OAuth configuration, secret masked
+ *   POST   google               save or update the Google OAuth configuration
+ *   POST   google/test          check the Google credentials against Google
  *   POST   ai-provider          save or update the provider settings
  *   POST   ai-provider/test     test the stored key against the provider
  *   PATCH  issues/:id           change an issue's status
@@ -1128,6 +1139,105 @@ async function testAiProvider(req: Request) {
   }
 }
 
+/**
+ * The Google Business Profile OAuth configuration, as the dashboard sees it.
+ *
+ * The client secret is never returned — only a mask. The client id and the
+ * redirect URI are shown in full, because the administrator has to copy them
+ * into the Google Cloud console, and neither is a secret.
+ */
+async function getGoogleConfigSettings(req: Request) {
+  const config = await getGoogleConfig();
+  return json(req, {
+    configured: Boolean(config.clientId && config.clientSecret),
+    clientId: config.clientId ?? "",
+    maskedSecret: maskSecret(config.clientSecret),
+    redirectUri: config.redirectUri ?? defaultRedirectUri(),
+    defaultRedirectUri: defaultRedirectUri(),
+    source: config.source,
+    scope: GBP_SCOPE,
+    updatedAt: config.updatedAt,
+  });
+}
+
+/**
+ * Save or update the Google OAuth configuration.
+ *
+ * The secret is only replaced when a new one is actually supplied; the
+ * dashboard sends the masked value back untouched most of the time, and
+ * writing that over the real secret would break the connection.
+ */
+async function saveGoogleConfig(req: Request, adminId: string) {
+  const b = await req.json().catch(() => ({})) as any;
+  const current = await getGoogleConfig();
+
+  const clientId = String(b.clientId ?? "").trim();
+  const redirectUri = String(b.redirectUri ?? "").trim();
+  const incoming = typeof b.clientSecret === "string" ? b.clientSecret.trim() : "";
+
+  // The dashboard sends the masked value back when the field is untouched.
+  const isMasked = incoming.length > 0 && incoming.includes("\u2022");
+  const nextSecret = incoming && !isMasked ? incoming : current.clientSecret;
+  const nextClientId = clientId || current.clientId;
+
+  if (!nextClientId || !nextSecret) {
+    return json(req, { error: "A client id and a client secret are both needed." }, 400);
+  }
+  if (redirectUri && !/^https:\/\//i.test(redirectUri)) {
+    return json(req, { error: "The redirect URI must start with https://" }, 400);
+  }
+
+  const { data, error } = await admin()
+    .from("google_oauth_config")
+    .upsert(
+      {
+        id: GOOGLE_CONFIG_ID,
+        client_id: nextClientId,
+        client_secret: nextSecret,
+        redirect_uri: redirectUri || defaultRedirectUri(),
+        updated_at: new Date().toISOString(),
+        updated_by: adminId,
+      },
+      { onConflict: "id" },
+    )
+    .select("id, updated_at")
+    .single();
+  if (error) return json(req, { error: error.message }, 500);
+
+  await logAdminAction(adminId, "google_oauth.updated", {
+    clientId: nextClientId,
+    redirectUri: redirectUri || defaultRedirectUri(),
+    secretChanged: Boolean(incoming && !isMasked),
+  });
+
+  return json(req, {
+    ok: true,
+    configured: true,
+    clientId: nextClientId,
+    maskedSecret: maskSecret(nextSecret),
+    redirectUri: redirectUri || defaultRedirectUri(),
+    source: "database",
+    updatedAt: data.updated_at,
+  });
+}
+
+/**
+ * Check the configured credentials against Google.
+ */
+async function testGoogleConfig(req: Request) {
+  const config = await getGoogleConfig();
+  if (!config.clientId || !config.clientSecret) {
+    return json(req, { ok: false, error: "No client id or client secret is configured. Save one first." }, 400);
+  }
+
+  const result = await testGoogleCredentials(config);
+  return json(req, {
+    ok: result.ok,
+    message: result.message,
+    redirectUri: config.redirectUri ?? defaultRedirectUri(),
+  });
+}
+
 Deno.serve(async (req: Request) => {
   const pf = preflight(req);
   if (pf) return pf;
@@ -1167,6 +1277,8 @@ Deno.serve(async (req: Request) => {
           return await getIssues(req);
         case "ai-provider":
           return await getAiProvider(req);
+        case "google":
+          return await getGoogleConfigSettings(req);
         default:
           return json(req, { error: "Not found" }, 404);
       }
@@ -1177,6 +1289,10 @@ Deno.serve(async (req: Request) => {
         return await addNote(req, segments[1], adminId);
       }
       if (route === "issues") return await createIssue(req, adminId);
+      if (route === "google") {
+        if (segments[1] === "test") return await testGoogleConfig(req);
+        return await saveGoogleConfig(req, adminId);
+      }
       if (route === "ai-provider") {
         // POST /ai-provider/test is the Test Connection button. Without this
         // branch the test would silently save the settings instead of

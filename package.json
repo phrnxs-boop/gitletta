@@ -11,6 +11,7 @@
     "test:promo": "tsx scripts/test-promo.mts",
     "test:superadmin": "tsx scripts/test-superadmin-security.mts && tsx scripts/test-superadmin-api.mts",
     "test:gemini": "tsx scripts/test-gemini.mts",
+    "test:google-reviews": "tsx scripts/test-google-reviews.mts",
     "test:qr": "tsx scripts/test-qr-flow.mts",
     "test:smoke": "tsx scripts/test-smoke.mts"
   },

@@ -3,6 +3,19 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { guard } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
 import { body, json, preflight, subPath } from "../_shared/http.ts";
+import {
+  buildAuthUrl,
+  defaultRedirectUri,
+  exchangeCodeForTokens as exchangeGoogleCode,
+  getGoogleConfig,
+  hasGoogleCreds as googleCredsPresent,
+  listAccounts,
+  listLocations,
+  refreshAccessToken as refreshGoogleToken,
+  signState,
+  verifyState,
+  type GoogleTokens,
+} from "../_shared/google.ts";
 
 /**
  * /functions/v1/google-reviews/<sub>
@@ -23,88 +36,31 @@ import { body, json, preflight, subPath } from "../_shared/http.ts";
 // Google helper library (inlined from src/lib/google-reviews.ts)
 // ---------------------------------------------------------------------------
 
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+/**
+ * The Google helpers themselves live in `_shared/google.ts`, so the
+ * `super-admin` function can use the same configuration and the same
+ * credential check. These are the thin wrappers this file needs.
+ */
+
 const GOOGLE_BM_BASE = "https://mybusiness.googleapis.com/v4";
 
-interface GoogleTokens {
-  access_token: string;
-  refresh_token?: string;
-  expires_at: number; // epoch ms
+/** Whether a Google client is configured, from the table or the function secret. */
+async function hasGoogleCreds(): Promise<boolean> {
+  return googleCredsPresent(await getGoogleConfig());
 }
 
-function googleClientId(): string | undefined {
-  return Deno.env.get("GOOGLE_CLIENT_ID") ?? undefined;
-}
-function googleClientSecret(): string | undefined {
-  return Deno.env.get("GOOGLE_CLIENT_SECRET") ?? undefined;
-}
-function hasGoogleCreds(): boolean {
-  return !!googleClientId() && !!googleClientSecret();
+/** Refresh a token using whichever client is currently configured. */
+async function refreshAccessToken(refreshToken: string): Promise<GoogleTokens | { error: string }> {
+  const config = await getGoogleConfig();
+  return refreshGoogleToken(config, refreshToken);
 }
 
 async function exchangeCodeForTokens(
   code: string,
   redirectUri: string,
 ): Promise<GoogleTokens | { error: string }> {
-  const clientId = googleClientId();
-  const clientSecret = googleClientSecret();
-  if (!clientId || !clientSecret) {
-    return { error: "Google OAuth not configured (missing GOOGLE_CLIENT_ID/SECRET)" };
-  }
-
-  const payload = new URLSearchParams({
-    code,
-    client_id: clientId,
-    client_secret: clientSecret,
-    redirect_uri: redirectUri,
-    grant_type: "authorization_code",
-  });
-
-  const res = await fetch(GOOGLE_TOKEN_URL, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: payload,
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    return { error: data.error_description || data.error || "Token exchange failed" };
-  }
-
-  return {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    expires_at: Date.now() + (data.expires_in ?? 3600) * 1000,
-  };
-}
-
-async function refreshAccessToken(refreshToken: string): Promise<GoogleTokens | { error: string }> {
-  const clientId = googleClientId();
-  const clientSecret = googleClientSecret();
-  if (!clientId || !clientSecret) return { error: "Google OAuth not configured" };
-
-  const payload = new URLSearchParams({
-    refresh_token: refreshToken,
-    client_id: clientId,
-    client_secret: clientSecret,
-    grant_type: "refresh_token",
-  });
-
-  const res = await fetch(GOOGLE_TOKEN_URL, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: payload,
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    return { error: data.error_description || data.error || "Token refresh failed" };
-  }
-
-  return {
-    access_token: data.access_token,
-    expires_at: Date.now() + (data.expires_in ?? 3600) * 1000,
-  };
+  const config = await getGoogleConfig();
+  return exchangeGoogleCode({ ...config, redirectUri }, code);
 }
 
 async function getValidAccessToken(connectionId: string): Promise<{ token: string } | { error: string }> {
@@ -168,9 +124,16 @@ async function syncReviews(connectionId: string): Promise<{ synced: number; erro
     }
   }
 
-  // Demo mode: if no real Google credentials, seed sample reviews
-  if (!hasGoogleCreds() || !conn.location_id) {
+  // Demo mode is the demo connection — the placeholder the platform creates
+  // when no Google client is configured at all. A real connection that has
+  // not chosen a location yet must not silently come back with sample
+  // reviews; that would look like the restaurant's own reviews.
+  if (conn.access_token === "demo-token") {
     return seedDemoReviews(conn.tenant_id, connectionId);
+  }
+
+  if (!conn.location_id) {
+    return { synced: 0, error: "Choose the business location for this restaurant first." };
   }
 
   const tokenResult = await getValidAccessToken(connectionId);
@@ -265,13 +228,17 @@ async function replyToReview(
   if (reviewError) return { ok: false, error: reviewError.message };
   if (!review) return { ok: false, error: "Review not found" };
 
-  if (!hasGoogleCreds() || !conn.location_id) {
+  if (conn.access_token === "demo-token") {
     const { error: updateError } = await db
       .from("google_reviews")
       .update({ reply: replyText, reply_time: new Date().toISOString() })
       .eq("id", reviewId);
     if (updateError) return { ok: false, error: updateError.message };
     return { ok: true };
+  }
+
+  if (!conn.location_id) {
+    return { ok: false, error: "Choose the business location for this restaurant first." };
   }
 
   const tokenResult = await getValidAccessToken(connectionId);
@@ -361,27 +328,9 @@ async function seedDemoReviews(tenantId: string, connectionId: string): Promise<
   return { synced: count };
 }
 
-function getAuthUrl(redirectUri: string, state: string): string {
-  const clientId = googleClientId();
-  if (!clientId) return "";
-
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    response_type: "code",
-    scope: "https://www.googleapis.com/auth/business.manage",
-    access_type: "offline",
-    prompt: "consent",
-    state,
-  });
-
-  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-}
-
 /** The edge callback URL used both when building the auth URL and exchanging the code. */
 function callbackRedirectUri(): string {
-  const base = Deno.env.get("SUPABASE_URL") ?? "";
-  return `${base}/functions/v1/google-reviews/callback`;
+  return defaultRedirectUri();
 }
 
 /** Where to send the browser back to after OAuth (the app origin). */
@@ -418,12 +367,18 @@ function mapGoogleReview(r: any) {
 }
 
 function mapConnection(c: any) {
+  // The access token and the refresh token are NOT in here, and they must
+  // never be. This response goes to the restaurant owner's browser, and a
+  // refresh token is a credential for their Google account. Everything the
+  // page needs to render the connection is here; everything it does not need
+  // to see is not.
   return {
     id: c.id,
     tenantId: c.tenant_id,
-    accessToken: c.access_token,
-    refreshToken: c.refresh_token,
-    tokenExpiresAt: c.token_expires_at,
+    // Whether the owner still has to choose which of their locations this
+    // restaurant is. A real connection with no location cannot sync anything.
+    // The demo connection never had a location and does not need one.
+    needsLocation: !c.location_id && c.access_token !== "demo-token",
     accountName: c.account_name,
     locationName: c.location_name,
     locationId: c.location_id,
@@ -461,6 +416,10 @@ Deno.serve(async (req: Request) => {
         if (req.method === "GET") return await connectGet(req);
         if (req.method === "DELETE") return await connectDelete(req);
         return json(req, { error: "Method not allowed" }, 405);
+      case "locations":
+        if (req.method === "GET") return await locationsGet(req);
+        if (req.method === "POST") return await locationsPost(req);
+        return json(req, { error: "Method not allowed" }, 405);
       case "sync":
         if (req.method === "POST") return await syncPost(req);
         return json(req, { error: "Method not allowed" }, 405);
@@ -477,6 +436,138 @@ Deno.serve(async (req: Request) => {
     return json(req, { error: (err as Error).message ?? "Unexpected error" }, 500);
   }
 });
+
+/**
+ * GET locations — settings.manage
+ *
+ * The accounts and locations the owner's Google account can reach, so they
+ * can pick the one this restaurant is. The list comes from the account the
+ * owner authorised, not from anything the browser sends, so a location that
+ * is not theirs cannot be attached to their restaurant.
+ */
+async function locationsGet(req: Request): Promise<Response> {
+  const g = await guard(req, { permission: "settings.manage" });
+  if (!g.ok) return g.response;
+  const tenantId = g.session.tenantId;
+
+  const db = admin();
+  const { data: conn, error: connError } = await db
+    .from("google_connections")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .limit(1)
+    .maybeSingle();
+  if (connError) return json(req, { error: connError.message }, 500);
+  if (!conn) {
+    return json(req, { error: "Connect Google Business Profile first." }, 400);
+  }
+  if (!conn.access_token || conn.access_token === "demo-token") {
+    return json(req, { error: "Google is not connected yet." }, 400);
+  }
+
+  const token = await getValidAccessToken(conn.id);
+  if ("error" in token) return json(req, { error: token.error }, 400);
+
+  const accounts = await listAccounts(token.token);
+  if ("error" in accounts) {
+    return json(req, { error: `Google would not list the accounts: ${accounts.error}` }, 400);
+  }
+
+  const groups: any[] = [];
+  for (const account of accounts) {
+    const locations = await listLocations(token.token, account.name);
+    if ("error" in locations) continue;
+    if (!locations.length) continue;
+    groups.push({
+      accountName: account.name,
+      accountTitle: account.accountName,
+      accountType: account.type,
+      locations: locations.map((l) => ({
+        locationId: l.name,
+        locationName: l.locationName,
+        address: l.address ?? null,
+        storeCode: l.storeCode ?? null,
+      })),
+    });
+  }
+
+  return json(req, {
+    groups,
+    selected: conn.location_id
+      ? { accountName: conn.account_name, locationId: conn.location_id, locationName: conn.location_name }
+      : null,
+  });
+}
+
+/**
+ * POST locations — settings.manage
+ *
+ * Attach one of the owner's locations to this restaurant. The location has to
+ * be one the owner's own token can reach, so this cannot be used to point a
+ * restaurant at somebody else's business.
+ */
+async function locationsPost(req: Request): Promise<Response> {
+  const g = await guard(req, { permission: "settings.manage" });
+  if (!g.ok) return g.response;
+  const tenantId = g.session.tenantId;
+
+  const b = await body(req);
+  const accountName = String(b.accountName ?? "").trim();
+  const locationId = String(b.locationId ?? "").trim();
+  if (!accountName || !locationId) {
+    return json(req, { error: "accountName and locationId are required" }, 400);
+  }
+
+  const db = admin();
+  const { data: conn, error: connError } = await db
+    .from("google_connections")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .limit(1)
+    .maybeSingle();
+  if (connError) return json(req, { error: connError.message }, 500);
+  if (!conn) return json(req, { error: "Connect Google Business Profile first." }, 400);
+
+  const token = await getValidAccessToken(conn.id);
+  if ("error" in token) return json(req, { error: token.error }, 400);
+
+  // Confirm the location really is one the owner can reach before storing it.
+  const locations = await listLocations(token.token, accountName);
+  if ("error" in locations) {
+    return json(req, { error: `Google would not list the locations: ${locations.error}` }, 400);
+  }
+  const chosen = locations.find((l) => l.name === locationId);
+  if (!chosen) {
+    return json(req, { error: "That location is not one your Google account can reach." }, 400);
+  }
+
+  const { data, error: updateError } = await db
+    .from("google_connections")
+    .update({
+      account_name: accountName,
+      location_id: locationId,
+      location_name: chosen.locationName,
+      enabled: true,
+      last_sync_error: null,
+    })
+    .eq("id", conn.id)
+    .eq("tenant_id", tenantId)
+    .select()
+    .single();
+  if (updateError) return json(req, { error: updateError.message }, 500);
+
+  // Now that a location is known, the reviews can actually be read.
+  const synced = await syncReviews(conn.id);
+
+  return json(req, {
+    success: true,
+    accountName,
+    locationId,
+    locationName: chosen.locationName,
+    synced: synced.synced,
+    ...(synced.error ? { syncError: synced.error } : {}),
+  });
+}
 
 /** GET settings — settings.view */
 async function settingsGet(req: Request): Promise<Response> {
@@ -567,7 +658,7 @@ async function connectGet(req: Request): Promise<Response> {
 
   const db = admin();
 
-  if (!hasGoogleCreds()) {
+  if (!(await hasGoogleCreds())) {
     const { data: existing, error: findError } = await db
       .from("google_connections")
       .select("*")
@@ -600,8 +691,16 @@ async function connectGet(req: Request): Promise<Response> {
     return json(req, { demoMode: true, connected: true, connectionId: conn.id });
   }
 
-  const redirectUri = callbackRedirectUri();
-  const authUrl = getAuthUrl(redirectUri, tenantId);
+  // The state is signed and expires. The old one was the bare tenant id,
+  // which meant anybody could craft a callback that attached their own
+  // Google account to somebody else's restaurant.
+  const config = await getGoogleConfig();
+  const state = await signState(tenantId);
+  const authUrl = buildAuthUrl(config, state);
+
+  if (!authUrl) {
+    return json(req, { error: "Google OAuth is not configured." }, 503);
+  }
 
   return json(req, { demoMode: false, authUrl });
 }
@@ -673,7 +772,7 @@ async function respondPost(req: Request): Promise<Response> {
 async function callbackGet(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state"); // tenantId
+  const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
   const back = appOrigin(req);
 
@@ -682,6 +781,13 @@ async function callbackGet(req: Request): Promise<Response> {
   }
   if (!code || !state) {
     return json(req, { error: "Missing code or state" }, 400);
+  }
+
+  // The state carries the tenant id, signed by this server and expiring in
+  // fifteen minutes. A state this server did not issue is refused.
+  const tenantId = await verifyState(state);
+  if (!tenantId) {
+    return json(req, { error: "The sign-in request could not be verified. Start again from the app." }, 400);
   }
 
   const tokens = await exchangeCodeForTokens(code, callbackRedirectUri());
@@ -694,7 +800,7 @@ async function callbackGet(req: Request): Promise<Response> {
   const { data: existing, error: findError } = await db
     .from("google_connections")
     .select("*")
-    .eq("tenant_id", state)
+    .eq("tenant_id", tenantId)
     .limit(1)
     .maybeSingle();
   if (findError) return json(req, { error: findError.message }, 500);
@@ -710,7 +816,7 @@ async function callbackGet(req: Request): Promise<Response> {
         enabled: true,
       })
       .eq("id", existing.id)
-      .eq("tenant_id", state)
+      .eq("tenant_id", tenantId)
       .select()
       .single();
     if (updateError) return json(req, { error: updateError.message }, 500);
@@ -719,7 +825,7 @@ async function callbackGet(req: Request): Promise<Response> {
     const { data, error: insertError } = await db
       .from("google_connections")
       .insert({
-        tenant_id: state,
+        tenant_id: tenantId,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         token_expires_at: new Date(tokens.expires_at).toISOString(),
@@ -731,7 +837,9 @@ async function callbackGet(req: Request): Promise<Response> {
     conn = data;
   }
 
-  await syncReviews(conn.id);
-
-  return Response.redirect(`${back}/?google_connected=true`, 302);
+  // The account and the location are not known yet — the owner chooses
+  // which of their locations this restaurant is. Syncing now would build a
+  // request for `accounts/null/locations/null`, so the owner is sent back to
+  // the app to pick a location first.
+  return Response.redirect(`${back}/?view=settings&google_connected=1`, 302);
 }

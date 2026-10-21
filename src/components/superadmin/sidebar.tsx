@@ -14,6 +14,7 @@ import {
   ScrollText,
   ShieldCheck,
   Sparkles,
+  Settings,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -49,6 +50,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
       { name: 'Reports', href: '/superadmin/reports', icon: FileBarChart },
       { name: 'Support Issues', href: '/superadmin/issues', icon: MessageSquareWarning },
       { name: 'AI Provider', href: '/superadmin/ai-provider', icon: Sparkles },
+      { name: 'Settings', href: '/superadmin/settings', icon: Settings },
       { name: 'Audit Log', href: '/superadmin/audit', icon: ScrollText },
     ],
   },

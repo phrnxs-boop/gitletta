@@ -23,7 +23,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Settings, Store, SlidersHorizontal, CreditCard, AlertTriangle, Save, Building2, MapPin, Phone, Mail, Globe, Clock, Trash2, Check, Sparkles, User, Palette, Bell, Lock, KeyRound, Smartphone, Moon, Sun, Languages, ShieldCheck, ChevronDown, FileText, Star, ExternalLink, RefreshCw, MessageSquare, Send, Instagram, Facebook, Youtube,
+  Settings, Store, SlidersHorizontal, CreditCard, AlertTriangle, Save, Building2, MapPin, Phone, Mail, Globe, Clock, Trash2, Check, Sparkles, User, Palette, Bell, Lock, KeyRound, Smartphone, Moon, Sun, Languages, ShieldCheck, ChevronDown, FileText, Star, ExternalLink, RefreshCw, MessageSquare, Send, Loader2, ChevronRight, Instagram, Facebook, Youtube,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { LANGUAGES } from '@/lib/i18n'
@@ -112,6 +112,19 @@ export function SettingsView() {
   useEffect(() => {
     if (settingsTab) setActiveTab(settingsTab)
   }, [settingsTab])
+
+  // Coming back from Google's sign-in. The URL is read directly rather than
+  // through useSearchParams, which would need a Suspense boundary around this
+  // view.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('google_connected') !== '1') return
+    setActiveTab('reviews')
+    const url = new URL(window.location.href)
+    url.searchParams.delete('google_connected')
+    window.history.replaceState({}, '', url.toString())
+  }, [])
 
   // Tenant form state
   const [tenantForm, setTenantForm] = useState({
@@ -1104,6 +1117,12 @@ function GoogleReviewsTab({ tenantId }: { tenantId: string }) {
   const [syncing, setSyncing] = useState(false)
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
+  // The locations the owner's Google account can reach, and the one they
+  // pick for this restaurant.
+  const [locationGroups, setLocationGroups] = useState<any[]>([])
+  const [locationsLoading, setLocationsLoading] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
+  const [choosingLocation, setChoosingLocation] = useState<string | null>(null)
   const [settings, setSettings] = useState({
     enabled: true,
     autoSync: true,
@@ -1140,6 +1159,55 @@ function GoogleReviewsTab({ tenantId }: { tenantId: string }) {
   }, [tenantId])
 
   useEffect(() => { load() }, [load])
+
+  /**
+   * The accounts and locations this owner can reach, so they can pick the one
+   * this restaurant is. Without a location there is nothing to sync.
+   */
+  const loadLocations = useCallback(async () => {
+    setLocationsLoading(true)
+    setLocationError(null)
+    try {
+      const res = await edgeFetch('/api/google-reviews/locations', { headers: { 'x-tenant-id': tenantId } })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setLocationError(data?.error || 'Could not list your Google locations.')
+        return
+      }
+      setLocationGroups(data.groups || [])
+    } catch {
+      setLocationError('Could not list your Google locations.')
+    } finally {
+      setLocationsLoading(false)
+    }
+  }, [tenantId])
+
+  useEffect(() => {
+    if (connection?.needsLocation) loadLocations()
+  }, [connection?.needsLocation, loadLocations])
+
+  const handleSelectLocation = async (accountName: string, locationId: string, locationName: string) => {
+    setChoosingLocation(locationId)
+    setLocationError(null)
+    try {
+      const res = await edgeFetch('/api/google-reviews/locations', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ accountName, locationId }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setLocationError(data?.error || 'Could not save that location.')
+        return
+      }
+      toast.success(`${locationName} connected`, { description: data.synced ? `Synced ${data.synced} review(s).` : undefined })
+      await load()
+    } catch {
+      setLocationError('Could not save that location.')
+    } finally {
+      setChoosingLocation(null)
+    }
+  }
 
   const handleConnect = async () => {
     try {
@@ -1293,7 +1361,87 @@ function GoogleReviewsTab({ tenantId }: { tenantId: string }) {
         )}
       </Card>
 
-      {connected && (
+      {connected && connection?.needsLocation && (
+        /* The owner has authorised Google but has not said which of their
+           locations this restaurant is. Nothing can be synced until they do. */
+        <Card className="rounded-2xl bg-card border-border p-4 md:p-6">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+              <MapPin className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold">Choose your business location</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Pick the Google Business Profile that belongs to this restaurant. Only the
+                profiles your Google account can manage are listed.
+              </p>
+            </div>
+          </div>
+
+          {locationError && (
+            <p className="mt-3 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-[12.5px] leading-relaxed text-destructive">
+              {locationError}
+            </p>
+          )}
+
+          {locationsLoading ? (
+            <div className="mt-4 space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-14 rounded-xl bg-secondary/30 animate-pulse" />
+              ))}
+            </div>
+          ) : locationGroups.length === 0 ? (
+            <p className="mt-4 rounded-lg bg-secondary/50 px-3 py-3 text-[12.5px] leading-relaxed text-muted-foreground">
+              No business locations came back for this Google account. A location has to be
+              verified and your account has to be a manager of it, or Google will not list it.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {locationGroups.map(group => (
+                <div key={group.accountName}>
+                  <p className="mb-1.5 text-[11.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {group.accountTitle || group.accountName}
+                  </p>
+                  <div className="space-y-1.5">
+                    {group.locations.map((loc: any) => (
+                      <button
+                        key={loc.locationId}
+                        onClick={() => handleSelectLocation(group.accountName, loc.locationId, loc.locationName)}
+                        disabled={choosingLocation !== null}
+                        className="flex w-full items-center gap-3 rounded-xl border border-border bg-secondary/20 px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-primary/5 disabled:opacity-60"
+                      >
+                        <Store className="h-4 w-4 shrink-0 text-primary" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{loc.locationName}</span>
+                          {(loc.address || loc.storeCode) && (
+                            <span className="block truncate text-[11.5px] text-muted-foreground">
+                              {[loc.address, loc.storeCode].filter(Boolean).join(' · ')}
+                            </span>
+                          )}
+                        </span>
+                        {choosingLocation === loc.locationId ? (
+                          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 flex justify-end">
+            <Button variant="outline" size="sm" onClick={loadLocations} disabled={locationsLoading}>
+              <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', locationsLoading && 'animate-spin')} />
+              Refresh locations
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {connected && !connection?.needsLocation && (
         <>
           {/* Rating overview */}
           <Card className="rounded-2xl bg-card border-border p-4 md:p-4 md:p-6">
@@ -1412,7 +1560,35 @@ function GoogleReviewsTab({ tenantId }: { tenantId: string }) {
                   {r.reply && (
                     <div className="rounded-lg bg-primary/5 border border-primary/10 p-2.5 mt-2">
                       <p className="text-[10px] font-semibold text-primary mb-0.5">OWNER REPLY</p>
-                      <p className="text-xs text-foreground/80">{r.reply}</p>
+                      {replyingTo === r.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            placeholder="Edit your reply…"
+                            rows={2}
+                            className="bg-background/60 border-border text-sm resize-none"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => { setReplyingTo(null); setReplyText('') }}>Cancel</Button>
+                            <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => handleReply(r.id)} disabled={!replyText.trim()}>
+                              <Send className="h-3 w-3 mr-1" /> Update Reply
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-xs text-foreground/80 whitespace-pre-wrap">{r.reply}</p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 mt-1 text-[11.5px] text-primary"
+                            onClick={() => { setReplyingTo(r.id); setReplyText(r.reply || '') }}
+                          >
+                            Edit reply
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                   {!r.reply && (
