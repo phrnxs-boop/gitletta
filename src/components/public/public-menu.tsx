@@ -289,6 +289,11 @@ export function PublicMenu() {
   // session state: 'activating' | 'active' | 'ended' | 'invalid'
   const [sessionState, setSessionState] = useState<'activating' | 'active' | 'ended' | 'invalid'>('activating')
   const [sessionToken, setSessionToken] = useState<string | null>(null)
+  // Does this session have anything on it? A table can be abandoned and its
+  // session ended from the POS without a single order ever being placed, and
+  // there is no bill to show for that. The server answers this on the same
+  // call that discovers the session is over; null means "not known yet".
+  const [sessionHasOrder, setSessionHasOrder] = useState<boolean | null>(null)
   const [sessionTenantId, setSessionTenantId] = useState<string | null>(null)
   const [sessionTableId, setSessionTableId] = useState<string | null>(null)
 
@@ -322,15 +327,22 @@ export function PublicMenu() {
   useEffect(() => {
     let cancelled = false
 
+    /**
+     * Check the session with the server.
+     *
+     * The body is read even when the check fails, because a failed check is
+     * exactly when the diner needs to know whether there is a bill waiting:
+     * the server says so in the same response.
+     */
     async function validateSession(session: CachedDinerSession) {
       const res = await edgeFetch(
         `/api/table-session/validate?tenantId=${encodeURIComponent(session.tenantId)}` +
           `&tableId=${encodeURIComponent(session.tableId)}` +
           `&sessionToken=${encodeURIComponent(session.token)}`,
       )
-      if (!res.ok) return null
-      const data = await res.json()
-      return data?.sessionStatus === 'ACTIVE' ? data : null
+      const data = await res.json().catch(() => null)
+      if (!res.ok) return { ok: false as const, data }
+      return { ok: true as const, data }
     }
 
     function adopt(session: CachedDinerSession, data: any) {
@@ -372,15 +384,17 @@ export function PublicMenu() {
             return
           }
 
-          const data = await validateSession(cached)
+          const check = await validateSession(cached)
           if (cancelled) return
-          if (!data) {
+          if (!check.ok) {
+            // The server says whether there is an order behind this session.
+            setSessionHasOrder(Boolean(check.data?.hasOrder))
             lockDinerSession(setSessionState)
             setLoading(false)
             return
           }
 
-          adopt(cached, data)
+          adopt(cached, check.data)
           setSessionState('active')
           setLoading(false)
           return
@@ -401,15 +415,16 @@ export function PublicMenu() {
         }
         if (cancelled) return
 
-        const data = await validateSession(session)
+        const check = await validateSession(session)
         if (cancelled) return
-        if (!data) {
+        if (!check.ok) {
+          setSessionHasOrder(Boolean(check.data?.hasOrder))
           lockDinerSession(setSessionState)
           setLoading(false)
           return
         }
 
-        adopt(session, data)
+        adopt(session, check.data)
         setSessionState('active')
         setLoading(false)
       } catch (e: any) {
@@ -554,7 +569,12 @@ export function PublicMenu() {
             tblId
           )}&sessionToken=${encodeURIComponent(sessionToken)}`
         )
-        if (res.status === 401 || res.status === 403 || !res.ok) {
+        if (!res.ok) {
+          // This is how a session ended from the POS reaches the diner. The
+          // response says whether the table had an order on it, so the ended
+          // screen knows whether there is a bill to offer.
+          const failed = await res.json().catch(() => null)
+          setSessionHasOrder(Boolean(failed?.hasOrder))
           lockDinerSession(setSessionState)
           setCartOpen(false)
           return
@@ -830,7 +850,14 @@ export function PublicMenu() {
             </p>
           )}
 
-          {ended && (
+          {/* The review card carries the "View Bill" link, so it only appears
+              when the session actually has an order on it. A table can be
+              abandoned and its session ended from the POS without anything
+              ever being ordered, and there is nothing to bill and nothing to
+              rate in that case. Until the server has answered, neither is
+              shown — a bill button that turns out to be empty is worse than
+              no bill button. */}
+          {ended && sessionHasOrder === true && (
             <SessionReviewCard
               tenantId={tenant?.id || sessionTenantId}
               tableId={table?.id || sessionTableId}
@@ -839,6 +866,12 @@ export function PublicMenu() {
               sessionTableId={sessionTableId}
               onViewBill={handleOpenBill}
             />
+          )}
+
+          {ended && sessionHasOrder === false && (
+            <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-[12.5px] leading-relaxed text-slate-500 border border-slate-100">
+              No orders were placed on this table, so there is no bill.
+            </p>
           )}
 
           <div className="mt-5 rounded-xl bg-slate-50 p-3 text-[11px] text-slate-400 leading-relaxed border border-slate-100">

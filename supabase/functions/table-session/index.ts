@@ -408,6 +408,43 @@ async function startSession(req: Request): Promise<Response> {
   );
 }
 
+/**
+ * The order a session produced, if any.
+ *
+ * A table session can be ended without a single order on it — the POS ends
+ * sessions for tables that were abandoned. The diner's "session ended" screen
+ * has to know whether there is anything to bill, and the only honest answer
+ * comes from the orders table rather than from the browser's memory.
+ *
+ * The session is found by its token and the order by the session it belongs
+ * to, so an order can never be attributed to the wrong table.
+ */
+async function orderForSession(sessionToken: string | null): Promise<{
+  id: string;
+  order_number: string | null;
+} | null> {
+  if (!sessionToken) return null;
+
+  const db = admin();
+
+  const { data: session } = await db
+    .from("table_sessions")
+    .select("id")
+    .eq("token", sessionToken)
+    .maybeSingle();
+  if (!session) return null;
+
+  const { data: order } = await db
+    .from("orders")
+    .select("id, order_number")
+    .eq("table_session_id", session.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return order ?? null;
+}
+
 /** GET /table-session/validate — PUBLIC. Session check + menu payload. */
 async function validate(req: Request): Promise<Response> {
   const url = new URL(req.url);
@@ -417,7 +454,21 @@ async function validate(req: Request): Promise<Response> {
 
   const result = await validateTableSession({ tenantId, tableId, sessionToken });
   if (!result.ok) {
-    return json(req, { error: result.error, sessionStatus: "INVALID" }, result.status);
+    // The session is not usable, but the diner still needs to know whether
+    // there is a bill waiting for them. Saying so here saves the page a
+    // second round trip.
+    const order = await orderForSession(sessionToken);
+    return json(
+      req,
+      {
+        error: result.error,
+        sessionStatus: "INVALID",
+        hasOrder: Boolean(order),
+        orderId: order?.id ?? null,
+        orderNumber: order?.order_number ?? null,
+      },
+      result.status,
+    );
   }
 
   const { tenant, table } = result.data;
