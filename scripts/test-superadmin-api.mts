@@ -91,9 +91,19 @@ console.log("\n── the conversion funnel ──");
 {
   const r = await call("conversion", a.token);
   const stages = r.body?.stages ?? [];
-  check("has six stages", stages.length, 6);
+  // The funnel is the activation path: signed up, onboarded, published a
+  // menu, took first order. Each step is a subset of the one before, so a
+  // step can never report a step rate over a hundred or a drop-off below
+  // zero.
+  check("has the four activation stages", stages.length, 4);
   checkTrue("stages carry a rate", typeof stages[0]?.rate === "number", `${stages[0]?.rate}%`);
   checkTrue("the funnel starts at the signup count", stages[0]?.count > 0, String(stages[0]?.count));
+  checkTrue("the funnel only goes down", stages.every((s: any, i: number) => i === 0 || s.count <= stages[i - 1].count), JSON.stringify(stages.map((s: any) => s.count)));
+  checkTrue("no stage drops below zero", stages.every((s: any) => s.dropOff >= 0), JSON.stringify(stages.map((s: any) => s.dropOff)));
+  checkTrue("no stage steps over a hundred", stages.every((s: any) => s.stepRate <= 100), JSON.stringify(stages.map((s: any) => s.stepRate)));
+  // The subscription cut is reported beside the funnel, not as a step in it.
+  checkTrue("the monetisation pair is reported", typeof r.body?.monetisation?.trial === "number" && typeof r.body?.monetisation?.paid === "number", JSON.stringify(r.body?.monetisation));
+  checkTrue("the totals still carry the trial and paid counts", typeof r.body?.totals?.trial === "number" && typeof r.body?.totals?.paid === "number", JSON.stringify(r.body?.totals));
 }
 
 console.log("\n── the CRM ──");
