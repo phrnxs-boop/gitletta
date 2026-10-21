@@ -66,6 +66,12 @@ type Payment = {
 
 type PayState = 'idle' | 'starting' | 'paying' | 'verifying' | 'success' | 'failed'
 
+/** The rupee sign where the currency is rupees, the code otherwise. */
+function money(currency: string, amount: number): string {
+  const n = Number(amount ?? 0).toLocaleString('en-IN')
+  return currency === 'INR' ? `₹${n}` : `${currency} ${n}`
+}
+
 const STATUS_LABEL: Record<string, string> = {
   trial: 'Free trial',
   active: 'Active',
@@ -290,7 +296,7 @@ export function BillingView() {
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {subscription
-                ? `${subscription.planName} · ${subscription.currency} ${subscription.priceMonthly.toLocaleString('en-IN')}/month`
+                ? `${subscription.planName} · ${money(subscription.currency, subscription.priceMonthly)}/month`
                 : 'No plan yet'}
             </p>
           </div>
@@ -444,7 +450,7 @@ export function BillingView() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-lg font-bold leading-none">
-                      ₹{plan.priceMonthly.toLocaleString('en-IN')}
+                      {money(plan.currency, plan.priceMonthly)}
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">per month</p>
                   </div>
@@ -514,7 +520,7 @@ export function BillingView() {
               >
                 <div className="min-w-0">
                   <p className="text-[13px] font-medium">
-                    ₹{Number(p.amount).toLocaleString('en-IN')} · {p.plan_id}
+                    {money(p.currency, Number(p.amount))} · {p.plan_id}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
                     {new Date(p.created_at).toLocaleDateString('en-IN')} · {p.billing_period}
