@@ -531,7 +531,7 @@ export function BillingView() {
                   variant="secondary"
                   className={cn(
                     'shrink-0 text-[10px]',
-                    p.status === 'captured'
+                    p.status === 'succeeded'
                       ? 'bg-emerald-500/15 text-emerald-600'
                       : 'bg-red-500/15 text-red-600',
                   )}

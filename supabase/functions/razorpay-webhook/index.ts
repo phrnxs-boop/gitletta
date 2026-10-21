@@ -176,7 +176,8 @@ async function handleEvent(event: any, eventType: string): Promise<EventResult> 
               tenant_id: tenantId,
               amount: Number(payment.amount ?? 0) / 100,
               currency: payment.currency ?? "INR",
-              status: "captured",
+              // "succeeded" is the status the Super Admin dashboard counts.
+              status: "succeeded",
               payment_method: "razorpay",
               transaction_id: String(payment.id),
               plan_id: planId,

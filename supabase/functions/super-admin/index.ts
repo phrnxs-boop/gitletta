@@ -291,14 +291,20 @@ async function getCrm(req: Request) {
   if ("error" in core) return json(req, { error: core.error }, 500);
   const { tenants, perTenant, ownerByTenant, payments } = core;
 
-  const { data: menuCounts } = await admin()
+  // The error is checked on purpose. A query that fails and is ignored turns
+  // into a confident zero, and the directory then says every restaurant has
+  // no menu and no staff — which looks like truth.
+  const { data: menuCounts, error: menuCountError } = await admin()
     .from("menu_items")
     .select("tenant_id")
     .limit(5000);
-  const { data: staffCounts } = await admin()
+  if (menuCountError) return json(req, { error: menuCountError.message }, 500);
+
+  const { data: staffCounts, error: staffCountError } = await admin()
     .from("staff")
     .select("tenant_id")
     .limit(5000);
+  if (staffCountError) return json(req, { error: staffCountError.message }, 500);
 
   const menuByTenant = new Map<string, number>();
   for (const m of menuCounts ?? []) {
@@ -448,7 +454,11 @@ async function getConversion(req: Request) {
   if ("error" in core) return json(req, { error: core.error }, 500);
   const { tenants, perTenant, ownerByTenant } = core;
 
-  const { data: menuRows } = await admin().from("menu_items").select("tenant_id").limit(5000);
+  const { data: menuRows, error: menuRowsError } = await admin()
+    .from("menu_items")
+    .select("tenant_id")
+    .limit(5000);
+  if (menuRowsError) return json(req, { error: menuRowsError.message }, 500);
   const tenantsWithMenu = new Set((menuRows ?? []).map((m) => m.tenant_id));
 
   const signedUp = tenants.length;
@@ -458,24 +468,41 @@ async function getConversion(req: Request) {
   const trial = tenants.filter((t) => t.subscription_status === "trial").length;
   const paid = tenants.filter((t) => t.subscription_status === "active").length;
 
+  // The funnel is the activation path, and every step of it is a subset of
+  // the one before. "On a trial" and "became a paying customer" are not part
+  // of that path — a restaurant can be on a trial without ever having taken
+  // an order — so they are reported as their own pair rather than as steps.
+  //
+  // They used to be steps, and because a trial is not a subset of "took first
+  // order", the step rate came out at 150% and the drop-off at minus three.
   const stages = [
     { key: "signup", label: "Signed up", count: signedUp },
     { key: "onboarding", label: "Completed onboarding", count: completedOnboarding },
     { key: "menu", label: "Published a menu", count: publishedMenu },
     { key: "first_order", label: "Took first order", count: firstOrder },
-    { key: "trial", label: "On a trial", count: trial },
-    { key: "paid", label: "Became a paying customer", count: paid },
   ];
 
   return json(req, {
-    stages: stages.map((s, i) => ({
-      ...s,
-      rate: signedUp ? +((s.count / signedUp) * 100).toFixed(1) : 0,
-      stepRate: i === 0 || !stages[i - 1].count
-        ? 100
-        : +((s.count / stages[i - 1].count) * 100).toFixed(1),
-      dropOff: i === 0 ? 0 : stages[i - 1].count - s.count,
-    })),
+    stages: stages.map((s, i) => {
+      const previous = stages[i - 1]?.count ?? 0;
+      // The counts are capped so that no step can report a step rate over a
+      // hundred or a drop-off below zero, whatever the data does.
+      const stepRate =
+        i === 0 || !previous ? 100 : Math.min(100, +((s.count / previous) * 100).toFixed(1));
+      return {
+        ...s,
+        rate: signedUp ? +((s.count / signedUp) * 100).toFixed(1) : 0,
+        stepRate,
+        dropOff: i === 0 ? 0 : Math.max(0, previous - s.count),
+      };
+    }),
+    // The subscription cut, as a share of everybody who signed up.
+    monetisation: {
+      trial,
+      paid,
+      trialRate: signedUp ? +((trial / signedUp) * 100).toFixed(1) : 0,
+      paidRate: signedUp ? +((paid / signedUp) * 100).toFixed(1) : 0,
+    },
     totals: { signedUp, completedOnboarding, publishedMenu, firstOrder, trial, paid },
   });
 }
@@ -652,10 +679,11 @@ async function getRetention(req: Request) {
   const in14 = now - 14 * DAY;
   const in7 = now + 7 * DAY;
 
-  const { data: logRows } = await admin()
+  const { data: logRows, error: logRowsError } = await admin()
     .from("security_logs")
     .select("tenant_id, action, created_at")
     .limit(20000);
+  if (logRowsError) return json(req, { error: logRowsError.message }, 500);
   const lastLoginByTenant = new Map<string, string>();
   for (const l of logRows ?? []) {
     if (l.action !== "LOGIN" && l.action !== "LOGIN_SUCCESS") continue;
@@ -764,7 +792,10 @@ async function getReports(req: Request) {
     .limit(20000);
   if (error) return json(req, { error: error.message }, 500);
 
-  const { data: tenants } = await db.from("tenants").select("id, name, plan");
+  const { data: tenants, error: tenantsError } = await db
+    .from("tenants")
+    .select("id, name, plan");
+  if (tenantsError) return json(req, { error: tenantsError.message }, 500);
   const nameById = new Map((tenants ?? []).map((t) => [t.id, t.name]));
 
   const byTenant = new Map<string, { orders: number; revenue: number; completed: number }>();
@@ -827,7 +858,10 @@ async function getCsvReport(req: Request) {
       .lte("created_at", new Date(`${to}T23:59:59Z`).toISOString())
       .limit(20000);
     if (error) return json(req, { error: error.message }, 500);
-    const { data: tenants } = await db.from("tenants").select("id, name");
+    const { data: tenants, error: tenantsError } = await db
+      .from("tenants")
+      .select("id, name");
+    if (tenantsError) return json(req, { error: tenantsError.message }, 500);
     const nameById = new Map((tenants ?? []).map((t) => [t.id, t.name]));
     const csv = toCsv(
       ["Date", "Restaurant", "Order", "Status", "Type", "Total"],

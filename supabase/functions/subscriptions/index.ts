@@ -307,7 +307,10 @@ async function verify(req: Request, tenantId: string): Promise<Response> {
         tenant_id: tenantId,
         amount: Number(planRow?.price_monthly ?? 0),
         currency: planRow?.currency ?? "INR",
-        status: "captured",
+        // "succeeded" is the status the Super Admin dashboard already counts
+        // for revenue and for paid subscribers. Writing a different word
+        // here would leave the MRR at zero after a real payment.
+        status: "succeeded",
         payment_method: "razorpay",
         transaction_id: razorpayPaymentId,
         plan_id: planId,

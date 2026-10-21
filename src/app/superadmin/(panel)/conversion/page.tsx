@@ -15,6 +15,13 @@ type Conversion = {
     stepRate: number
     dropOff: number
   }[]
+  /** The subscription cut — not part of the activation funnel. */
+  monetisation: {
+    trial: number
+    paid: number
+    trialRate: number
+    paidRate: number
+  }
   totals: Record<string, number>
 }
 
@@ -111,6 +118,15 @@ export default function SuperAdminConversion() {
             </Panel>
 
             <Panel title="Where people stop" description="The step that loses the most.">
+              {t && (
+                <p className="mb-3 rounded-lg bg-admin-elevated px-2.5 py-2 text-[12px] leading-relaxed text-admin-muted">
+                  <span className="font-medium text-admin-fg-body">{data?.monetisation?.trial ?? t.trial ?? 0}</span>{' '}
+                  of {t.signedUp ?? 0} signed-up restaurants are on a trial, and{' '}
+                  <span className="font-medium text-admin-fg-body">{data?.monetisation?.paid ?? t.paid ?? 0}</span> are
+                  paying. A trial is not a step in the activation funnel, so it is counted here
+                  rather than in the funnel.
+                </p>
+              )}
               {worst && worst.label ? (
                 <div className="space-y-3">
                   <div>
