@@ -172,15 +172,15 @@ export function RolesView() {
       <div className={cn(
         'overflow-hidden transition-all duration-200 ease-out px-3.5 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3',
         // The expanded height has to clear the tallest layout this grid takes.
-        // It is one row from md up (four columns, ~128px), but two rows on a
-        // phone (two columns, ~192px) — and a single max-h-32 cut the second row
-        // in half, which read as the role chips sitting on top of the cards.
-        collapsed ? 'max-h-0 opacity-0 pb-0' : 'max-h-[13rem] md:max-h-32 opacity-100 pb-3',
+        // It is one row from md up, but two rows on a phone — and the cap has
+        // to match the compact cards, or the collapse animation leaves a gap
+        // where the cards used to be.
+        collapsed ? 'max-h-0 opacity-0 pb-0' : 'max-h-[8.5rem] md:max-h-20 opacity-100 pb-3',
       )}>
-        <StatCard icon={<Shield className="h-4 w-4" />} label="Total Roles" value={roles.length} tint="#f97316" />
-        <StatCard icon={<ShieldCheck className="h-4 w-4" />} label="System Roles" value={systemCount} tint="#4ade80" />
-        <StatCard icon={<ShieldPlus className="h-4 w-4" />} label="Custom Roles" value={customCount} tint="#60a5fa" />
-        <StatCard icon={<Users className="h-4 w-4" />} label="Total Staff" value={staff.length > 0 ? staff.length : users.length} tint="#fbbf24" />
+        <StatCard icon={<Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} label="Total Roles" value={roles.length} tint="#f97316" />
+        <StatCard icon={<ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} label="System Roles" value={systemCount} tint="#4ade80" />
+        <StatCard icon={<ShieldPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} label="Custom Roles" value={customCount} tint="#60a5fa" />
+        <StatCard icon={<Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} label="Total Staff" value={staff.length > 0 ? staff.length : users.length} tint="#fbbf24" />
       </div>
 
       {/* Two-column layout (desktop) + horizontal pills (mobile) */}
@@ -190,7 +190,7 @@ export function RolesView() {
         <div className="lg:hidden flex flex-col gap-3 h-full min-h-0">
           {/* Scrolls on its own, so a long role list never widens the page. */}
           <div className="shrink-0 -mx-3.5 px-3.5 overflow-x-auto overscroll-x-contain scrollbar-thin">
-            <div className="flex gap-2 py-1 w-max min-w-full">
+            <div className="flex gap-1.5 py-1 w-max min-w-full">
               {roles.map((role) => {
                 const active = role.id === (selectedRole?.id ?? null)
                 return (
@@ -198,24 +198,24 @@ export function RolesView() {
                     key={role.id}
                     onClick={() => setSelectedId(role.id)}
                     className={cn(
-                      'shrink-0 inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition-all min-h-[40px]',
+                      'shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[13px] transition-all min-h-[32px]',
                       active
                         ? 'border-primary/50 bg-primary/10 text-foreground ring-1 ring-primary/30'
                         : 'border-border bg-secondary/40 text-foreground hover:bg-secondary',
                     )}
                   >
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: role.color }} />
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: role.color }} />
                     <span className="font-medium whitespace-nowrap">{role.name}</span>
-                    {role.isSystem && <Lock className="h-3 w-3 text-muted-foreground shrink-0" />}
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">({memberCounts[role.id] || 0})</span>
+                    {role.isSystem && <Lock className="h-2.5 w-2.5 text-muted-foreground shrink-0" />}
+                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">({memberCounts[role.id] || 0})</span>
                   </button>
                 )
               })}
               <button
                 onClick={() => setCreateOpen(true)}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors min-h-[40px]"
+                className="shrink-0 inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1.5 text-[13px] text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors min-h-[32px]"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3 w-3" />
                 <span className="whitespace-nowrap">New</span>
               </button>
             </div>
@@ -316,17 +316,21 @@ export function RolesView() {
 
 function StatCard({ icon, label, value, tint }: { icon: React.ReactNode; label: string; value: number; tint: string }) {
   return (
-    <Card className="rounded-2xl bg-card border-border p-4">
-      <div className="flex items-center gap-3">
+    // The Card primitive ships with py-6 and gap-6, which is a lot of air for a
+    // number and a label. Both are overridden here, and the type and the icon
+    // are sized for a phone — four of these used to take a third of the
+    // screen.
+    <Card className="rounded-2xl bg-card border-border p-2.5 gap-0 sm:p-3">
+      <div className="flex items-center gap-2.5 sm:gap-3">
         <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center"
+          className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0"
           style={{ backgroundColor: `${tint}1a`, color: tint }}
         >
           {icon}
         </div>
-        <div>
-          <p className="text-2xl font-bold leading-none">{value}</p>
-          <p className="text-xs text-muted-foreground mt-1">{label}</p>
+        <div className="min-w-0">
+          <p className="text-lg sm:text-xl font-bold leading-none">{value}</p>
+          <p className="text-[10.5px] sm:text-xs text-muted-foreground mt-0.5 leading-tight truncate">{label}</p>
         </div>
       </div>
     </Card>
@@ -491,25 +495,25 @@ function RoleDetail({
   }
 
   return (
-    <Card className="rounded-2xl bg-card border-border h-full flex flex-col overflow-hidden">
+    <Card className="rounded-2xl bg-card border-border h-full flex flex-col overflow-hidden py-0 gap-0">
       {/* Role header */}
-      <div className="p-4 border-b border-border flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 min-w-0 flex-1">
+      <div className="p-3 sm:p-4 border-b border-border flex items-start justify-between gap-3">
+        <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
           <span
-            className="mt-1 w-4 h-4 rounded-full shrink-0 ring-2 ring-background"
+            className="mt-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full shrink-0 ring-2 ring-background"
             style={{ backgroundColor: color }}
           />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-semibold text-lg leading-tight truncate">{role.name}</h3>
+              <h3 className="font-semibold text-base sm:text-lg leading-tight truncate">{role.name}</h3>
               {isSystem && (
-                <Badge variant="secondary" className="text-[10px] h-5 bg-secondary/80">
-                  <Lock className="h-3 w-3" />
+                <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-secondary/80">
+                  <Lock className="h-2.5 w-2.5" />
                   System Role
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{description || 'No description provided'}</p>
+            <p className="text-[13px] sm:text-sm text-muted-foreground mt-0.5 line-clamp-2">{description || 'No description provided'}</p>
           </div>
         </div>
         {!isSystem && (
@@ -520,9 +524,9 @@ function RoleDetail({
       </div>
 
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
-        <div className="p-4 space-y-5">
+        <div className="p-3 sm:p-4 space-y-3.5 sm:space-y-5">
           {/* Role meta */}
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid sm:grid-cols-2 gap-2.5 sm:gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Role Name</Label>
               <Input
@@ -542,12 +546,12 @@ function RoleDetail({
                     disabled={isSystem}
                     onClick={() => setColor(c)}
                     className={cn(
-                      'w-7 h-7 rounded-full ring-2 ring-offset-2 ring-offset-card transition-all disabled:opacity-40',
+                      'w-6 h-6 sm:w-7 sm:h-7 rounded-full ring-2 ring-offset-2 ring-offset-card transition-all disabled:opacity-40',
                       color === c ? 'ring-foreground scale-110' : 'ring-transparent hover:scale-105'
                     )}
                     style={{ backgroundColor: c }}
                   >
-                    {color === c && <Check className="h-3.5 w-3.5 text-white mx-auto" />}
+                    {color === c && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white mx-auto" />}
                   </button>
                 ))}
               </div>
