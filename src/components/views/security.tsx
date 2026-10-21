@@ -127,7 +127,7 @@ export function SecurityView() {
       <div
         className={cn(
           'shrink-0 px-3.5 md:px-6 flex items-center justify-between gap-3 flex-wrap transition-all duration-200 ease-out',
-          collapsed ? 'pt-1.5 pb-1.5' : 'pt-3 md:pt-6 pb-2.5',
+          collapsed ? 'pt-1.5 pb-1.5' : 'pt-2.5 md:pt-5 pb-2',
         )}
       >
         <div className="min-w-0">
@@ -151,8 +151,8 @@ export function SecurityView() {
             Sessions, two-factor authentication & activity audit
           </p>
         </div>
-        <Button variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setRevokeAllOpen(true)}>
-          <LogOut className="h-4 w-4" />
+        <Button variant="outline" className="h-8 shrink-0 px-2.5 text-[13px] border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setRevokeAllOpen(true)}>
+          <LogOut className="h-3.5 w-3.5" />
           Revoke All Sessions
         </Button>
       </div>
@@ -160,26 +160,29 @@ export function SecurityView() {
       {/* Top stats — collapse away when header is collapsed */}
       <div
         className={cn(
-          'shrink-0 px-3.5 md:px-6 grid grid-cols-2 md:grid-cols-4 gap-3 transition-all duration-200 ease-out',
+          // Three cards, so three columns from md up rather than four with a
+          // hole in the row. The cap is sized to the compact cards so the
+          // collapse animation does not leave a gap behind them.
+          'shrink-0 px-3.5 md:px-6 grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 transition-all duration-200 ease-out',
           collapsed
             ? 'max-h-0 pb-0 opacity-0 overflow-hidden'
-            : 'max-h-48 pb-3 opacity-100',
+            : 'max-h-[8.5rem] pb-2 opacity-100',
         )}
       >
-        <StatCard icon={<Monitor className="h-4 w-4" />} label="Active Sessions" value={sessions.length} tint="#ff7e6b" />
-        <StatCard icon={<Activity className="h-4 w-4" />} label="Security Events" value={logs.length} tint="#60a5fa" />
-        <StatCard icon={<ShieldAlert className="h-4 w-4" />} label="Failed Logins" value={failedLoginCount} tint="#ef4444" />
+        <StatCard icon={<Monitor className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} label="Active Sessions" value={sessions.length} tint="#ff7e6b" />
+        <StatCard icon={<Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} label="Security Events" value={logs.length} tint="#60a5fa" />
+        <StatCard icon={<ShieldAlert className="h-3.5 w-3.5 sm:h-4 sm:w-4" />} label="Failed Logins" value={failedLoginCount} tint="#ef4444" />
       </div>
 
       {/* Main scroll area: two-column grid + activity log */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pb-4 md:pb-6 space-y-4">
-        <div className="grid lg:grid-cols-2 gap-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pb-4 md:pb-6 space-y-3">
+        <div className="grid lg:grid-cols-2 gap-3">
           {/* Sessions */}
-          <Card className="rounded-2xl bg-card border-border flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-border flex items-center justify-between gap-2">
+          <Card className="rounded-2xl bg-card border-border flex flex-col overflow-hidden py-0 gap-0">
+            <div className="p-3 sm:p-4 border-b border-border flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <Monitor className="h-4 w-4 text-primary shrink-0" />
+                <h3 className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                  <Monitor className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
                   <span className="truncate">Active Sessions</span>
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">Devices currently signed in</p>
@@ -187,11 +190,11 @@ export function SecurityView() {
               <Badge variant="secondary" className="bg-secondary/70 shrink-0">{sessions.length}</Badge>
             </div>
             <div className="lg:max-h-[440px] overflow-y-auto scrollbar-thin">
-              <div className="p-3 space-y-2">
+              <div className="p-2.5 sm:p-3 space-y-2">
                 {sessions.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Monitor className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
-                    <p className="text-sm text-muted-foreground">No active sessions</p>
+                  <div className="text-center py-6">
+                    <Monitor className="h-7 w-7 text-muted-foreground mx-auto mb-2 opacity-50" />
+                    <p className="text-[13px] text-muted-foreground">No active sessions</p>
                   </div>
                 ) : (
                   sessions.map((s) => (
@@ -210,11 +213,11 @@ export function SecurityView() {
         </div>
 
         {/* Recent activity */}
-        <Card className="rounded-2xl bg-card border-border flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center justify-between gap-2">
+        <Card className="rounded-2xl bg-card border-border flex flex-col overflow-hidden py-0 gap-0">
+          <div className="p-3 sm:p-4 border-b border-border flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Activity className="h-4 w-4 text-primary shrink-0" />
+              <h3 className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
                 <span className="truncate">Recent Activity Log</span>
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">Audit trail of security events</p>
@@ -222,11 +225,11 @@ export function SecurityView() {
             <Badge variant="secondary" className="bg-secondary/70 shrink-0">{logs.length} events</Badge>
           </div>
           <div className="max-h-80 overflow-y-auto scrollbar-thin">
-            <div className="p-4">
+            <div className="p-3 sm:p-4">
               {logs.length === 0 ? (
-                <div className="text-center py-10">
-                  <Activity className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
-                  <p className="text-sm text-muted-foreground">No activity recorded yet</p>
+                <div className="text-center py-6">
+                  <Activity className="h-7 w-7 text-muted-foreground mx-auto mb-2 opacity-50" />
+                  <p className="text-[13px] text-muted-foreground">No activity recorded yet</p>
                 </div>
               ) : (
                 <div className="relative pl-4">
@@ -273,17 +276,20 @@ export function SecurityView() {
 
 function StatCard({ icon, label, value, tint = '#ff7e6b', sub }: { icon: React.ReactNode; label: string; value: number; tint?: string; sub?: string }) {
   return (
-    <Card className="rounded-2xl bg-card border-border p-4">
-      <div className="flex items-center gap-3">
+    // The Card primitive ships with py-6 and gap-6, which is a lot of air
+    // for a number and a label. Both are overridden here, and the type and the
+    // icon are sized for a phone.
+    <Card className="rounded-2xl bg-card border-border p-2.5 gap-0 sm:p-3">
+      <div className="flex items-center gap-2.5 sm:gap-3">
         <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center"
+          className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0"
           style={{ backgroundColor: `${tint}1a`, color: tint }}
         >
           {icon}
         </div>
         <div className="min-w-0">
-          <p className="text-2xl font-bold leading-none tabular-nums">{value}</p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-lg sm:text-xl font-bold leading-none tabular-nums">{value}</p>
+          <p className="text-[10.5px] sm:text-xs text-muted-foreground mt-0.5 leading-tight truncate">
             {label}{sub ? <span className="opacity-70"> · {sub}</span> : null}
           </p>
         </div>
