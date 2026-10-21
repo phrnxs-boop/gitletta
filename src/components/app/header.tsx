@@ -114,7 +114,9 @@ export function Header() {
               >
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">{t.name}</span>
-                  <span className="text-xs text-muted-foreground">{t.plan} plan</span>
+                  <span className="text-xs text-muted-foreground">
+                    {(t.plan || '').charAt(0).toUpperCase() + (t.plan || '').slice(1)} plan
+                  </span>
                 </div>
                 {t.id === tenant.id && <Check className="h-4 w-4 text-primary" />}
               </DropdownMenuItem>

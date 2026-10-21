@@ -1,6 +1,8 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { ArrowRight, ArrowUpRight, Check, QrCode, BarChart3, Users, Smartphone } from 'lucide-react'
+import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { cn } from '@/lib/utils'
@@ -275,34 +277,95 @@ function Showcase() {
 /*  Pricing                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const PLANS = [
+type MarketingPlan = {
+  id: string
+  name: string
+  description: string | null
+  priceMonthly: number
+  currency: string
+  features: string[]
+  popular: boolean
+}
+
+/**
+ * The pricing, if the catalogue cannot be reached.
+ *
+ * The real list comes from the plan catalogue, which is the only copy — the
+ * landing page and the billing tab used to have their own, and they
+ * disagreed with each other and with the catalogue. This is only here so a
+ * failed request leaves a sensible page rather than an empty one, and it
+ * matches the catalogue.
+ */
+const FALLBACK_PLANS: MarketingPlan[] = [
   {
+    id: 'starter',
     name: 'Starter',
-    price: '₹999',
-    period: '/mo',
-    desc: 'One location, getting started',
-    features: ['Up to 50 menu items', 'QR table ordering', 'Staff dashboard', 'Basic analytics'],
+    description: 'One location, getting started',
+    priceMonthly: 999,
+    currency: 'INR',
+    features: [
+      'AI menu scanning with instant extraction',
+      'Up to 100 menu items',
+      '1 restaurant location',
+      'Up to 5 staff members with roles',
+      'Basic analytics',
+      'Email support',
+      'QR ordering',
+      'Kitchen display',
+    ],
     popular: false,
   },
   {
+    id: 'pro',
     name: 'Pro',
-    price: '₹2,499',
-    period: '/mo',
-    desc: 'Busy restaurants that need everything',
-    features: ['Unlimited menu items', 'AI menu extraction', 'Unlimited staff & roles', 'Advanced analytics', 'Priority support'],
+    description: 'Busy restaurants that need everything',
+    priceMonthly: 2499,
+    currency: 'INR',
+    features: [
+      'Unlimited menu items',
+      'Up to 3 restaurant locations',
+      'Unlimited staff members with roles',
+      'Advanced analytics',
+      'Priority support',
+      'All Starter features, including AI menu scanning, QR ordering, and kitchen display',
+    ],
     popular: true,
-  },
-  {
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    desc: 'Multi-location chains',
-    features: ['Everything in Pro', 'Unlimited locations', 'API access', 'Onboarding & SLA'],
-    popular: false,
   },
 ]
 
+/** The rupee sign where the currency is rupees, the code otherwise. */
+function priceLabel(plan: MarketingPlan): { price: string; period: string } {
+  if (!plan.priceMonthly) return { price: 'Custom', period: '' }
+  const n = plan.priceMonthly.toLocaleString('en-IN')
+  return {
+    price: plan.currency === 'INR' ? `\u20b9${n}` : `${plan.currency} ${n}`,
+    period: '/mo',
+  }
+}
+
 function Pricing() {
+  const [plans, setPlans] = useState<MarketingPlan[]>(FALLBACK_PLANS)
+
+  // The plan catalogue is the only copy of the pricing. The fallback above is
+  // only used if the request fails, so the page never renders empty.
+  useEffect(() => {
+    let cancelled = false
+    edgeFetch('/api/plans')
+      .then((res) => res.json())
+      .then((body: { plans?: MarketingPlan[] }) => {
+        if (cancelled) return
+        if (Array.isArray(body?.plans) && body.plans.length) {
+          setPlans(body.plans)
+        }
+      })
+      .catch(() => {
+        /* the fallback is already in place */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <section id="pricing" className="border-t border-white/[0.06]">
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
@@ -313,43 +376,57 @@ function Pricing() {
           </h2>
         </div>
 
-        <div className="mt-12 grid gap-6 lg:grid-cols-3">
-          {PLANS.map((plan) => (
-            <div
-              key={plan.name}
-              className={cn(
-                'flex flex-col rounded-2xl border p-7',
-                plan.popular ? 'border-primary/40 bg-primary/[0.04]' : 'border-white/[0.08] bg-white/[0.015]',
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">{plan.name}</h3>
-                {plan.popular && (
-                  <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-medium text-primary">
-                    Most popular
-                  </span>
+        <div
+          className={cn(
+            'mt-12 grid gap-6',
+            // Three columns on a wide screen, two when there is room for them,
+            // and one on a phone. `sm:grid-cols-2` is what makes the second
+            // row a single card that spans the width, rather than a card
+            // squeezed into a column.
+            plans.length > 2 ? 'lg:grid-cols-3' : 'sm:grid-cols-2',
+          )}
+        >
+          {plans.map((plan) => {
+            const { price, period } = priceLabel(plan)
+            return (
+              <div
+                key={plan.id}
+                className={cn(
+                  'flex flex-col rounded-2xl border p-5 sm:p-6 lg:p-7',
+                  plan.popular ? 'border-primary/40 bg-primary/[0.04]' : 'border-white/[0.08] bg-white/[0.015]',
                 )}
-              </div>
-              <div className="mt-5 flex items-baseline gap-1">
-                <span className="text-3xl font-semibold tracking-tight">{plan.price}</span>
-                <span className="text-sm text-muted-foreground">{plan.period}</span>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">{plan.desc}</p>
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">{plan.name}</h3>
+                  {plan.popular && (
+                    <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-medium text-primary">
+                      Most popular
+                    </span>
+                  )}
+                </div>
+                <div className="mt-5 flex flex-wrap items-baseline gap-1">
+                  <span className="text-3xl font-semibold tracking-tight">{price}</span>
+                  {period && <span className="text-sm text-muted-foreground">{period}</span>}
+                </div>
+                {plan.description && (
+                  <p className="mt-2 text-xs text-muted-foreground">{plan.description}</p>
+                )}
 
-              <ul className="mt-6 flex-1 space-y-2.5">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex gap-2.5 text-sm text-muted-foreground">
-                    <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
+                <ul className="mt-6 flex-1 space-y-2.5">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex gap-2.5 text-sm text-muted-foreground">
+                      <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
 
-              <PrimaryCta className={cn('mt-8 w-full', !plan.popular && 'bg-white/10 text-foreground hover:bg-white/15 hover:text-foreground')}>
-                {plan.price === 'Custom' ? 'Contact us' : 'Start free'}
-              </PrimaryCta>
-            </div>
-          ))}
+                <PrimaryCta className={cn('mt-8 w-full', !plan.popular && 'bg-white/10 text-foreground hover:bg-white/15 hover:text-foreground')}>
+                  {price === 'Custom' ? 'Contact us' : 'Start free'}
+                </PrimaryCta>
+              </div>
+            )
+          })}
         </div>
       </div>
     </section>

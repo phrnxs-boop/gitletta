@@ -86,7 +86,7 @@ async function planRow(id: string): Promise<PlanRow | null> {
   const { data } = await admin()
     .from("subscription_plans")
     .select(
-      "id, name, price_monthly, currency, trial_days, features, is_active, max_locations, max_staff, max_menu_items, razorpay_plan_id",
+      "id, name, price_monthly, currency, trial_days, features, is_active, is_popular, max_locations, max_staff, max_menu_items, razorpay_plan_id",
     )
     .eq("id", id)
     .maybeSingle();
@@ -230,6 +230,7 @@ export async function planCatalogue() {
       staff: p.max_staff,
       menuItems: p.max_menu_items,
     },
+    popular: Boolean(p.is_popular),
     razorpayPlanId: p.razorpay_plan_id,
   }));
 }

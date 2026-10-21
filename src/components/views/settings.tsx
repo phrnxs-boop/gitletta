@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useApp } from '@/components/app/data-context'
+import { BillingView } from '@/components/views/billing'
 import { useStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
@@ -32,33 +33,6 @@ const CURRENCIES = [
   { code: 'INR', symbol: '₹' },
 ]
 
-const PLANS = [
-  {
-    id: 'STARTER',
-    name: 'Starter',
-    price: '₹999',
-    period: '/mo',
-    color: '#9aa3b2',
-    features: ['1 location', 'Up to 5 staff', 'Basic analytics', 'Email support'],
-  },
-  {
-    id: 'PRO',
-    name: 'Pro',
-    price: '₹2,499',
-    period: '/mo',
-    color: '#f97316',
-    features: ['3 locations', 'Unlimited staff', 'Advanced analytics', 'Priority support', 'QR ordering', 'Kitchen display'],
-    popular: true,
-  },
-  {
-    id: 'ENTERPRISE',
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    color: '#c084fc',
-    features: ['Unlimited locations', 'SSO & SAML', 'Dedicated manager', '99.9% SLA', 'Custom integrations'],
-  },
-]
 
 /**
  * Timezone options, India first.
@@ -860,91 +834,31 @@ export function SettingsView() {
           </TabsContent>
 
           <TabsContent value="billing" className="flex-1 mt-3 min-h-0">
+              {/* The real billing section. It used to be a copy here with its
+                  own prices, its own feature lists and buttons that only
+                  showed a toast — and it disagreed with the plan catalogue
+                  and with the landing page. There is one section now. */}
               <div className="max-w-4xl space-y-4">
-                <Card className="rounded-2xl bg-card border-border p-4 md:p-4 md:p-6">
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center"
-                        style={{ backgroundColor: `${PLANS.find((p) => p.id === currentPlan)?.color || '#f97316'}1a` }}
-                      >
-                        <CreditCard className="h-5 w-5" style={{ color: PLANS.find((p) => p.id === currentPlan)?.color || '#f97316' }} />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Current Plan</p>
-                        <p className="text-xl font-bold">{PLANS.find((p) => p.id === currentPlan)?.name ?? currentPlan}</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      Active
-                    </Badge>
-                  </div>
-                </Card>
+                <BillingView />
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {PLANS.map((plan) => {
-                    const isCurrent = plan.id === currentPlan
-                    return (
-                      <Card
-                        key={plan.id}
-                        className={cn(
-                          'rounded-2xl p-5 relative flex flex-col',
-                          isCurrent ? 'border-2 bg-card' : 'border border-border bg-card'
-                        )}
-                        style={isCurrent ? { borderColor: plan.color } : undefined}
-                      >
-                        {plan.popular && !isCurrent && (
-                          <Badge className="absolute -top-2.5 left-5 bg-primary text-primary-foreground">
-                            <Sparkles className="h-3 w-3" /> Popular
-                          </Badge>
-                        )}
-                        {isCurrent && (
-                          <Badge
-                            className="absolute -top-2.5 left-5"
-                            style={{ backgroundColor: plan.color, color: '#fff' }}
-                          >
-                            <Check className="h-3 w-3" /> Current
-                          </Badge>
-                        )}
-                        <div className="mb-3">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: plan.color }} />
-                            <h3 className="font-semibold">{plan.name}</h3>
-                          </div>
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-bold">{plan.price}</span>
-                            <span className="text-sm text-muted-foreground">{plan.period}</span>
-                          </div>
-                        </div>
-                        <ul className="space-y-2 text-sm flex-1">
-                          {plan.features.map((f) => (
-                            <li key={f} className="flex items-start gap-2">
-                              <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: plan.color }} />
-                              <span className="text-muted-foreground">{f}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        <Separator className="my-4" />
-                        <Button
-                          variant={isCurrent ? 'secondary' : 'default'}
-                          disabled={isCurrent}
-                          onClick={() => toast.success(`Upgrade to ${plan.name}`, { description: 'Our team will reach out to finalize your upgrade.' })}
-                          className={isCurrent ? '' : 'bg-primary hover:bg-primary/90'}
-                        >
-                          {isCurrent ? 'Current Plan' : `Upgrade to ${plan.name}`}
-                        </Button>
-                      </Card>
-                    )
-                  })}
-                </div>
-
-                <Card className="rounded-2xl bg-card border-border p-4 md:p-4 md:p-6">
+                <Card className="rounded-2xl bg-card border-border p-4 md:p-6">
                   <h3 className="font-semibold mb-4">Usage This Month</h3>
                   <div className="grid sm:grid-cols-3 gap-4">
-                    <UsageStat label="Staff Members" value={data.users.length} limit={currentPlan === 'STARTER' ? 5 : 50} />
-                    <UsageStat label="Menu Items" value={data.menuItems.length} limit={currentPlan === 'STARTER' ? 50 : 500} />
-                    <UsageStat label="Tables" value={data.tables.length} limit={currentPlan === 'STARTER' ? 10 : 100} />
+                    <UsageStat
+                      label="Staff Members"
+                      value={data.users.length}
+                      limit={data.subscription?.limits?.staff ?? null}
+                    />
+                    <UsageStat
+                      label="Menu Items"
+                      value={data.menuItems.length}
+                      limit={data.subscription?.limits?.menuItems ?? null}
+                    />
+                    <UsageStat
+                      label="Locations"
+                      value={1}
+                      limit={data.subscription?.limits?.locations ?? null}
+                    />
                   </div>
                 </Card>
               </div>
@@ -1051,25 +965,34 @@ function Field({ label, icon, children }: { label: string; icon?: React.ReactNod
   )
 }
 
-function UsageStat({ label, value, limit }: { label: string; value: number; limit: number }) {
-  const pct = Math.min(100, Math.round((value / limit) * 100))
-  const over = value >= limit
+function UsageStat({ label, value, limit }: { label: string; value: number; limit: number | null }) {
+  // A null limit means the plan does not cap this — Pro has unlimited staff
+  // and unlimited menu items — and dividing by it would be nonsense.
+  const unlimited = limit === null || limit === undefined
+  const pct = unlimited ? 0 : Math.min(100, Math.round((value / limit) * 100))
+  const over = !unlimited && value >= limit
   return (
     <div className="rounded-xl border border-border bg-secondary/30 p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-lg font-bold mt-0.5">
         {value}
-        <span className="text-sm text-muted-foreground font-normal"> / {limit}</span>
+        <span className="text-sm text-muted-foreground font-normal">
+          {unlimited ? ' · unlimited' : ` / ${limit}`}
+        </span>
       </p>
-      <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
-        <div
-          className={cn('h-full rounded-full', over ? 'bg-destructive' : 'bg-primary')}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <p className={cn('text-xs mt-1.5', over ? 'text-destructive' : 'text-muted-foreground')}>
-        {over ? 'Limit reached — upgrade plan' : `${pct}% used`}
-      </p>
+      {!unlimited && (
+        <>
+          <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
+            <div
+              className={cn('h-full rounded-full', over ? 'bg-destructive' : 'bg-primary')}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className={cn('text-xs mt-1.5', over ? 'text-destructive' : 'text-muted-foreground')}>
+            {over ? 'Limit reached — upgrade plan' : `${pct}% used`}
+          </p>
+        </>
+      )}
     </div>
   )
 }

@@ -31,6 +31,7 @@ type Plan = {
   trialDays: number
   features: string[]
   limits: PlanLimits
+  popular: boolean
   razorpayPlanId: string | null
 }
 
@@ -440,7 +441,7 @@ export function BillingView() {
                       {isCurrent && (
                         <Badge className="bg-primary/15 text-[10px] text-primary">Current</Badge>
                       )}
-                      {plan.id === 'pro' && !isCurrent && (
+                        {plan.popular && !isCurrent && (
                         <Badge className="bg-amber-500/15 text-[10px] text-amber-600">Popular</Badge>
                       )}
                     </div>
