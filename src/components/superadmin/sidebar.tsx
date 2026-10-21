@@ -152,7 +152,7 @@ export function Sidebar({
     <>
       {/* Desktop */}
       <aside className="hidden w-64 shrink-0 lg:block">
-        <div className="sticky top-0 h-screen">{nav}</div>
+        <div className="sticky top-0 h-[100dvh]">{nav}</div>
       </aside>
 
       {/* Mobile drawer */}

@@ -304,7 +304,7 @@ export function OrdersView() {
                   key={tab.key}
                   onClick={() => setStatusFilter(tab.key)}
                   className={cn(
-                    'shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all flex items-center gap-1.5',
+                    'shrink-0 rounded-lg px-3 py-1.5 min-h-8 text-xs font-medium transition-all flex items-center gap-1.5',
                     active
                       ? 'bg-primary/15 text-primary'
                       : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -330,7 +330,7 @@ export function OrdersView() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t('orders.search')}
-                className="bg-transparent outline-none text-sm flex-1 placeholder:text-muted-foreground"
+                className="bg-transparent outline-none text-sm h-8 flex-1 placeholder:text-muted-foreground"
               />
               {search && (
                 <button onClick={() => setSearch('')}>

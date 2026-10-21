@@ -138,7 +138,7 @@ export function RolesView() {
             <button
               onClick={() => setActiveTab('roles')}
               className={cn(
-                'flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-premium',
+                'flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 min-h-8 text-xs font-medium whitespace-nowrap transition-premium',
                 activeTab === 'roles' ? 'bg-primary text-white shadow-glow-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -147,7 +147,7 @@ export function RolesView() {
             <button
               onClick={() => setActiveTab('staff')}
               className={cn(
-                'flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-premium',
+                'flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 min-h-8 text-xs font-medium whitespace-nowrap transition-premium',
                 activeTab === 'staff' ? 'bg-primary text-white shadow-glow-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -546,7 +546,7 @@ function RoleDetail({
                     disabled={isSystem}
                     onClick={() => setColor(c)}
                     className={cn(
-                      'w-6 h-6 sm:w-7 sm:h-7 rounded-full ring-2 ring-offset-2 ring-offset-card transition-all disabled:opacity-40',
+                      'w-7 h-7 sm:w-7 sm:h-7 rounded-full ring-2 ring-offset-2 ring-offset-card transition-all disabled:opacity-40',
                       color === c ? 'ring-foreground scale-110' : 'ring-transparent hover:scale-105'
                     )}
                     style={{ backgroundColor: c }}

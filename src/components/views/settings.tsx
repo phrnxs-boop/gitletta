@@ -390,7 +390,7 @@ export function SettingsView() {
       {/* Tabs — the wrapper is the scroll container; TabsList sticks to the top */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pb-3 md:pb-6 min-h-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col">
-          <TabsList className="flex w-full md:w-auto overflow-x-auto scrollbar-thin justify-start gap-1 bg-background/95 backdrop-blur-sm border border-border self-start sticky top-0 z-10">
+          <TabsList className="flex w-full md:w-auto overflow-x-auto scrollbar-thin justify-start gap-1 h-11 sm:h-9 bg-background/95 backdrop-blur-sm border border-border self-start sticky top-0 z-10">
             <TabsTrigger value="profile" className="flex-none whitespace-nowrap px-3"><User className="h-3.5 w-3.5" /> Profile</TabsTrigger>
             <TabsTrigger value="preferences" className="flex-none whitespace-nowrap px-3"><Palette className="h-3.5 w-3.5" /> Preferences</TabsTrigger>
             <TabsTrigger value="restaurant" className="flex-none whitespace-nowrap px-3"><Store className="h-3.5 w-3.5" /> Restaurant</TabsTrigger>

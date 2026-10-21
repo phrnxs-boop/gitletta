@@ -417,13 +417,13 @@ export function MenuView() {
 
         {/* Search + category filter — stack on mobile, row on sm+ */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <div className="flex items-center gap-2 bg-secondary/60 rounded-xl px-3 py-2 flex-1 min-w-0">
+          <div className="flex items-center gap-2 bg-secondary/60 rounded-xl px-3 py-1 flex-1 min-w-0">
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search menu items…"
-              className="bg-transparent outline-none text-sm flex-1 min-w-0 placeholder:text-muted-foreground"
+              className="bg-transparent outline-none text-sm h-8 flex-1 min-w-0 placeholder:text-muted-foreground"
             />
             {search && (
               <button onClick={() => setSearch('')} aria-label="Clear search" className="shrink-0">
@@ -1028,7 +1028,7 @@ function MenuCard({
           )}
           {!item.available && (
             <span className="absolute inset-0 rounded-full bg-background/60 flex items-center justify-center">
-              <span className="text-[9px] font-semibold uppercase text-muted-foreground">Hidden</span>
+              <span className="text-[10px] font-semibold uppercase text-muted-foreground">Hidden</span>
             </span>
           )}
         </div>

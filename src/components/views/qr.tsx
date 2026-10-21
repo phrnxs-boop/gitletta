@@ -397,7 +397,7 @@ export function QrView() {
       {/* Main content with tabs */}
       <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col min-h-0">
         <div className="px-3.5 md:px-6 pt-3 shrink-0 flex items-center justify-between">
-          <TabsList className="bg-secondary/50">
+          <TabsList className="bg-secondary/50 h-11 sm:h-9">
             <TabsTrigger value="grid" className="gap-1.5 text-xs">
               <LayoutGrid className="h-3.5 w-3.5" />
               By Table
@@ -773,13 +773,13 @@ function OverviewList({
                 <span className="text-muted-foreground text-xs">{it.seats}</span>
                 <span className="text-muted-foreground text-xs font-mono truncate">{it.qrUrl || '—'}</span>
                 <div className="flex items-center justify-end gap-1">
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(it)} aria-label={`Edit ${it.name}`}>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onEdit(it)} aria-label={`Edit ${it.name}`}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDownload(it)} aria-label={`Download ${it.name} PNG`}>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onDownload(it)} aria-label={`Download ${it.name} PNG`}>
                     <Download className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onCopy(it.qrUrl)} aria-label={`Copy ${it.name} link`}>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onCopy(it.qrUrl)} aria-label={`Copy ${it.name} link`}>
                     <LinkIcon className="h-3.5 w-3.5" />
                   </Button>
                 </div>

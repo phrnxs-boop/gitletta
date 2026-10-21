@@ -21,7 +21,9 @@ export function AdminShell({
   const [navOpen, setNavOpen] = useState(false)
 
   return (
-    <div className="flex min-h-screen bg-admin-bg text-admin-fg">
+    // 100dvh, not 100vh: on a phone the browser chrome takes the top and
+    // bottom of the screen, and a 100vh rail runs off under it.
+    <div className="flex min-h-[100dvh] bg-admin-bg text-admin-fg">
       <Sidebar navOpen={navOpen} onClose={() => setNavOpen(false)} identity={identity} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onOpenNav={() => setNavOpen(true)} identity={identity} />

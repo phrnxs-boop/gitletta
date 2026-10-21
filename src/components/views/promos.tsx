@@ -274,13 +274,13 @@ export function PromosView() {
               : 'max-h-20 opacity-100 mt-3',
           )}
         >
-          <div className="flex items-center gap-2 bg-secondary/60 rounded-xl px-3 py-2 max-w-md">
+          <div className="flex items-center gap-2 bg-secondary/60 rounded-xl px-3 py-1 max-w-md">
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search promo codes…"
-              className="bg-transparent outline-none text-sm flex-1 placeholder:text-muted-foreground"
+              className="bg-transparent outline-none text-sm h-8 flex-1 placeholder:text-muted-foreground"
             />
             {search && (
               <button onClick={() => setSearch('')} aria-label="Clear search">

@@ -328,7 +328,7 @@ export function DashboardView() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={tr('pos.search')}
-              className="bg-transparent outline-none text-sm flex-1 placeholder:text-muted-foreground min-w-0"
+              className="bg-transparent outline-none text-sm h-8 flex-1 placeholder:text-muted-foreground min-w-0"
             />
             {search && <button onClick={() => setSearch('')} className="shrink-0"><X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" /></button>}
           </div>
@@ -563,7 +563,7 @@ function CategoryPill({ active, onClick, icon, label, count }: { active: boolean
       <span className={cn('text-sm transition-transform group-hover:scale-110', active && 'drop-shadow')}>{icon}</span>
       <span className="whitespace-nowrap">{label}</span>
       <span className={cn(
-        'text-[9px] rounded-full px-1 py-0.5 font-semibold leading-none',
+        'text-[10px] rounded-full px-1 py-0.5 font-semibold leading-none',
         active ? 'bg-white/20 text-white' : 'bg-secondary text-muted-foreground'
       )}>{count}</span>
     </button>
@@ -595,7 +595,7 @@ function MenuCard({ item, inCart, onAdd, currencySymbol = '₹' }: { item: any; 
         <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/5 pointer-events-none" />
         {/* rating overlay */}
         {item.rating > 0 && (
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-background/90 backdrop-blur border border-border px-1.5 py-0.5 text-[9px] font-medium">
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-background/90 backdrop-blur border border-border px-1.5 py-0.5 text-[10px] font-medium">
             <span className="text-amber-400">★</span>
             <span>{item.rating.toFixed(1)}</span>
           </div>
