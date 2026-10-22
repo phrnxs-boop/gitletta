@@ -27,6 +27,8 @@ export interface User {
   avatar?: string | null
   roleId?: string | null
   twoFactorEnabled?: boolean
+  /** The owner's own contact number. */
+  phone?: string | null
 }
 
 export interface Role {

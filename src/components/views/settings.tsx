@@ -9,6 +9,7 @@ import { useScrollCollapse } from '@/lib/use-scroll-collapse'
 import { ImageUpload } from '@/components/shared/image-upload'
 import { PhoneInput } from '@/components/shared/phone-input'
 import { applyTheme } from '@/lib/theme'
+import { createClient } from '@/lib/supabase/client'
 import {
   MENU_THEMES,
   normaliseMenuTheme,
@@ -106,6 +107,9 @@ export function SettingsView() {
   }, [])
 
   // Tenant form state
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
+
   const [tenantForm, setTenantForm] = useState({
     name: '',
     tagline: '',
@@ -187,7 +191,7 @@ export function SettingsView() {
     setOpToggles(toggles)
     // profile
     const u = data.currentUser
-    setProfileForm({ name: u.name || '', email: u.email || '', phone: '', avatar: u.avatar || '' })
+    setProfileForm({ name: u.name || '', email: u.email || '', phone: u.phone || '', avatar: u.avatar || '' })
     // prefs
     setPrefs({
       theme: data.settings.pref_theme || 'dark',
@@ -300,6 +304,121 @@ export function SettingsView() {
       toast.error('Failed to save settings')
     } finally {
       setSaving(false)
+    }
+  }
+
+  /**
+   * Save the owner's own details.
+   *
+   * This button used to show "Profile updated" and save nothing at all, so
+   * the form silently threw away everything the owner typed. It writes to the
+   * owner's own profile row, which is the one place row level security
+   * allows a browser to write, and which a trigger keeps the owner from
+   * moving themselves to another restaurant or making themselves an admin.
+   */
+  const saveProfile = async () => {
+    setSavingProfile(true)
+    try {
+      const supabase = createClient()
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      if (userError || !userData?.user) {
+        toast.error('Your session has expired. Sign in again.')
+        return
+      }
+      const user = userData.user
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: profileForm.name.trim(),
+          phone: profileForm.phone,
+          avatar: profileForm.avatar,
+        })
+        .eq('id', user.id)
+      if (error) {
+        toast.error(error.message)
+        return
+      }
+
+      // The email is the account's, not the profile's, so it is changed
+      // through the account and may need confirming.
+      const wantedEmail = profileForm.email.trim()
+      if (wantedEmail && wantedEmail !== user.email) {
+        const { data: updated, error: emailError } = await supabase.auth.updateUser({ email: wantedEmail })
+        if (emailError) {
+          toast.error(emailError.message)
+          return
+        }
+        if (updated.user?.email !== wantedEmail) {
+          toast.success('Profile saved. Confirm the new email address from the message we sent.')
+          await refresh()
+          return
+        }
+      }
+
+      toast.success('Profile updated')
+      await refresh()
+    } catch {
+      toast.error('Could not save the profile')
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  /**
+   * Change the account password.
+   *
+   * This button used to check the two new passwords matched, clear the form
+   * and say "Password updated" — and the password did not change. A
+   * restaurant owner who believed they had locked the door had not.
+   *
+   * The current password is proved first, so that a session left open on
+   * someone else's laptop cannot change the password either.
+   */
+  const changePassword = async () => {
+    if (!pwdForm.current || !pwdForm.next) {
+      toast.error('Fill all the fields')
+      return
+    }
+    if (pwdForm.next !== pwdForm.confirm) {
+      toast.error('Passwords do not match')
+      return
+    }
+    if (pwdForm.next.length < 8) {
+      toast.error('Password must be 8+ characters')
+      return
+    }
+    setChangingPassword(true)
+    try {
+      const supabase = createClient()
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      if (userError || !userData?.user?.email) {
+        toast.error('Your session has expired. Sign in again.')
+        return
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userData.user.email,
+        password: pwdForm.current,
+      })
+      if (signInError) {
+        toast.error('That is not your current password')
+        return
+      }
+
+      const { error } = await supabase.auth.updateUser({ password: pwdForm.next })
+      if (error) {
+        toast.error(error.message)
+        return
+      }
+
+      setPwdForm({ current: '', next: '', confirm: '' })
+      setOpenSection(null)
+      toast.success('Password updated')
+    } catch {
+      toast.error('Could not change the password')
+    } finally {
+      setChangingPassword(false)
     }
   }
 
@@ -450,7 +569,19 @@ export function SettingsView() {
                   </div>
                 </div>
                 <div className="flex justify-end mt-4">
-                  <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => toast.success('Profile updated')}><Save className="h-3.5 w-3.5" /> Save Profile</Button>
+                  <Button
+                    size="sm"
+                    className="bg-primary hover:bg-primary/90"
+                    disabled={savingProfile}
+                    onClick={saveProfile}
+                  >
+                    {savingProfile ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Save className="h-3.5 w-3.5" />
+                    )}
+                    Save Profile
+                  </Button>
                 </div>
               </ExpandCard>
 
@@ -475,14 +606,19 @@ export function SettingsView() {
                   </Field>
                 </div>
                 <div className="flex justify-end mt-4">
-                  <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => {
-                    if (!pwdForm.current || !pwdForm.next) { toast.error('Fill all fields'); return }
-                    if (pwdForm.next !== pwdForm.confirm) { toast.error('Passwords do not match'); return }
-                    if (pwdForm.next.length < 8) { toast.error('Password must be 8+ characters'); return }
-                    setPwdForm({ current: '', next: '', confirm: '' })
-                    setOpenSection(null)
-                    toast.success('Password updated')
-                  }}><KeyRound className="h-3.5 w-3.5" /> Update Password</Button>
+                  <Button
+                    size="sm"
+                    className="bg-primary hover:bg-primary/90"
+                    disabled={changingPassword}
+                    onClick={changePassword}
+                  >
+                    {changingPassword ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <KeyRound className="h-3.5 w-3.5" />
+                    )}
+                    Update Password
+                  </Button>
                 </div>
               </ExpandCard>
 
