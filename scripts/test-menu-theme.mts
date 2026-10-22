@@ -2,6 +2,16 @@
  * The customer menu's theme, end to end.
  *
  * Sets a restaurant's theme, checks the menu endpoint carries it, and opens
+ * the menu in a browser to see whether it is actually in that palette. The
+ * theme it changed is put back at the end.
+ *
+ * It needs the app deployed:
+ *   npx tsx scripts/test-menu-theme.mts
+ */
+/**
+ * The customer menu's theme, end to end.
+ *
+ * Sets a restaurant's theme, checks the menu endpoint carries it, and opens
  * the menu in a browser to see whether it is actually in that palette.
  */
 import fs from "node:fs";
@@ -35,6 +45,14 @@ if (!table) {
 const tenantId = table.tenant_id;
 const { data: tenant } = await db.from("tenants").select("name").eq("id", tenantId).maybeSingle();
 console.log(`  restaurant: ${tenant?.name} (${tenantId})`);
+
+// What the theme was before the test, so it can be put back.
+const { data: original } = await db
+  .from("settings")
+  .select("value")
+  .eq("tenant_id", tenantId)
+  .eq("key", "menu_theme")
+  .maybeSingle();
 
 const setTheme = async (theme: string) => {
   await db.from("settings").upsert(
@@ -130,8 +148,15 @@ try {
 } finally {
   chrome.kill();
   // Put the theme back the way it was.
-  const { data: was } = await db.from("settings").select("value").eq("tenant_id", tenantId).eq("key", "menu_theme").maybeSingle();
-  if (was) await db.from("settings").update({ value: was.value }).eq("tenant_id", tenantId).eq("key", "menu_theme");
+  if (original) {
+    await db
+      .from("settings")
+      .update({ value: original.value })
+      .eq("tenant_id", tenantId)
+      .eq("key", "menu_theme");
+  } else {
+    await db.from("settings").delete().eq("tenant_id", tenantId).eq("key", "menu_theme");
+  }
 }
 
 console.log(`\n${checks - failures}/${checks} passed`);
