@@ -282,6 +282,57 @@ try {
   const cuisine = await controlValue(sid, 'Cuisine Type', '[role="combobox"]');
   check("an option can be chosen on a phone", String(cuisine).includes("Indian"), String(cuisine));
 
+  // ---- the theme picker --------------------------------------------------
+  console.log("\n── the theme picker ──");
+  await evaluate(sid, `(() => {
+    const raw = localStorage.getItem('tablo-onboarding');
+    const d = raw ? JSON.parse(raw) : {};
+    d.step = 3;
+    localStorage.setItem('tablo-onboarding', JSON.stringify(d));
+    return 'ok';
+  })()`);
+  await send("Page.navigate", { url: `${SITE}/?view=onboarding` }, sid);
+  await sleep(8000);
+
+  const picker = await evaluate(sid, `(() => {
+    const text = document.body.innerText;
+    const options = [...document.querySelectorAll('button[aria-pressed]')].map(b => ({
+      pressed: b.getAttribute('aria-pressed'),
+      label: (b.querySelector('p')?.textContent || '').trim(),
+    }));
+    return JSON.stringify({
+      onStep3: text.includes('Customize the experience'),
+      options,
+      hasWarm: /\\bWarm\\b/.test(text),
+      hasMinimal: /\\bMinimal\\b/.test(text),
+      hasLight: text.includes('Light Mode'),
+      hasDark: text.includes('Dark Mode'),
+      previews: document.querySelectorAll('button[aria-pressed] .bg-background').length,
+    });
+  })()`);
+  console.log("  ", picker);
+  const pk = JSON.parse(String(picker));
+  check("the customize step is showing", pk.onStep3 === true);
+  check("there are exactly two themes", pk.options.length === 2, JSON.stringify(pk.options));
+  check("Light Mode is one of them", pk.hasLight === true);
+  check("Dark Mode is one of them", pk.hasDark === true);
+  check("Warm is gone", pk.hasWarm === false);
+  check("Minimal is gone", pk.hasMinimal === false);
+  check("each theme has a preview", pk.previews >= 2, String(pk.previews));
+
+  // Picking the dark one must change what is stored.
+  const darkClicked = await evaluate(sid, `(() => {
+    const b = [...document.querySelectorAll('button[aria-pressed]')].find(x => (x.textContent || '').includes('Dark Mode'));
+    if (!b) return 'no button';
+    for (const t of ['pointerdown','mousedown','pointerup','mouseup','click']) {
+      b.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window }));
+    }
+    return 'clicked';
+  })()`);
+  await sleep(900);
+  const themeNow = await evaluate(sid, "(() => { const raw = localStorage.getItem('tablo-onboarding'); return raw ? JSON.parse(raw).customize.theme : null })()");
+  check("picking the dark theme is instant", darkClicked === 'clicked' && themeNow === 'dark', `${darkClicked} / ${themeNow}`);
+
   // ---- the number fields -------------------------------------------------
   console.log("\n── the number fields ──");
   // Go to step 4 (the table count).
