@@ -290,12 +290,22 @@ Deno.serve(async (req: Request) => {
     if (onboardingError) return json(req, { error: onboardingError.message }, 500);
 
     // 7. Link the current auth user's profile to the tenant (upsert on id).
+    //
+    // The name typed in the setup flow wins, so what the owner sees in the
+    // form is what the account carries. It is only written when it was
+    // actually filled in, so an empty field can never blank a name that is
+    // already set.
+    const typedOwnerName =
+      typeof restaurant?.ownerName === "string" ? restaurant.ownerName.trim() : "";
     const { error: linkError } = await db.from("profiles").upsert(
       {
         id: g.session.subjectId,
         tenant_id: tenantId,
         email: profile?.email || g.session.email,
-        name: profile?.name || g.session.name ||
+        name:
+          typedOwnerName ||
+          profile?.name ||
+          g.session.name ||
           String(restaurant?.name || "Owner"),
       },
       { onConflict: "id" },

@@ -70,11 +70,16 @@ function SelectContent({
         {...props}
       >
         <SelectScrollUpButton />
+        {/* The viewport was given the trigger's height, which made the
+            scrollable list one row tall. On a desktop that was a nuisance you
+            could wheel past; on a phone it was a 36px window with the
+            options hidden behind it, so the dropdown did not work. The list
+            now grows to fit its options and the content scrolls instead. */}
         <SelectPrimitive.Viewport
           className={cn(
             "p-1",
             position === "popper" &&
-              "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
+              "w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
           )}
         >
           {children}

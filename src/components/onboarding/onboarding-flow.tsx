@@ -107,6 +107,8 @@ interface CategoryDraft {
 
 interface RestaurantDraft {
   name: string
+  /** The person who owns the restaurant. The account already knows this. */
+  ownerName: string
   logo: string
   phone: string
   email: string
@@ -190,6 +192,7 @@ function defaultData(): OnboardingData {
     step: 1,
     restaurant: {
       name: '',
+      ownerName: '',
       logo: '',
       phone: '',
       email: '',
@@ -312,6 +315,69 @@ export function OnboardingFlow() {
       /* quota / private mode — ignore */
     }
   }, [data])
+
+  // Whether there is a draft from an earlier visit. When there is one, the
+  // owner's own choices win over anything the account has saved; when there
+  // is not, the account is the source of truth.
+  const [hadStoredDraft] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return Boolean(window.localStorage.getItem(STORAGE_KEY))
+    } catch {
+      return false
+    }
+  })
+
+  // Fill in what the account already knows.
+  //
+  // The sign-up form collected the name, the email and the restaurant name,
+  // and the register route put them in the database — and then the setup flow
+  // asked for all three again, empty. This reads them back so they arrive
+  // filled, and every field stays editable.
+  useEffect(() => {
+    let cancelled = false
+    edgeFetch('/api/auth/me')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: any) => {
+        if (cancelled || !body?.authenticated) return
+        const t = body.tenant
+        const u = body.user
+        if (!t && !u) return
+        setData((prev) => ({
+          ...prev,
+          restaurant: {
+            ...prev.restaurant,
+            ownerName: prev.restaurant.ownerName || u?.name || '',
+            name: prev.restaurant.name || t?.name || '',
+            email: prev.restaurant.email || t?.email || u?.email || '',
+            phone: prev.restaurant.phone || t?.phone || '',
+            address: prev.restaurant.address || t?.address || '',
+            logo: prev.restaurant.logo || t?.logo || '',
+            gstin: prev.restaurant.gstin || t?.gstin || '',
+            fssai: prev.restaurant.fssai || t?.fssai || '',
+          },
+          customize: hadStoredDraft
+            ? prev.customize
+            : {
+                ...prev.customize,
+                currency: t?.currency || prev.customize.currency,
+                currencySymbol: t?.currencySymbol || prev.customize.currencySymbol,
+                taxRate:
+                  typeof t?.taxRate === 'number' ? t.taxRate : prev.customize.taxRate,
+                serviceCharge:
+                  typeof t?.serviceCharge === 'number'
+                    ? t.serviceCharge
+                    : prev.customize.serviceCharge,
+              },
+        }))
+      })
+      .catch(() => {
+        /* the account could not be read — the form still works, just empty */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [hadStoredDraft])
 
   const step = data.step
   const progress = Math.round((step / TOTAL_STEPS) * 100)
@@ -577,6 +643,15 @@ function StepRestaurant({ restaurant, setRestaurant, onNext }: StepRestaurantPro
               onChange={(e) => setRestaurant({ name: e.target.value })}
               placeholder="e.g. Jaegar Resto"
               autoFocus
+            />
+          </Field>
+
+          <Field label="Your Name" hint="from your account">
+            <Input
+              value={restaurant.ownerName}
+              onChange={(e) => setRestaurant({ ownerName: e.target.value })}
+              placeholder="e.g. Priyanshu"
+              autoComplete="name"
             />
           </Field>
 
@@ -1422,13 +1497,12 @@ function ItemReviewRow({
               className="h-8"
             />
             <div className="relative">
-              <Input
-                value={Number.isNaN(item.price) ? '' : item.price}
+              <NumberInput
+                value={Number.isNaN(item.price) ? 0 : item.price}
                 placeholder="0.00"
-                type="number"
                 min={0}
                 step="0.01"
-                onChange={(e) => onUpdate({ price: parseFloat(e.target.value) || 0 })}
+                onChange={(price) => onUpdate({ price })}
                 className="h-8 pr-7"
               />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -1565,9 +1639,23 @@ interface StepCustomizeProps {
 }
 
 function StepCustomize({ customize, setCustomize, onNext, onBack }: StepCustomizeProps) {
-  const onCurrency = (code: string) => {
-    const c = CURRENCIES.find((x) => x.code === code)
-    if (c) setCustomize({ currency: c.code, currencySymbol: c.symbol })
+  // The currency used to be a dropdown holding a single option — INR — which
+  // is not a control, and on a phone it was a 36px window that could not be
+  // opened at all. It is two fields now: a code and the symbol that goes
+  // with it, both editable and both checked.
+  const onCurrencyCode = (raw: string) => {
+    const code = raw.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3)
+    const known = CURRENCIES.find((x) => x.code === code)
+    setCustomize({
+      currency: code,
+      // A known code carries its own symbol; anything else keeps the one the
+      // owner already chose.
+      currencySymbol: known ? known.symbol : customize.currencySymbol,
+    })
+  }
+
+  const onCurrencySymbol = (raw: string) => {
+    setCustomize({ currencySymbol: raw.slice(0, 3) })
   }
 
   return (
@@ -1607,41 +1695,51 @@ function StepCustomize({ customize, setCustomize, onNext, onBack }: StepCustomiz
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Currency">
-            <Select value={customize.currency} onValueChange={onCurrency}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCIES.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    {c.symbol} · {c.label} ({c.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          <div className="grid grid-cols-[1fr_84px] gap-3">
+            <Field label="Currency" hint="code, e.g. INR">
+              <Input
+                value={customize.currency}
+                onChange={(e) => onCurrencyCode(e.target.value)}
+                placeholder="INR"
+                inputMode="text"
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+                maxLength={3}
+                className="uppercase"
+              />
+            </Field>
+            <Field label="Symbol">
+              <Input
+                value={customize.currencySymbol}
+                onChange={(e) => onCurrencySymbol(e.target.value)}
+                placeholder="₹"
+                inputMode="text"
+                autoComplete="off"
+                maxLength={3}
+                className="text-center"
+              />
+            </Field>
+          </div>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Tax Rate (%)" hint="Applied on subtotal">
-            <Input
-              type="number"
+            <NumberInput
               min={0}
               max={100}
               step="0.1"
               value={customize.taxRate}
-              onChange={(e) => setCustomize({ taxRate: parseFloat(e.target.value) || 0 })}
+              onChange={(taxRate) => setCustomize({ taxRate })}
             />
           </Field>
           <Field label="Service Charge (%)" hint="Optional, on subtotal">
-            <Input
-              type="number"
+            <NumberInput
               min={0}
               max={100}
               step="0.1"
               value={customize.serviceCharge}
-              onChange={(e) => setCustomize({ serviceCharge: parseFloat(e.target.value) || 0 })}
+              onChange={(serviceCharge) => setCustomize({ serviceCharge })}
             />
           </Field>
         </div>
@@ -1755,12 +1853,11 @@ function StepQr({ restaurant, qr, setQr, onNext, onBack }: StepQrProps) {
       <div className="mt-6 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-end gap-3">
           <Field label="Number of tables" className="flex-1">
-            <Input
-              type="number"
+            <NumberInput
               min={1}
               max={60}
               value={qr.tableCount}
-              onChange={(e) => setQr({ tableCount: Math.max(1, parseInt(e.target.value) || 1) })}
+              onChange={(tableCount) => setQr({ tableCount })}
             />
           </Field>
           <Button type="button" onClick={generate} className="gap-2 sm:w-auto w-full">
@@ -2098,6 +2195,93 @@ function StepHeading({
         <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{desc}</p>
       </div>
     </div>
+  )
+}
+
+/**
+ * A number field that can actually be edited.
+ *
+ * The value used to be parsed on every keystroke and written straight back
+ * into the field, which broke it in two ways. Clearing the field put the
+ * number straight back — the table count came back as 1 the moment it was
+ * emptied, so it could never be replaced. And a trailing decimal point was
+ * swallowed the instant it was typed, because "12." parsed to 12 and the "."
+ * was thrown away: typing "12.50" produced "1250".
+ *
+ * The raw text is kept here while the field has the focus, so it can be
+ * empty and it can hold a half-typed decimal. The number is committed when
+ * the field is left, and the limits are applied then rather than while the
+ * owner is typing.
+ */
+function NumberInput({
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  placeholder,
+  className,
+  emptyValue = 0,
+  ...rest
+}: {
+  value: number
+  onChange: (n: number) => void
+  min?: number
+  max?: number
+  /** The HTML step attribute is a string, so it is allowed to be one. */
+  step?: number | string
+  placeholder?: string
+  className?: string
+  /** What an empty field means. */
+  emptyValue?: number
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'>) {
+  const [text, setText] = useState(() => (value === 0 ? '' : String(value)))
+  const [focused, setFocused] = useState(false)
+
+  // Follow the model when it changes underneath us — a reset, or the
+  // prefill — but never while the owner is typing in the field.
+  useEffect(() => {
+    if (focused) return
+    setText(value === 0 ? '' : String(value))
+  }, [value, focused])
+
+  const commit = () => {
+    setFocused(false)
+    const wasEmpty = text.trim() === ''
+    const parsed = wasEmpty ? emptyValue : Number(text)
+    let n = Number.isFinite(parsed) ? parsed : emptyValue
+    if (min !== undefined && n < min) n = min
+    if (max !== undefined && n > max) n = max
+    onChange(n)
+    setText(wasEmpty && n === 0 ? '' : String(n))
+  }
+
+  return (
+    <Input
+      type="number"
+      inputMode="decimal"
+      value={text}
+      min={min}
+      max={max}
+      step={step}
+      placeholder={placeholder}
+      className={className}
+      onFocus={() => setFocused(true)}
+      onBlur={commit}
+      onChange={(e) => {
+        const raw = e.target.value
+        setText(raw)
+        // The model keeps up while typing so anything that reads it — a
+        // total, a limit — is right, but an empty field stays empty.
+        if (raw.trim() === '') {
+          onChange(emptyValue)
+          return
+        }
+        const parsed = Number(raw)
+        if (Number.isFinite(parsed)) onChange(parsed)
+      }}
+      {...rest}
+    />
   )
 }
 

@@ -249,15 +249,28 @@ async function me(req: Request): Promise<Response> {
       return json(req, { authenticated: false }, 401);
     }
 
-    const [tenantRes, roleRes] = await Promise.all([
+    const [tenantRes, roleRes, settingsRes] = await Promise.all([
       db.from("tenants").select("*").eq("id", profile.tenant_id).maybeSingle(),
       profile.role_id
         ? db.from("roles").select("*").eq("id", profile.role_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
+      // The tax IDs are settings keys, not tenant columns, so they are read
+      // from where they are written.
+      db
+        .from("settings")
+        .select("key, value")
+        .eq("tenant_id", profile.tenant_id)
+        .in("key", ["gstin", "fssai"]),
     ]);
 
     if (tenantRes.error) return json(req, { error: tenantRes.error.message }, 500);
     if (roleRes.error) return json(req, { error: roleRes.error.message }, 500);
+    if (settingsRes.error) return json(req, { error: settingsRes.error.message }, 500);
+
+    const settings: Record<string, string> = {};
+    for (const row of (settingsRes.data ?? []) as any[]) {
+      if (row?.key) settings[row.key] = row.value ?? "";
+    }
 
     const tenant = tenantRes.data;
     const role = roleRes.data;
@@ -273,11 +286,23 @@ async function me(req: Request): Promise<Response> {
         tenantId: profile.tenant_id,
         avatar: profile.avatar,
       },
+      // The details the restaurant has already saved, so a screen that asks
+      // for them can show what is there instead of asking again.
       tenant: tenant
         ? {
           id: tenant.id,
           name: tenant.name,
           slug: tenant.slug,
+          logo: tenant.logo ?? "",
+          phone: tenant.phone ?? "",
+          email: tenant.email ?? "",
+          address: tenant.address ?? "",
+          currency: tenant.currency ?? "INR",
+          currencySymbol: tenant.currency_symbol ?? "\u20b9",
+          taxRate: Number(tenant.tax_rate ?? 0),
+          serviceCharge: Number(tenant.service_charge ?? 0),
+          gstin: settings.gstin ?? "",
+          fssai: settings.fssai ?? "",
         }
         : null,
       role: role
