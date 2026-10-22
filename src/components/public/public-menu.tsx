@@ -286,8 +286,12 @@ function lockDinerSession(setState: (v: 'ended') => void) {
 export function PublicMenu() {
   const searchParams = useSearchParams()
   const [tenant, setTenant] = useState<Tenant | null>(null)
-  // The menu's theme is the restaurant's, not the diner's.
-  const [menuTheme, setMenuTheme] = useState<MenuTheme>('light')
+  // The menu's theme is the restaurant's, not the diner's. It is null until
+  // the server has said, and until then the theme this diner was last shown
+  // stands in for it.
+  const [serverTheme, setServerTheme] = useState<MenuTheme | null>(null)
+  const [cachedTheme, setCachedTheme] = useState<MenuTheme | null>(null)
+  const menuTheme = serverTheme ?? cachedTheme ?? 'light'
   const [table, setTable] = useState<TableObj>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -363,7 +367,7 @@ export function PublicMenu() {
       setCategories(data.categories || [])
       setMenuItems(data.menuItems || [])
       setSocial(data.social || {})
-      setMenuTheme(normaliseMenuTheme(data.theme))
+      setServerTheme(normaliseMenuTheme(data.theme))
     }
 
     async function activateAndLoad() {
@@ -817,19 +821,22 @@ export function PublicMenu() {
   // These sit above every early return, because a hook that is only reached
   // on some renders is a hook that is called in a different order some of
   // the time.
+  // The theme in force is applied to the document, so the sheets Radix
+  // renders in a portal are in the same palette as the menu.
   useEffect(() => {
     applyMenuTheme(menuTheme)
   }, [menuTheme])
 
+  // The theme this diner was last shown, read once the restaurant is known.
+  // It stands in until the server answers, and it never overrules it.
   useEffect(() => {
-    const cached = cachedMenuTheme(sessionTenantId)
-    if (cached) applyMenuTheme(cached)
+    setCachedTheme(cachedMenuTheme(sessionTenantId))
   }, [sessionTenantId])
 
   useEffect(() => {
-    if (!tenant) return
-    cacheMenuTheme(tenant.id, menuTheme)
-  }, [tenant, menuTheme])
+    if (!tenant || !serverTheme) return
+    cacheMenuTheme(tenant.id, serverTheme)
+  }, [tenant, serverTheme])
 
   // ---------- Loading state ----------
   // ---------- Session ended / invalid → LOCKED screen ----------
