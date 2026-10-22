@@ -266,5 +266,52 @@ console.log("\n── the usage and retention pages ──");
   check("the prospect count matches the list", summary.prospectCount === (r?.prospects ?? []).length);
 }
 
+console.log("\n── the order counter comes back down ──");
+{
+  // The counter behind the dashboard's order count and revenue used to fire
+  // on INSERT only, so a deleted order left its number behind for ever and
+  // the dashboard drifted away from the truth.
+  const { data: tenant } = await admin.from("tenants").select("id").limit(1).maybeSingle();
+  const tenantId = tenant!.id;
+
+  const countFor = async (rows: any[] | null) =>
+    (rows ?? []).reduce((n, r: any) => n + Number(r.order_count ?? 0), 0);
+
+  const before = await admin
+    .from("daily_tenant_metrics")
+    .select("order_count, order_value")
+    .eq("tenant_id", tenantId);
+  const beforeCount = await countFor(before?.data);
+
+  const { data: order, error: insertError } = await admin
+    .from("orders")
+    .insert({
+      tenant_id: tenantId,
+      total: 123.45,
+      status: "COMPLETED",
+      order_type: "DINE_IN",
+      payment_method: "CASH",
+    })
+    .select("id")
+    .single();
+  check("an order can be written", !insertError, insertError?.message);
+
+  const during = await admin
+    .from("daily_tenant_metrics")
+    .select("order_count, order_value")
+    .eq("tenant_id", tenantId);
+  const duringCount = await countFor(during?.data);
+  check("the counter went up by one", duringCount === beforeCount + 1, `${beforeCount} -> ${duringCount}`);
+
+  if (order?.id) await admin.from("orders").delete().eq("id", order.id);
+
+  const after = await admin
+    .from("daily_tenant_metrics")
+    .select("order_count, order_value")
+    .eq("tenant_id", tenantId);
+  const afterCount = await countFor(after?.data);
+  check("the counter came back down", afterCount === beforeCount, `${duringCount} -> ${afterCount}`);
+}
+
 console.log(`\n${checks - failures}/${checks} passed`);
 if (failures > 0) process.exit(1);
