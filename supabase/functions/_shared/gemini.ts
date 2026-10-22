@@ -86,26 +86,36 @@ type GeminiErrorBody = {
 
 function describeGeminiError(status: number, body: GeminiErrorBody, model: string): string {
   const message = body?.error?.message?.trim();
+  // The key is an edge function secret now, so the advice says where it
+  // lives. It used to say "save it in Super Admin -> AI Provider", and that
+  // page is gone.
+  const keyAdvice = "Check the GEMINI_API_KEY edge function secret.";
+  const modelAdvice =
+    "Change the model name in the plan catalogue (ai_provider_settings) and redeploy.";
   if (status === 400) {
     if (/api key not valid/i.test(message ?? "")) {
-      return "The Gemini API key was rejected. Check it in Super Admin → AI Provider and save it again.";
+      return `The Gemini API key was rejected. ${keyAdvice}`;
     }
     if (/model/i.test(message ?? "") && /not found|not supported/i.test(message ?? "")) {
-      return `Gemini does not recognise the model "${model}". Change the model name in Super Admin → AI Provider.`;
+      return `Gemini does not recognise the model "${model}". ${modelAdvice}`;
     }
     return `Gemini rejected the request (${message ?? "bad request"}).`;
   }
   if (status === 401 || status === 403) {
-    return "The Gemini API key was rejected. Check it in Super Admin → AI Provider and save it again.";
+    // A 403 is also what an API that is not enabled in the key's project
+    // looks like, so both are worth saying.
+    return `Gemini refused the key (${status}). ${keyAdvice} The Generative Language API must also be enabled in that project.`;
   }
   if (status === 404) {
-    return `Gemini does not recognise the model "${model}". Change the model name in Super Admin → AI Provider.`;
+    return `Gemini does not recognise the model "${model}". ${modelAdvice}`;
   }
   if (status === 429) {
     return "Gemini is rate limiting this key. Wait a moment and try again.";
   }
   if (status >= 500) {
-    return `Gemini had a server error (${status}). Try again in a moment.`;
+    // Google's own words are kept, because a 503 from a model that does not
+    // exist says so, and a generic "try again" would hide that.
+    return `Gemini had a server error (${status})${message ? `: ${message}` : ""}.`;
   }
   return `Gemini request failed (${status})${message ? `: ${message}` : ""}.`;
 }

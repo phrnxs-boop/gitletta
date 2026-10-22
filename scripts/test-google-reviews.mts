@@ -248,14 +248,23 @@ console.log("\n── a restaurant's own tokens stay on the server ──");
   check("the settings answer does not carry a refresh token", !/"refreshToken"/.test(body), body.slice(0, 200));
 }
 
-console.log("\n── the demo path still works ──");
+console.log("\n── what a restaurant is offered ──");
 {
-  // With no client configured at all, the platform falls back to the sample
-  // connection so the page is not a dead end.
-  await admin.from("google_oauth_config").update({ client_id: null, client_secret: null }).eq("id", "google_business_profile");
+  // Whether the platform has a Google client is not the test's business.
+  // With one, the restaurant gets a real sign-in; without one, it gets the
+  // sample connection so the page is not a dead end.
+  const cfg = await call("super-admin/google", adminToken);
+  const hasClient = cfg.body?.configured === true;
+
   const res = await call("google-reviews/connect", ownerToken);
-  check("it falls back to demo mode", res.body?.demoMode === true, JSON.stringify(res.body).slice(0, 140));
-  check("demo mode reports itself as connected", res.body?.connected === true);
+  if (hasClient) {
+    check("it offers a real sign-in", res.body?.demoMode === false, JSON.stringify(res.body).slice(0, 140));
+    check("the sign-in points at Google", String(res.body?.authUrl ?? "").startsWith("https://accounts.google.com/"), String(res.body?.authUrl).slice(0, 80));
+    check("the sign-in asks for the Business Profile scope", String(res.body?.authUrl ?? "").includes("business.manage"));
+  } else {
+    check("it falls back to demo mode", res.body?.demoMode === true, JSON.stringify(res.body).slice(0, 140));
+    check("demo mode reports itself as connected", res.body?.connected === true);
+  }
 }
 
 console.log("\n── cleaning up ──");
@@ -271,10 +280,19 @@ console.log("\n── cleaning up ──");
     await admin.from("google_connections").delete().eq("tenant_id", ownerProfile.tenant_id);
   }
 
-  await admin.from("google_oauth_config").update({ client_id: null, client_secret: null }).eq("id", "google_business_profile");
+  // The credentials are edge function secrets, so the test cannot take them
+  // away — and it must not. What it can check is the thing that actually
+  // matters: that no credential is left lying in the database, and that the
+  // response never carries one.
+  const { data: configRows } = await admin.from("google_oauth_config").select("*");
+  const columns = Object.keys((configRows ?? [])[0] ?? {});
+  check("the configuration table holds no client id", !columns.includes("client_id"), columns.join(","));
+  check("the configuration table holds no client secret", !columns.includes("client_secret"), columns.join(","));
+
   const res = await call("super-admin/google", adminToken);
-  check("the credentials are gone", res.body?.configured === false, `configured: ${res.body?.configured}`);
-  check("the client id is gone", !res.body?.clientId, String(res.body?.clientId));
+  check("the response carries no client id", !res.body?.clientId, String(res.body?.clientId));
+  check("the response carries no client secret", !res.body?.clientSecret, String(res.body?.clientSecret));
+  check("the response carries no mask either", !res.body?.maskedSecret, String(res.body?.maskedSecret));
 }
 
 console.log(`\n${checks - failures}/${checks} passed`);
