@@ -2,6 +2,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { guard, tableSession } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
+import { normaliseMenuTheme } from "../_shared/menu-theme.ts";
 import { body, json, preflight, subPath } from "../_shared/http.ts";
 
 /**
@@ -483,7 +484,11 @@ async function validate(req: Request): Promise<Response> {
       .eq("available", true)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
-    db.from("settings").select("*").eq("tenant_id", tenant.id).in("key", ["instagram", "facebook", "youtube"]),
+    db
+      .from("settings")
+      .select("*")
+      .eq("tenant_id", tenant.id)
+      .in("key", ["instagram", "facebook", "youtube", "menu_theme"]),
   ]);
 
   const social: Record<string, string> = {};
@@ -495,6 +500,9 @@ async function validate(req: Request): Promise<Response> {
     tenant,
     table,
     social,
+    // The menu's theme. The diner sees the restaurant's choice, so it travels
+    // with the menu rather than being read from the diner's device.
+    theme: normaliseMenuTheme(social.menu_theme),
     categories: (categories || []).map(mapCategory),
     menuItems: (menuItems || []).map(mapMenuItem),
   });

@@ -2,6 +2,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { guard } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
+import { MENU_THEME_KEY, normaliseMenuTheme } from "../_shared/menu-theme.ts";
 import { PERMISSION_KEYS } from "../_shared/permissions.ts";
 import { body, json, preflight } from "../_shared/http.ts";
 
@@ -183,6 +184,9 @@ Deno.serve(async (req: Request) => {
     const settingsSeed: Record<string, string> = { ...DEFAULT_SETTINGS };
     if (restaurant?.gstin) settingsSeed.gstin = String(restaurant.gstin).trim();
     if (restaurant?.fssai) settingsSeed.fssai = String(restaurant.fssai).trim();
+    // The customer menu's theme. It used to be collected on the setup form
+    // and never sent, so the menu looked the same for every restaurant.
+    settingsSeed[MENU_THEME_KEY] = normaliseMenuTheme(restaurant?.menuTheme);
 
     const { error: settingsError } = await db.from("settings").upsert(
       Object.entries(settingsSeed).map(([key, value]) => ({

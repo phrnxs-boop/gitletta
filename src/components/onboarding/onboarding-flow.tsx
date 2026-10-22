@@ -50,6 +50,11 @@ import {
 
 import { cn } from '@/lib/utils'
 import { edgeFetch } from '@/lib/edge'
+import {
+  MENU_THEMES as MENU_THEME_OPTIONS,
+  normaliseMenuTheme,
+  type MenuTheme,
+} from '@/lib/menu-theme'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -174,7 +179,9 @@ const CURRENCIES: { code: string; symbol: string; label: string }[] = [
   { code: 'INR', symbol: '₹', label: 'Indian Rupee' },
 ]
 
-const MENU_THEMES = ['Dark', 'Light', 'Warm', 'Minimal']
+// The two themes the customer menu can be shown in. Warm and Minimal were
+// names and nothing else — they were never applied to anything.
+const MENU_THEMES = MENU_THEME_OPTIONS
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -203,7 +210,9 @@ function defaultData(): OnboardingData {
     },
     menu: { categories: [] },
     customize: {
-      theme: 'Dark',
+      // Light, because that is what the customer menu looks like today.
+      // A restaurant that wants the dark one picks it here.
+      theme: 'light',
       currency: 'INR',
       currencySymbol: '₹',
       taxRate: 5,
@@ -1681,19 +1690,47 @@ function StepCustomize({ customize, setCustomize, onNext, onBack }: StepCustomiz
 
       <div className="space-y-5 mt-6">
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Menu Theme">
-            <Select value={customize.theme} onValueChange={(v) => setCustomize({ theme: v })}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MENU_THEMES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Field
+            label="Menu Theme"
+            hint="what your customers see"
+            className="sm:col-span-2"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {MENU_THEMES.map((option) => {
+                const selected = customize.theme === option.id
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setCustomize({ theme: option.id })}
+                    aria-pressed={selected}
+                    className={cn(
+                      'group overflow-hidden rounded-xl border text-left transition',
+                      selected
+                        ? 'border-primary ring-2 ring-primary/25'
+                        : 'border-border hover:border-primary/50',
+                    )}
+                  >
+                    <MenuThemePreview theme={option.id} />
+                    <div className="flex items-start gap-2 px-3 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold text-foreground">
+                          {option.name}
+                          {selected && (
+                            <span className="ml-2 align-middle text-[10px] font-medium text-primary">
+                              Selected
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
+                          {option.description}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </Field>
           <div className="grid grid-cols-[1fr_84px] gap-3">
             <Field label="Currency" hint="code, e.g. INR">
@@ -1992,6 +2029,10 @@ function StepGoLive({
               // reached the server and the bill printed with no tax IDs.
               gstin: data.restaurant.gstin || undefined,
               fssai: data.restaurant.fssai || undefined,
+              // The theme the customer menu is shown in. It was collected
+              // here and thrown away, so every restaurant got the same
+              // menu however it was set.
+              menuTheme: data.customize.theme,
             },
             categories: data.menu.categories.map((c) => ({ id: c.id, name: c.name })),
             menuItems: flattenedItems,
@@ -2193,6 +2234,39 @@ function StepHeading({
         </p>
         <h2 className="text-xl sm:text-2xl font-bold leading-tight">{title}</h2>
         <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{desc}</p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A small picture of the customer menu, in the theme it would be shown in.
+ *
+ * It is built from the app's own tokens, so it is the real palette and not
+ * a drawing of it. The wrapper carries the theme's class, which is what
+ * declares the palette for everything inside it.
+ */
+function MenuThemePreview({ theme }: { theme: MenuTheme }) {
+  return (
+    <div className={cn(theme, 'w-full overflow-hidden border-b border-border')}>
+      <div className="bg-background px-3 pt-3 pb-2.5">
+        <div className="flex items-center gap-2">
+          <div className="size-6 rounded-md bg-primary/15" />
+          <div className="h-2 w-16 rounded-full bg-foreground/70" />
+        </div>
+        <div className="mt-3 h-1.5 w-20 rounded-full bg-muted-foreground/40" />
+        <div className="mt-2 space-y-1.5">
+          <div className="h-7 rounded-lg bg-card border border-border" />
+          <div className="h-7 rounded-lg bg-card border border-border" />
+        </div>
+        <div className="mt-2.5 flex gap-1.5">
+          <div className="h-4 w-10 rounded-full bg-muted" />
+          <div className="h-4 w-10 rounded-full bg-muted" />
+        </div>
+      </div>
+      <div className="h-7 bg-card flex items-center justify-between px-3">
+        <div className="h-1.5 w-12 rounded-full bg-muted-foreground/40" />
+        <div className="h-5 w-8 rounded-md bg-primary" />
       </div>
     </div>
   )

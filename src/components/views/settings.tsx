@@ -9,6 +9,11 @@ import { useScrollCollapse } from '@/lib/use-scroll-collapse'
 import { ImageUpload } from '@/components/shared/image-upload'
 import { PhoneInput } from '@/components/shared/phone-input'
 import { applyTheme } from '@/lib/theme'
+import {
+  MENU_THEMES,
+  normaliseMenuTheme,
+  type MenuTheme,
+} from '@/lib/menu-theme'
 import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -115,6 +120,8 @@ export function SettingsView() {
     instagram: '',
     facebook: '',
     youtube: '',
+    /** The customer menu's theme. The owner's app theme is a different thing. */
+    menuTheme: 'light' as MenuTheme,
   })
 
   // Operations form state
@@ -167,6 +174,7 @@ export function SettingsView() {
       instagram: data.settings.instagram || '',
       facebook: data.settings.facebook || '',
       youtube: data.settings.youtube || '',
+      menuTheme: normaliseMenuTheme(data.settings.menu_theme),
     })
     setTaxRate(t.taxRate ?? 0)
     setServiceCharge(t.serviceCharge ?? 0)
@@ -265,6 +273,8 @@ export function SettingsView() {
           instagram: tenantForm.instagram,
           facebook: tenantForm.facebook,
           youtube: tenantForm.youtube,
+          // The customer menu's theme. It is not the owner's app theme.
+          menu_theme: tenantForm.menuTheme,
           // These were read on load but never written, so every preference
           // reset to its default on reload no matter what was chosen.
           pref_theme: prefs.theme,
@@ -309,6 +319,7 @@ export function SettingsView() {
       instagram: data.settings.instagram || '',
       facebook: data.settings.facebook || '',
       youtube: data.settings.youtube || '',
+      menuTheme: normaliseMenuTheme(data.settings.menu_theme),
     })
     setTaxRate(t.taxRate ?? 0)
     setServiceCharge(t.serviceCharge ?? 0)
@@ -651,6 +662,29 @@ export function SettingsView() {
                       placeholder="98765 43210"
                     />
                   </Field>
+                  <Field
+                    label="Menu Theme"
+                    icon={<Palette className="h-3.5 w-3.5" />}
+                    hint="what your customers see"
+                  >
+                    <Select
+                      value={tenantForm.menuTheme}
+                      onValueChange={(v) =>
+                        setTenantForm((f) => ({ ...f, menuTheme: normaliseMenuTheme(v) }))
+                      }
+                    >
+                      <SelectTrigger className="bg-secondary/50 border-border w-full">
+                        <SelectValue placeholder="Select a theme" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MENU_THEMES.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
                   <Field label="Currency" icon={<CreditCard className="h-3.5 w-3.5" />}>
                     <Select value={tenantForm.currency} onValueChange={onCurrencyChange}>
                       <SelectTrigger className="bg-secondary/50 border-border w-full">
@@ -953,12 +987,23 @@ export function SettingsView() {
   )
 }
 
-function Field({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
+function Field({
+  label,
+  icon,
+  hint,
+  children,
+}: {
+  label: string
+  icon?: React.ReactNode
+  hint?: string
+  children: React.ReactNode
+}) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
         {icon}
         {label}
+        {hint && <span className="text-muted-foreground/70 font-normal">· {hint}</span>}
       </Label>
       {children}
     </div>

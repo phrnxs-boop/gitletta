@@ -25,6 +25,13 @@ import {
 
 import { cn } from '@/lib/utils'
 import { edgeFetch } from '@/lib/edge'
+import {
+  applyMenuTheme,
+  cacheMenuTheme,
+  cachedMenuTheme,
+  normaliseMenuTheme,
+  type MenuTheme,
+} from '@/lib/menu-theme'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { BillDialog } from '@/components/shared/bill-dialog'
@@ -140,23 +147,23 @@ function tagMeta(tag: string): { label: string; icon?: React.ReactNode; cls: str
     'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none'
   switch (t) {
     case 'spicy':
-      return { label: 'Spicy', icon: <Flame className="size-2.5" />, cls: `${base} bg-red-50 text-red-600` }
+      return { label: 'Spicy', icon: <Flame className="size-2.5" />, cls: `${base} bg-red-500/15 text-red-500` }
     case 'veg':
-      return { label: 'Veg', icon: <Leaf className="size-2.5" />, cls: `${base} bg-emerald-50 text-emerald-600` }
+      return { label: 'Veg', icon: <Leaf className="size-2.5" />, cls: `${base} bg-emerald-500/15 text-emerald-400` }
     case 'vegan':
-      return { label: 'Vegan', icon: <Leaf className="size-2.5" />, cls: `${base} bg-green-50 text-green-700` }
+      return { label: 'Vegan', icon: <Leaf className="size-2.5" />, cls: `${base} bg-green-500/15 text-green-400` }
     case 'new':
-      return { label: 'New', icon: <Sparkles className="size-2.5" />, cls: `${base} bg-amber-50 text-amber-600` }
+      return { label: 'New', icon: <Sparkles className="size-2.5" />, cls: `${base} bg-amber-500/15 text-amber-400` }
     case 'bestseller':
-      return { label: 'Bestseller', icon: <Star className="size-2.5 fill-current" />, cls: `${base} bg-orange-50 text-orange-600` }
+      return { label: 'Bestseller', icon: <Star className="size-2.5 fill-current" />, cls: `${base} bg-orange-500/15 text-orange-400` }
     case 'non-veg':
       return { label: 'Non-Veg', cls: `${base} bg-rose-50 text-rose-600` }
     case 'jain':
-      return { label: 'Jain', icon: <Sparkles className="size-2.5" />, cls: `${base} bg-amber-50 text-amber-700` }
+      return { label: 'Jain', icon: <Sparkles className="size-2.5" />, cls: `${base} bg-amber-500/15 text-amber-400` }
     case 'gluten-free':
       return { label: 'GF', cls: `${base} bg-purple-50 text-purple-600` }
     default:
-      return { label: tag.toUpperCase(), cls: `${base} bg-slate-100 text-slate-600` }
+      return { label: tag.toUpperCase(), cls: `${base} bg-slate-100 text-foreground` }
   }
 }
 
@@ -279,6 +286,8 @@ function lockDinerSession(setState: (v: 'ended') => void) {
 export function PublicMenu() {
   const searchParams = useSearchParams()
   const [tenant, setTenant] = useState<Tenant | null>(null)
+  // The menu's theme is the restaurant's, not the diner's.
+  const [menuTheme, setMenuTheme] = useState<MenuTheme>('light')
   const [table, setTable] = useState<TableObj>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -354,6 +363,7 @@ export function PublicMenu() {
       setCategories(data.categories || [])
       setMenuItems(data.menuItems || [])
       setSocial(data.social || {})
+      setMenuTheme(normaliseMenuTheme(data.theme))
     }
 
     async function activateAndLoad() {
@@ -797,13 +807,37 @@ export function PublicMenu() {
     }
   }
 
+  // ---------- The theme ----------
+  //
+  // It is applied to the document, not only to the menu, because the cart
+  // sheet and the item sheet are rendered in a portal on the document body.
+  // The theme the diner was last shown is put on straight away, so the menu
+  // does not load in the wrong palette.
+  //
+  // These sit above every early return, because a hook that is only reached
+  // on some renders is a hook that is called in a different order some of
+  // the time.
+  useEffect(() => {
+    applyMenuTheme(menuTheme)
+  }, [menuTheme])
+
+  useEffect(() => {
+    const cached = cachedMenuTheme(sessionTenantId)
+    if (cached) applyMenuTheme(cached)
+  }, [sessionTenantId])
+
+  useEffect(() => {
+    if (!tenant) return
+    cacheMenuTheme(tenant.id, menuTheme)
+  }, [tenant, menuTheme])
+
   // ---------- Loading state ----------
   // ---------- Session ended / invalid → LOCKED screen ----------
   if (sessionState === 'ended' || sessionState === 'invalid') {
     const ended = sessionState === 'ended'
     return (
-      <div className="light min-h-screen bg-[#fafaf7] text-[#1a1d29] flex items-center justify-center p-4 sm:p-6">
-        <div className="max-w-[440px] w-full text-center rounded-3xl bg-white p-6 sm:p-8 shadow-sm border border-slate-100">
+      <div className={`${menuTheme} min-h-screen bg-background text-foreground flex items-center justify-center p-4 sm:p-6`}>
+        <div className="max-w-[440px] w-full text-center rounded-3xl bg-card p-6 sm:p-8 shadow-sm border border-border">
           <div className="mx-auto size-16 rounded-2xl flex items-center justify-center shadow-xs" style={{ background: ended ? '#fef3c7' : '#fee2e2' }}>
             {ended ? (
               <svg className="size-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -817,17 +851,17 @@ export function PublicMenu() {
           </div>
 
           {ended && (
-            <div className="mt-4 inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-50 border border-slate-200/90 shadow-2xs">
+            <div className="mt-4 inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-muted border border-border/90 shadow-2xs">
               <svg className="size-4 shrink-0" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
-              <span className="text-xs font-bold text-slate-800 tracking-tight">Google Reviews</span>
+              <span className="text-xs font-bold text-foreground tracking-tight">Google Reviews</span>
               <div className="flex items-center text-amber-500 text-xs">
                 <span>★</span>
-                <span className="text-[11px] font-bold ml-0.5 text-slate-700">5.0</span>
+                <span className="text-[11px] font-bold ml-0.5 text-foreground">5.0</span>
               </div>
             </div>
           )}
@@ -835,7 +869,7 @@ export function PublicMenu() {
           <h2 className={cn("text-xl font-bold tracking-tight", ended ? "mt-2" : "mt-4")}>
             {ended ? 'Your table session has ended.' : 'Menu access requires a table session.'}
           </h2>
-          <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+          <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
             {ended
               ? 'Please scan the QR code on your table to continue viewing the menu and placing orders.'
               : 'This menu is only accessible by scanning the QR code on your restaurant table.'}
@@ -869,12 +903,12 @@ export function PublicMenu() {
           )}
 
           {ended && sessionHasOrder === false && (
-            <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-[12.5px] leading-relaxed text-slate-500 border border-slate-100">
+            <p className="mt-4 rounded-xl bg-muted px-3 py-2.5 text-[12.5px] leading-relaxed text-muted-foreground border border-border">
               No orders were placed on this table, so there is no bill.
             </p>
           )}
 
-          <div className="mt-5 rounded-xl bg-slate-50 p-3 text-[11px] text-slate-400 leading-relaxed border border-slate-100">
+          <div className="mt-5 rounded-xl bg-muted p-3 text-[11px] text-muted-foreground leading-relaxed border border-border">
             For security, menu access cannot be restored by refreshing the page, using browser history, or copying the URL. Only scanning the table QR code activates a new session.
           </div>
         </div>
@@ -893,28 +927,28 @@ export function PublicMenu() {
   // ---------- Activating session → loading skeleton ----------
   if (loading || sessionState === 'activating') {
     return (
-      <div className="light min-h-screen bg-[#fafaf7] text-[#1a1d29]">
+      <div className={`${menuTheme} min-h-screen bg-background text-foreground`}>
         <div className="max-w-md mx-auto px-4 pt-6">
-          <Skeleton className="h-16 w-16 rounded-2xl bg-[#eeeae3]" />
-          <Skeleton className="mt-4 h-7 w-3/4 bg-[#eeeae3]" />
-          <Skeleton className="mt-2 h-4 w-1/2 bg-[#eeeae3]" />
-          <Skeleton className="mt-4 h-12 w-full rounded-2xl bg-[#eeeae3]" />
+          <Skeleton className="h-16 w-16 rounded-2xl bg-muted" />
+          <Skeleton className="mt-4 h-7 w-3/4 bg-muted" />
+          <Skeleton className="mt-2 h-4 w-1/2 bg-muted" />
+          <Skeleton className="mt-4 h-12 w-full rounded-2xl bg-muted" />
           <div className="mt-4 flex gap-2 overflow-hidden">
             {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-9 w-20 rounded-full bg-[#eeeae3]" />
+              <Skeleton key={i} className="h-9 w-20 rounded-full bg-muted" />
             ))}
           </div>
           <div className="mt-6 space-y-4">
             {[0, 1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="flex gap-4 rounded-2xl bg-white p-3 shadow-sm"
+                className="flex gap-4 rounded-2xl bg-card p-3 shadow-sm"
               >
-                <Skeleton className="size-20 rounded-xl bg-[#eeeae3]" />
+                <Skeleton className="size-20 rounded-xl bg-muted" />
                 <div className="flex-1 space-y-2 py-1">
-                  <Skeleton className="h-4 w-2/3 bg-[#eeeae3]" />
-                  <Skeleton className="h-3 w-full bg-[#eeeae3]" />
-                  <Skeleton className="h-3 w-1/3 bg-[#eeeae3]" />
+                  <Skeleton className="h-4 w-2/3 bg-muted" />
+                  <Skeleton className="h-3 w-full bg-muted" />
+                  <Skeleton className="h-3 w-1/3 bg-muted" />
                 </div>
               </div>
             ))}
@@ -927,13 +961,13 @@ export function PublicMenu() {
   // ---------- Error state ----------
   if (error || !tenant) {
     return (
-      <div className="light min-h-screen bg-[#fafaf7] text-[#1a1d29] flex items-center justify-center p-6">
-        <div className="max-w-sm w-full text-center rounded-3xl bg-white p-8 shadow-sm">
+      <div className={`${menuTheme} min-h-screen bg-background text-foreground flex items-center justify-center p-6`}>
+        <div className="max-w-sm w-full text-center rounded-3xl bg-card p-8 shadow-sm">
           <div className="mx-auto size-14 rounded-2xl bg-red-50 flex items-center justify-center">
             <X className="size-7 text-red-500" />
           </div>
           <h2 className="mt-4 text-xl font-bold">Menu unavailable</h2>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-muted-foreground">
             {error || 'We could not load this restaurant’s menu. Please try again.'}
           </p>
           <Button
@@ -951,12 +985,12 @@ export function PublicMenu() {
   // ---------- Main render ----------
   return (
     <div
-      className="light min-h-screen bg-[#fafaf7] text-[#1a1d29]"
+      className={`${menuTheme} min-h-screen bg-background text-foreground`}
       style={{ paddingBottom: cart.length ? 96 : 0 }}
     >
       <div className="max-w-md mx-auto relative">
         {/* ===== Sticky header ===== */}
-        <header className="sticky top-0 z-30 bg-[#fafaf7]/95 backdrop-blur-md border-b border-[#eeeae3]">
+        <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border">
           <div className="px-4 pt-5 pb-3">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -979,7 +1013,7 @@ export function PublicMenu() {
                     {tenant.name}
                   </h1>
                   {tenant.tagline && (
-                    <p className="text-xs text-slate-500 mt-0.5 truncate">
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
                       {tenant.tagline}
                     </p>
                   )}
@@ -989,7 +1023,7 @@ export function PublicMenu() {
               {tenant.phone && (
                 <a
                   href={`tel:${tenant.phone}`}
-                  className="shrink-0 size-10 rounded-full bg-white shadow-sm border border-[#eeeae3] flex items-center justify-center text-[#1a1d29] hover:bg-[#f5f1e8] transition"
+                  className="shrink-0 size-10 rounded-full bg-card shadow-sm border border-border flex items-center justify-center text-foreground hover:bg-card-elevated transition"
                   aria-label="Call restaurant"
                 >
                   <Phone className="size-4" />
@@ -998,18 +1032,18 @@ export function PublicMenu() {
             </div>
 
             {/* Table card */}
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-medium shadow-sm border border-[#eeeae3]">
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-card px-3 py-1.5 text-xs font-medium shadow-sm border border-border">
               {table ? (
                 <>
                   <span className="size-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-slate-700">
+                  <span className="text-foreground">
                     🍽️ {table.name} · {table.area} · {table.seats} seats
                   </span>
                 </>
               ) : (
                 <>
                   <span className="size-1.5 rounded-full bg-amber-500" />
-                  <span className="text-slate-700">Takeaway order</span>
+                  <span className="text-foreground">Takeaway order</span>
                 </>
               )}
             </div>
@@ -1018,17 +1052,17 @@ export function PublicMenu() {
           {/* Search */}
           <div className="px-4 pb-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search dishes…"
-                className="pl-9 pr-9 h-11 rounded-full bg-white border-[#eeeae3] focus-visible:ring-[#f97316]/30 focus-visible:border-[#f97316]"
+                className="pl-9 pr-9 h-11 rounded-full bg-card border-border focus-visible:ring-primary/30 focus-visible:border-primary"
               />
               {search && (
                 <button
                   onClick={() => setSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   aria-label="Clear search"
                 >
                   <X className="size-4" />
@@ -1067,13 +1101,13 @@ export function PublicMenu() {
         <main className="px-4 py-4">
           {groupedSections.length === 0 ? (
             <div className="py-16 text-center">
-              <div className="mx-auto size-14 rounded-2xl bg-white shadow-sm flex items-center justify-center">
-                <Search className="size-6 text-slate-400" />
+              <div className="mx-auto size-14 rounded-2xl bg-card shadow-sm flex items-center justify-center">
+                <Search className="size-6 text-muted-foreground" />
               </div>
-              <p className="mt-4 text-sm font-medium text-slate-700">
+              <p className="mt-4 text-sm font-medium text-foreground">
                 No dishes found
               </p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Try a different search or category.
               </p>
               {search && (
@@ -1084,7 +1118,7 @@ export function PublicMenu() {
                     setSearch('')
                     setActiveCat('all')
                   }}
-                  className="mt-3 text-[#f97316] hover:text-[#c43d1a] hover:bg-[#f97316]/10"
+                  className="mt-3 text-primary hover:text-primary hover:bg-primary/10"
                 >
                   Clear filters
                 </Button>
@@ -1134,15 +1168,15 @@ export function PublicMenu() {
 
           {/* Footer info */}
           <footer className="mt-12 pb-8 text-center">
-            <Separator className="my-6 bg-[#eeeae3]" />
+            <Separator className="my-6 bg-muted" />
             {tenant.address && (
-              <div className="flex items-start justify-center gap-1.5 text-xs text-slate-500">
+              <div className="flex items-start justify-center gap-1.5 text-xs text-muted-foreground">
                 <MapPin className="size-3.5 mt-0.5 shrink-0" />
                 <span className="max-w-[260px]">{tenant.address}</span>
               </div>
             )}
             {tenant.phone && (
-              <div className="mt-2 flex items-center justify-center gap-1.5 text-xs text-slate-500">
+              <div className="mt-2 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
                 <Phone className="size-3.5" />
                 <span>{tenant.phone}</span>
               </div>
@@ -1150,7 +1184,7 @@ export function PublicMenu() {
             {/* Social media icons */}
             {(social.instagram || social.facebook || social.youtube) && (
               <div className="mt-5 flex flex-col items-center gap-2.5">
-                <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400">Follow us</p>
+                <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Follow us</p>
                 <div className="flex items-center justify-center gap-3">
                 {social.instagram && (
                   <a href={social.instagram} target="_blank" rel="noopener noreferrer" className={cn(SOCIAL_BTN, INSTAGRAM_BG)} aria-label="Instagram">
@@ -1170,7 +1204,7 @@ export function PublicMenu() {
                 </div>
               </div>
             )}
-            <p className="mt-4 text-[10px] uppercase tracking-widest text-slate-400">
+            <p className="mt-4 text-[10px] uppercase tracking-widest text-muted-foreground">
               Powered by Swixo
             </p>
           </footer>
@@ -1187,7 +1221,7 @@ export function PublicMenu() {
             <ShoppingBag className="size-5" />
             {cartCount > 0 && (
               <span
-                className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center ring-2 ring-[#fafaf7]"
+                className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center ring-2 ring-background"
                 style={{ background: CORAL }}
               >
                 {cartCount}
@@ -1206,7 +1240,7 @@ export function PublicMenu() {
                 style={{ background: CORAL }}
               >
                 <div className="flex items-center gap-2.5">
-                  <span className="size-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
+                  <span className="size-7 rounded-full bg-card/20 flex items-center justify-center text-xs font-bold">
                     {cartCount}
                   </span>
                   <span className="text-sm font-semibold">
@@ -1232,7 +1266,7 @@ export function PublicMenu() {
           <SheetContent
             side="bottom"
             hideCloseButton
-            className="light max-w-md mx-auto rounded-t-3xl p-0 border-0 bg-[#fafaf7] max-h-[92vh] flex flex-col"
+            className={`${menuTheme} max-w-md mx-auto rounded-t-3xl p-0 border-0 bg-background max-h-[92vh] flex flex-col`}
           >
             {placedOrder ? (
               <SuccessView
@@ -1246,7 +1280,7 @@ export function PublicMenu() {
               <EmptyCart onClose={closeSheet} />
             ) : (
               <>
-                <SheetHeader className="shrink-0 px-5 pt-5 pb-3 border-b border-[#eeeae3]">
+                <SheetHeader className="shrink-0 px-5 pt-5 pb-3 border-b border-border">
                   <div className="flex items-center justify-between">
                     <SheetTitle className="text-lg font-bold flex items-center gap-2">
                       <ShoppingBag className="size-5" style={{ color: CORAL }} />
@@ -1254,7 +1288,7 @@ export function PublicMenu() {
                     </SheetTitle>
                     <button
                       onClick={closeSheet}
-                      className="size-8 rounded-full bg-[#f0ebe1] flex items-center justify-center text-slate-500 hover:bg-[#e6e0d3] transition"
+                      className="size-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:bg-muted transition"
                       aria-label="Close cart"
                     >
                       <X className="size-4" />
@@ -1292,7 +1326,7 @@ export function PublicMenu() {
                     ))}
 
                     {/* Suggested note */}
-                    <div className="rounded-2xl bg-[#fff4f0] border border-[#ffe0d6] p-3 text-xs text-[#7a4a3a] flex items-start gap-2">
+                    <div className="rounded-2xl bg-[#fff4f0] border border-[#ffe0d6] p-3 text-xs text-foreground flex items-start gap-2">
                       <Sparkles className="size-3.5 mt-0.5 shrink-0" style={{ color: CORAL }} />
                       <span>
                         Add notes for the kitchen — allergies, spice level, or
@@ -1303,7 +1337,7 @@ export function PublicMenu() {
                 </div>
 
                 {/* Totals + place order */}
-                <div className="shrink-0 border-t border-[#eeeae3] bg-white px-5 pt-4 pb-5 space-y-3 rounded-b-3xl">
+                <div className="shrink-0 border-t border-border bg-card px-5 pt-4 pb-5 space-y-3 rounded-b-3xl">
                   <div className="space-y-1.5 text-sm">
                     <Row label="Subtotal" value={formatPrice(itemsTotal, currency)} />
                     {service > 0 && (
@@ -1316,7 +1350,7 @@ export function PublicMenu() {
                       label={`Tax (${Math.round(taxRate * 100)}%)`}
                       value={formatPrice(tax, currency)}
                     />
-                    <Separator className="my-2 bg-[#eeeae3]" />
+                    <Separator className="my-2 bg-muted" />
                     <div className="flex items-center justify-between">
                       <span className="font-bold">Total</span>
                       <span className="font-bold text-lg">
@@ -1324,7 +1358,7 @@ export function PublicMenu() {
                       </span>
                     </div>
                     {estimatedPrep > 0 && (
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 pt-1">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
                         <Clock className="size-3.5" />
                         <span>
                           Estimated prep time ~{estimatedPrep} min
@@ -1386,7 +1420,7 @@ function CategoryPill({
         'shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-semibold transition-all',
         active
           ? 'text-white shadow-sm'
-          : 'bg-white text-slate-600 border border-[#eeeae3] hover:bg-[#f5f1e8]'
+          : 'bg-card text-foreground border border-border hover:bg-card-elevated'
       )}
       style={active ? { background: CORAL } : undefined}
     >
@@ -1411,7 +1445,7 @@ function MenuItemCard({
 }) {
   const tags = parseTags(item.tags)
   return (
-    <article className="flex gap-3 rounded-2xl bg-white p-3 shadow-sm border border-[#f0ebe1] hover:shadow-md transition-shadow">
+    <article className="flex gap-3 rounded-2xl bg-card p-3 shadow-sm border border-border hover:shadow-md transition-shadow">
       {/* Image */}
       <div className="relative shrink-0">
         {item.image ? (
@@ -1422,8 +1456,8 @@ function MenuItemCard({
             loading="lazy"
           />
         ) : (
-          <div className="size-20 rounded-xl bg-[#f5f1e8] flex items-center justify-center">
-            <Utensils className="size-6 text-slate-300" />
+          <div className="size-20 rounded-xl bg-card-elevated flex items-center justify-center">
+            <Utensils className="size-6 text-muted-foreground" />
           </div>
         )}
         {item.rating >= 4.7 && (
@@ -1442,16 +1476,16 @@ function MenuItemCard({
           </h3>
         </div>
         {item.description && (
-          <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
             {item.description}
           </p>
         )}
 
         {/* Meta row */}
-        <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-500">
+        <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
           <span className="inline-flex items-center gap-0.5">
             <Star className="size-3 fill-amber-400 text-amber-400" />
-            <span className="font-semibold text-slate-600">
+            <span className="font-semibold text-foreground">
               {item.rating.toFixed(1)}
             </span>
           </span>
@@ -1503,7 +1537,7 @@ function MenuItemCard({
             >
               <button
                 onClick={onDecrement}
-                className="size-7 rounded-full bg-white/20 flex items-center justify-center transition active:scale-90"
+                className="size-7 rounded-full bg-card/20 flex items-center justify-center transition active:scale-90"
                 aria-label="Decrease quantity"
               >
                 <Minus className="size-3.5" />
@@ -1513,7 +1547,7 @@ function MenuItemCard({
               </span>
               <button
                 onClick={onAdd}
-                className="size-7 rounded-full bg-white/20 flex items-center justify-center transition active:scale-90"
+                className="size-7 rounded-full bg-card/20 flex items-center justify-center transition active:scale-90"
                 aria-label="Increase quantity"
               >
                 <Plus className="size-3.5" />
@@ -1543,7 +1577,7 @@ function CartLine({
 }) {
   const lineTotal = item.price * item.quantity
   return (
-    <div className="rounded-2xl bg-white p-3 border border-[#f0ebe1]">
+    <div className="rounded-2xl bg-card p-3 border border-border">
       <div className="flex gap-3">
         <div className="shrink-0">
           {item.image ? (
@@ -1553,8 +1587,8 @@ function CartLine({
               className="size-14 rounded-lg object-cover ring-1 ring-black/5"
             />
           ) : (
-            <div className="size-14 rounded-lg bg-[#f5f1e8] flex items-center justify-center">
-              <Utensils className="size-5 text-slate-300" />
+            <div className="size-14 rounded-lg bg-card-elevated flex items-center justify-center">
+              <Utensils className="size-5 text-muted-foreground" />
             </div>
           )}
         </div>
@@ -1565,13 +1599,13 @@ function CartLine({
             </h4>
             <button
               onClick={onRemove}
-              className="shrink-0 text-slate-300 hover:text-red-500 transition"
+              className="shrink-0 text-muted-foreground hover:text-red-500 transition"
               aria-label="Remove item"
             >
               <Trash2 className="size-4" />
             </button>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             {formatPrice(item.price, currency)} each
           </p>
 
@@ -1582,7 +1616,7 @@ function CartLine({
             >
               <button
                 onClick={onDecrement}
-                className="size-7 rounded-full bg-white/20 flex items-center justify-center transition active:scale-90"
+                className="size-7 rounded-full bg-card/20 flex items-center justify-center transition active:scale-90"
                 aria-label="Decrease quantity"
               >
                 <Minus className="size-3.5" />
@@ -1592,7 +1626,7 @@ function CartLine({
               </span>
               <button
                 onClick={onAdd}
-                className="size-7 rounded-full bg-white/20 flex items-center justify-center transition active:scale-90"
+                className="size-7 rounded-full bg-card/20 flex items-center justify-center transition active:scale-90"
                 aria-label="Increase quantity"
               >
                 <Plus className="size-3.5" />
@@ -1607,7 +1641,7 @@ function CartLine({
         value={item.notes || ''}
         onChange={(e) => onNotesChange(e.target.value)}
         placeholder="Add notes (no onions, extra spicy…)"
-        className="mt-3 min-h-9 text-xs rounded-lg bg-[#fafaf7] border-[#eeeae3] focus-visible:ring-[#f97316]/30 focus-visible:border-[#f97316] resize-none"
+        className="mt-3 min-h-9 text-xs rounded-lg bg-background border-border focus-visible:ring-primary/30 focus-visible:border-primary resize-none"
         rows={1}
       />
     </div>
@@ -1619,7 +1653,7 @@ function EmptyCart({ onClose }: { onClose: () => void }) {
     <div className="py-16 px-6 text-center relative">
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 size-8 rounded-full bg-[#f0ebe1] flex items-center justify-center text-slate-500 hover:bg-[#e6e0d3] transition"
+        className="absolute top-4 right-4 size-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:bg-muted transition"
         aria-label="Close cart"
       >
         <X className="size-4" />
@@ -1631,7 +1665,7 @@ function EmptyCart({ onClose }: { onClose: () => void }) {
         <ShoppingBag className="size-7" style={{ color: CORAL }} />
       </div>
       <h3 className="mt-4 text-lg font-bold">Your cart is empty</h3>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-muted-foreground">
         Add a few dishes from the menu to get started.
       </p>
       <Button
@@ -1675,31 +1709,31 @@ function SuccessView({
       </div>
 
       <h2 className="mt-6 text-2xl font-bold">Order Confirmed!</h2>
-      <p className="mt-2 text-sm text-slate-500 max-w-[280px]">
+      <p className="mt-2 text-sm text-muted-foreground max-w-[280px]">
         The kitchen has received your order and will start preparing it right
         away.
       </p>
 
-      <div className="mt-6 w-full rounded-2xl bg-white p-4 border border-[#f0ebe1] text-left space-y-3">
+      <div className="mt-6 w-full rounded-2xl bg-card p-4 border border-border text-left space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-500">Order number</span>
+          <span className="text-xs text-muted-foreground">Order number</span>
           <span className="font-bold text-base">#{order.orderNumber}</span>
         </div>
         {tableName && (
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-500">Table</span>
+            <span className="text-xs text-muted-foreground">Table</span>
             <span className="font-semibold text-sm">{tableName}</span>
           </div>
         )}
-        <Separator className="bg-[#eeeae3]" />
+        <Separator className="bg-muted" />
         <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-500">Total</span>
+          <span className="text-xs text-muted-foreground">Total</span>
           <span className="font-bold text-sm">
             {formatPrice(order.total, currency)}
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-500">Estimated prep time</span>
+          <span className="text-xs text-muted-foreground">Estimated prep time</span>
           <span className="font-semibold text-sm inline-flex items-center gap-1">
             <Clock className="size-3.5" style={{ color: CORAL }} />
             ~{estimatedPrep || 20} min
@@ -1707,7 +1741,7 @@ function SuccessView({
         </div>
       </div>
 
-      <div className="mt-4 w-full rounded-2xl bg-[#fff4f0] border border-[#ffe0d6] p-3 text-xs text-[#7a4a3a] flex items-start gap-2">
+      <div className="mt-4 w-full rounded-2xl bg-[#fff4f0] border border-[#ffe0d6] p-3 text-xs text-foreground flex items-start gap-2">
         <Clock className="size-3.5 mt-0.5 shrink-0" style={{ color: CORAL }} />
         <span>
           Your order status will be updated by the kitchen. Sit tight — your
@@ -1729,8 +1763,8 @@ function SuccessView({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-800">{value}</span>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-foreground">{value}</span>
     </div>
   )
 }
@@ -1823,30 +1857,30 @@ function SessionReviewCard({
 
   if (submitted) {
     return (
-      <div className="mt-5 w-full rounded-2xl bg-amber-50/70 border border-amber-200/70 p-5 text-center animate-in fade-in zoom-in-95 duration-300">
+      <div className="mt-5 w-full rounded-2xl bg-amber-50/70 border border-amber-500/25/70 p-5 text-center animate-in fade-in zoom-in-95 duration-300">
         <div className="size-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto text-emerald-600 mb-2 shadow-xs">
           <Check className="size-6" />
         </div>
-        <h3 className="font-bold text-base text-[#1a1d29]">Review Submitted!</h3>
+        <h3 className="font-bold text-base text-foreground">Review Submitted!</h3>
         <div className="flex items-center justify-center gap-1 my-2">
           {[1, 2, 3, 4, 5].map((star) => (
             <Star
               key={star}
               className={cn(
                 'size-5 transition-all',
-                star <= rating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'
+                star <= rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'
               )}
             />
           ))}
         </div>
-        <p className="text-xs text-slate-600 leading-relaxed max-w-xs mx-auto">
+        <p className="text-xs text-foreground leading-relaxed max-w-xs mx-auto">
           Thank you for sharing your feedback! We truly appreciate you dining with us and hope to welcome you back soon.
         </p>
-        <div className="mt-4 pt-3 border-t border-amber-200/50">
+        <div className="mt-4 pt-3 border-t border-amber-500/25/50">
           <button
             type="button"
             onClick={handleViewBill}
-            className="text-xs font-semibold text-slate-500 hover:text-[#1a1d29] underline transition-colors cursor-pointer"
+            className="text-xs font-semibold text-muted-foreground hover:text-foreground underline transition-colors cursor-pointer"
           >
             View Bill
           </button>
@@ -1858,10 +1892,10 @@ function SessionReviewCard({
   return (
     <form
       onSubmit={handleSubmit}
-      className="mt-5 w-full text-left bg-slate-50/90 rounded-2xl p-4 border border-slate-200/80 shadow-xs"
+      className="mt-5 w-full text-left bg-muted/90 rounded-2xl p-4 border border-border/80 shadow-xs"
     >
       <div className="text-center mb-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Rate your experience
         </p>
         {/* Star rating buttons */}
@@ -1881,7 +1915,7 @@ function SessionReviewCard({
                   'size-7 transition-colors drop-shadow-xs',
                   star <= activeRating
                     ? 'fill-amber-400 text-amber-400'
-                    : 'text-slate-300 hover:text-amber-200'
+                    : 'text-muted-foreground hover:text-amber-200'
                 )}
               />
             </button>
@@ -1894,7 +1928,7 @@ function SessionReviewCard({
 
       {/* Quick feedback tags */}
       <div className="mb-3">
-        <p className="text-[11px] text-slate-500 font-medium mb-1.5">What did you like most?</p>
+        <p className="text-[11px] text-muted-foreground font-medium mb-1.5">What did you like most?</p>
         <div className="flex flex-wrap gap-1.5">
           {QUICK_TAGS.map((tag) => {
             const isSelected = selectedTags.includes(tag)
@@ -1907,7 +1941,7 @@ function SessionReviewCard({
                   'rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all cursor-pointer',
                   isSelected
                     ? 'bg-amber-100 text-amber-900 border-amber-300 shadow-xs scale-102 font-semibold'
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                    : 'bg-card text-foreground border-border hover:border-slate-300'
                 )}
               >
                 {tag}
@@ -1925,7 +1959,7 @@ function SessionReviewCard({
           placeholder="Share your thoughts about the food or service..."
           rows={2}
           maxLength={500}
-          className="w-full text-xs rounded-xl border border-slate-200 bg-white p-2.5 text-[#1a1d29] placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-amber-400/50 resize-none"
+          className="w-full text-xs rounded-xl border border-border bg-card p-2.5 text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-amber-400/50 resize-none"
         />
         <input
           type="text"
@@ -1933,7 +1967,7 @@ function SessionReviewCard({
           onChange={(e) => setName(e.target.value)}
           placeholder="Your name (optional)"
           maxLength={50}
-          className="w-full text-xs rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[#1a1d29] placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-amber-400/50"
+          className="w-full text-xs rounded-xl border border-border bg-card px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-amber-400/50"
         />
       </div>
 
@@ -1961,7 +1995,7 @@ function SessionReviewCard({
         <button
           type="button"
           onClick={handleViewBill}
-          className="text-xs text-slate-400 hover:text-[#1a1d29] underline transition-colors cursor-pointer"
+          className="text-xs text-muted-foreground hover:text-foreground underline transition-colors cursor-pointer"
         >
           View Bill
         </button>
