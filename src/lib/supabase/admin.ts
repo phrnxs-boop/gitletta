@@ -6,7 +6,7 @@ let cached: SupabaseClient | null = null
  * Privileged server-only client (service role). Bypasses RLS.
  *
  * Used for operations that are deliberately not expressible as a user policy:
- * staff PIN sessions, customer ordering, onboarding, Google review sync.
+ * staff PIN sessions, customer ordering, onboarding, customer review sync.
  * NEVER import this from a client component.
  */
 export function supabaseAdmin(): SupabaseClient {

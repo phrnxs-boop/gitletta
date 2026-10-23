@@ -10,14 +10,6 @@ import {
   DEFAULT_TEXT_MODEL,
   DEFAULT_IMAGE_MODEL,
 } from "../_shared/gemini.ts";
-import {
-  getGoogleConfig,
-  maskSecret,
-  defaultRedirectUri,
-  testGoogleCredentials,
-  GOOGLE_CONFIG_ID,
-  GBP_SCOPE,
-} from "../_shared/google.ts";
 
 /**
  * /functions/v1/super-admin
@@ -1213,33 +1205,6 @@ async function testAiProvider(req: Request) {
   }
 }
 
-/**
- * The Google Business Profile OAuth configuration, as the dashboard sees it.
- *
- * The client secret is never returned — only a mask. The client id and the
- * redirect URI are shown in full, because the administrator has to copy them
- * into the Google Cloud console, and neither is a secret.
- */
-/**
- * The Google Business Profile configuration, as the dashboard sees it.
- *
- * The client id and the client secret are edge function secrets, so there is
- * nothing to show and nothing to change — only whether one is configured and
- * which redirect URI to register. The redirect URI is not a credential: it is
- * the address Google sends the owner back to, and it has to match the OAuth
- * client exactly.
- */
-async function getGoogleConfigSettings(req: Request) {
-  const config = await getGoogleConfig();
-  return json(req, {
-    configured: Boolean(config.clientId && config.clientSecret),
-    source: config.source,
-    redirectUri: config.redirectUri ?? defaultRedirectUri(),
-    defaultRedirectUri: defaultRedirectUri(),
-    scope: GBP_SCOPE,
-    updatedAt: config.updatedAt,
-  });
-}
 
 /**
  * Change the redirect URI.
@@ -1249,18 +1214,8 @@ async function getGoogleConfigSettings(req: Request) {
  * silently ignored.
  */
 async function saveGoogleConfig(req: Request, adminId: string) {
-  const b = await req.json().catch(() => ({})) as any;
-
-  if (b.clientId || b.client_id || b.clientSecret || b.client_secret) {
-    return json(
-      req,
-      {
-        error:
-          "The client id and secret are edge function secrets now, not settings. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as Supabase edge function secrets.",
-      },
-      400,
-    );
-  }
+  return json(req, { error: "Not found" }, 404);
+}
 
   const redirectUri = String(b.redirectUri ?? "").trim() || defaultRedirectUri();
   if (!/^https:\/\//i.test(redirectUri)) {
@@ -1287,27 +1242,7 @@ async function saveGoogleConfig(req: Request, adminId: string) {
   return json(req, { ok: true, redirectUri: data.redirect_uri, updatedAt: data.updated_at });
 }
 
-async function testGoogleConfig(req: Request) {
-  const config = await getGoogleConfig();
-  if (!config.clientId || !config.clientSecret) {
-    return json(
-      req,
-      {
-        ok: false,
-        error:
-          "No client id or client secret is configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as Supabase edge function secrets.",
-      },
-      400,
-    );
-  }
 
-  const result = await testGoogleCredentials(config);
-  return json(req, {
-    ok: result.ok,
-    message: result.message,
-    redirectUri: config.redirectUri ?? defaultRedirectUri(),
-  });
-}
 
 /**
  * Set the Razorpay plan id for a plan.
