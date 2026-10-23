@@ -711,16 +711,10 @@ function MenuCard({
         </div>
       )}
 
-      {/* Single bottom row: price + compact add button */}
+      {/* Price only — card tap handles add with selected portion */}
       <div className="mt-auto pt-2 flex items-center justify-between gap-2">
         <span className="font-bold text-sm sm:text-base text-gradient-primary leading-none">
           {currencySymbol}{displayPrice.toFixed(2)}
-        </span>
-        <span
-          className="h-7 px-2.5 rounded-lg border border-primary/25 bg-primary/10 group-hover:bg-primary group-hover:text-primary-foreground text-primary text-[11px] font-semibold inline-flex items-center gap-1 transition-colors shrink-0"
-        >
-          <Plus className="h-3 w-3" />
-          <span>{activePortion ? activePortion.name : 'Add'}</span>
         </span>
       </div>
     </div>
