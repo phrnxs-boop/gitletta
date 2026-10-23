@@ -6,6 +6,7 @@ import { toCamel } from "../_shared/case.ts";
 import { json, preflight } from "../_shared/http.ts";
 import { resolvePlan } from "../_shared/plans.ts";
 import { PERMISSION_KEYS } from "../_shared/permissions.ts";
+import { effectiveDishBasePrice, normalizeStoredPortions } from "../_shared/portions.ts";
 
 /**
  * /functions/v1/bootstrap  (GET, dashboard.view)
@@ -143,7 +144,15 @@ Deno.serve(async (req: Request) => {
     const users = toCamel(usersRes.data ?? []);
     const roles = toCamel(rolesRes.data ?? []);
     const categories = toCamel(categoriesRes.data ?? []);
-    const menuItems = toCamel(menuRes.data ?? []);
+    const menuItems = (menuRes.data ?? []).map((row: any) => {
+      const item = toCamel<any>(row);
+      const portions = normalizeStoredPortions(row?.portions);
+      item.portions = portions;
+      if (portions && portions.length > 0) {
+        item.price = effectiveDishBasePrice(item.price, portions);
+      }
+      return item;
+    });
     const tables = toCamel(tablesRes.data ?? []);
     const orders = toCamel(ordersRes.data ?? []);
     const reservations = toCamel(reservationsRes.data ?? []);

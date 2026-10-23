@@ -4,6 +4,7 @@ import { guard } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
 import { evaluatePromo } from "../_shared/promo.ts";
 import { body, json, preflight, subPath } from "../_shared/http.ts";
+import { resolveOrderUnitPrice } from "../_shared/portions.ts";
 
 /**
  * /functions/v1/orders
@@ -35,31 +36,13 @@ function mapOrderItem(row: any) {
     orderId: row.order_id,
     menuItemId: row.menu_item_id,
     name: row.name,
+    portionId: row.portion_id ?? null,
     portion: row.portion ?? null,
     price: row.price,
     quantity: row.quantity,
     notes: row.notes,
     status: row.status,
   };
-}
-
-/**
- * Resolve the price for one order line from the database — never from the
- * client. A portion dish has a price per portion; anything else uses the base
- * price. A portion name that does not exist on the item is rejected rather
- * than silently charged at the wrong price.
- */
-function resolveUnitPrice(
-  mi: { name: string; price: number; portions: { name: string; price: number }[] | null },
-  portion: unknown,
-): { ok: true; price: number; portion: string | null } | { ok: false; error: string } {
-  if (portion === null || portion === undefined || portion === "") {
-    return { ok: true, price: mi.price, portion: null };
-  }
-  const wanted = String(portion).trim().toLowerCase();
-  const match = (mi.portions ?? []).find((p) => p.name.toLowerCase() === wanted);
-  if (!match) return { ok: false, error: `${mi.name} has no portion named "${String(portion)}"` };
-  return { ok: true, price: match.price, portion: match.name };
 }
 
 function mapOrder(row: any) {
@@ -345,7 +328,6 @@ async function create(req: Request): Promise<Response> {
     }
 
     // Compute item totals from the database (never from client prices)
-    let itemsTotal = 0;
     const itemData: any[] = [];
     for (const it of items || []) {
       const { data: mi } = await db
@@ -355,20 +337,36 @@ async function create(req: Request): Promise<Response> {
         .maybeSingle();
       if (!mi) continue;
       if (mi.tenant_id !== tenantId) continue; // ensure item belongs to this tenant
-      const unit = resolveUnitPrice(mi, it.portion);
+      const unit = resolveOrderUnitPrice(mi, it.portion, it.portionId);
       if (!unit.ok) return json(req, { error: unit.error }, 400);
       const qty = Math.max(1, Number(it.quantity) || 1);
-      itemsTotal += unit.price * qty;
-      itemData.push({
-        menu_item_id: mi.id,
-        name: mi.name,
-        portion: unit.portion,
-        price: unit.price,
-        quantity: qty,
-        notes: it.notes || null,
-        status: "PENDING",
-      });
+      const cleanNotes = String(it.notes ?? "").trim() || null;
+
+      // Merge duplicate lines for the same dish + portion + note so an order
+      // never creates duplicate order_items rows or double-charges a line.
+      const existing = itemData.find(
+        (row) =>
+          row.menu_item_id === mi.id &&
+          (row.portion_id ?? null) === (unit.portionId ?? null) &&
+          (row.notes ?? null) === cleanNotes,
+      );
+      if (existing) {
+        existing.quantity += qty;
+      } else {
+        itemData.push({
+          menu_item_id: mi.id,
+          name: mi.name,
+          portion_id: unit.portionId,
+          portion: unit.portion,
+          price: unit.price,
+          quantity: qty,
+          notes: cleanNotes,
+          status: "PENDING",
+        });
+      }
     }
+
+    const itemsTotal = itemData.reduce((s, row) => s + row.price * row.quantity, 0);
 
     if (itemData.length === 0) {
       return json(req, { error: "No valid items in order" }, 400);
@@ -615,7 +613,7 @@ async function addItem(req: Request, orderId: string): Promise<Response> {
   if (miError) return json(req, { error: miError.message }, 500);
   if (!mi) return json(req, { error: "Menu item not found" }, 404);
 
-  const unit = resolveUnitPrice(mi, b.portion);
+  const unit = resolveOrderUnitPrice(mi, b.portion, b.portionId);
   if (!unit.ok) return json(req, { error: unit.error }, 400);
 
   const { data: item, error: itemError } = await db
@@ -624,10 +622,11 @@ async function addItem(req: Request, orderId: string): Promise<Response> {
       order_id: orderId,
       menu_item_id: mi.id,
       name: mi.name,
+      portion_id: unit.portionId,
       portion: unit.portion,
       price: unit.price,
-      quantity: b.quantity || 1,
-      notes: b.notes,
+      quantity: Math.max(1, Number(b.quantity) || 1),
+      notes: b.notes || null,
       status: "PENDING",
     })
     .select()

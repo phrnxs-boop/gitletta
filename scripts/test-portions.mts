@@ -123,7 +123,7 @@ try {
   check("Over 8 portions rejected with 400", manyRes.status === 400, manyRes.data);
 
   console.log(`
-── 3. Create Dish with Portions ──`);
+── 3. Create Dish with Portions (without separate base price) ──`);
   const testDishName = `Tandoori Chicken Test ${Date.now()}`;
   const createRes = await callFn("menu", token, {
     method: "POST",
@@ -131,11 +131,12 @@ try {
       categoryId,
       name: testDishName,
       description: "Tender chicken cooked with aromatic spices in a clay oven",
-      price: 240, // Base price (fallback)
+      // Even if a conflicting price (90) or no price is sent, server syncs base price to min portion (70)
+      price: 90,
       portions: [
-        { name: "Quarter", price: 70 },
+        { name: "quarter", price: 70 },
         { name: "Half", price: 130 },
-        { name: "Full", price: 240 },
+        { name: "full", price: 240 },
       ],
     }),
   });
@@ -143,6 +144,15 @@ try {
   const dishId = createRes.data?.id;
   if (dishId) createdItemIds.push(dishId);
   check("Dish portions returned on create", Array.isArray(createRes.data?.portions) && createRes.data.portions.length === 3);
+  check("Base price synced to min portion price (70, not conflicting 90)", createRes.data?.price === 70, createRes.data?.price);
+  check(
+    "Portion names canonicalised and assigned stable IDs",
+    createRes.data?.portions?.[0]?.id === "quarter" &&
+      createRes.data?.portions?.[0]?.name === "Quarter" &&
+      createRes.data?.portions?.[2]?.id === "full" &&
+      createRes.data?.portions?.[2]?.name === "Full",
+    createRes.data?.portions,
+  );
 
   console.log(`
 ── 4. Verify Menu List contains Portions ──`);
@@ -156,7 +166,7 @@ try {
   check("Full price is 240", foundDish?.portions?.find((p: any) => p.name === "Full")?.price === 240);
 
   console.log(`
-── 5. Place Order with Selected Portion (Half @ ₹130) ──`);
+── 5. Place Order with Selected Portion (Half @ ₹130) & Duplicate Line Merging ──`);
   const orderRes = await callFn("orders", token, {
     method: "POST",
     body: JSON.stringify({
@@ -165,8 +175,16 @@ try {
       items: [
         {
           menuItemId: dishId,
+          portionId: "half",
           portion: "Half",
-          quantity: 2,
+          price: 9999, // Tampered client price — must be ignored
+          quantity: 1,
+          notes: "Extra mint chutney",
+        },
+        {
+          menuItemId: dishId,
+          portion: "half", // Duplicate line with lowercase 'half' and same note -> merges into qty 2
+          quantity: 1,
           notes: "Extra mint chutney",
         },
       ],
@@ -176,9 +194,11 @@ try {
   const orderId = orderRes.data?.id;
   if (orderId) createdOrderIds.push(orderId);
 
+  check("Duplicate portion lines merged into 1 order_item row", orderRes.data?.items?.length === 1, orderRes.data?.items);
   const orderItem = orderRes.data?.items?.[0];
-  check("Order item has portion 'Half'", orderItem?.portion === "Half", orderItem);
-  check("Order item unit price is ₹130 (portion price, not base ₹240)", orderItem?.price === 130, orderItem?.price);
+  check("Order item has portion 'Half' and portionId 'half'", orderItem?.portion === "Half" && orderItem?.portionId === "half", orderItem);
+  check("Order item unit price is ₹130 (portion price charged once, not base ₹70 + ₹130)", orderItem?.price === 130, orderItem?.price);
+  check("Order item quantity merged to 2", orderItem?.quantity === 2, orderItem?.quantity);
   check("Order itemsTotal matches 2 × 130 = ₹260", orderRes.data?.itemsTotal === 260, orderRes.data?.itemsTotal);
 
   console.log(`
@@ -200,26 +220,45 @@ try {
   check("Invalid portion rejected with 400", badOrderRes.status === 400, badOrderRes.data);
 
   console.log(`
-── 7. Order Item Without Portion (Backward Compatibility) ──`);
-  const baseOrderRes = await callFn("orders", token, {
+── 7. Single-Price Dish & Backward Compatibility ──`);
+  const singleDishRes = await callFn("menu", token, {
+    method: "POST",
+    body: JSON.stringify({
+      categoryId,
+      name: `Single Price Paneer ${Date.now()}`,
+      price: 180,
+      portions: null,
+    }),
+  });
+  check("Single-price dish created (201)", singleDishRes.status === 201, singleDishRes.data);
+  const singleDishId = singleDishRes.data?.id;
+  if (singleDishId) createdItemIds.push(singleDishId);
+  check("Single-price dish portions is null", singleDishRes.data?.portions === null);
+  check("Single-price dish price is 180", singleDishRes.data?.price === 180);
+
+  const singleOrderRes = await callFn("orders", token, {
     method: "POST",
     body: JSON.stringify({
       orderType: "TAKEAWAY",
-      customerName: "Base Portion Test",
-      items: [
-        {
-          menuItemId: dishId,
-          // No portion sent -> should fall back to base price 240
-          quantity: 1,
-        },
-      ],
+      customerName: "Single Price Test",
+      items: [{ menuItemId: singleDishId, quantity: 2 }],
     }),
   });
-  check("Order without portion accepted (201)", baseOrderRes.status === 201, baseOrderRes.data);
-  if (baseOrderRes.data?.id) createdOrderIds.push(baseOrderRes.data.id);
-  const baseItem = baseOrderRes.data?.items?.[0];
-  check("Item portion is null", baseItem?.portion === null, baseItem?.portion);
-  check("Item unit price is base price ₹240", baseItem?.price === 240, baseItem?.price);
+  check("Order for single-price dish accepted (201)", singleOrderRes.status === 201, singleOrderRes.data);
+  if (singleOrderRes.data?.id) createdOrderIds.push(singleOrderRes.data.id);
+  const singleOrderItem = singleOrderRes.data?.items?.[0];
+  check("Single-price order item portion is null", singleOrderItem?.portion === null);
+  check("Single-price order item unit price is ₹180 and itemsTotal is ₹360", singleOrderItem?.price === 180 && singleOrderRes.data?.itemsTotal === 360);
+
+  const invalidSinglePortionRes = await callFn("orders", token, {
+    method: "POST",
+    body: JSON.stringify({
+      orderType: "TAKEAWAY",
+      customerName: "Invalid Single Portion",
+      items: [{ menuItemId: singleDishId, portion: "Half", quantity: 1 }],
+    }),
+  });
+  check("Sending portion for a single-price dish rejected with 400", invalidSinglePortionRes.status === 400, invalidSinglePortionRes.data);
 
   console.log(`
 ── 8. Add Item with Portion to Existing Order (Quarter @ ₹70) ──`);
@@ -227,13 +266,14 @@ try {
     method: "POST",
     body: JSON.stringify({
       menuItemId: dishId,
+      portionId: "quarter",
       portion: "Quarter",
       quantity: 1,
       notes: "Crispy",
     }),
   });
   check("Item added to order (201)", addItemRes.status === 201, addItemRes.data);
-  check("Added item has portion 'Quarter'", addItemRes.data?.portion === "Quarter");
+  check("Added item has portion 'Quarter' and portionId 'quarter'", addItemRes.data?.portion === "Quarter" && addItemRes.data?.portionId === "quarter");
   check("Added item price is ₹70", addItemRes.data?.price === 70);
 
   // Check updated order totals: 2×130 + 1×70 = ₹330
@@ -255,7 +295,7 @@ try {
   check("Bill subtotal is 330", billRes.data?.subtotal === 330);
 
   console.log(`
-── 10. Update Dish Portions (PATCH /menu) ──`);
+── 10. Update Dish Portions (PATCH /menu) & DB Trigger Deduplication ──`);
   const patchRes = await callFn(`menu/${dishId}`, token, {
     method: "PATCH",
     body: JSON.stringify({
@@ -266,8 +306,47 @@ try {
     }),
   });
   check("Menu item patched with new portions (200)", patchRes.status === 200, patchRes.data);
-  check("Patched item has 2 portions", patchRes.data?.portions?.length === 2);
-  check("New portion 'Small' is ₹80", patchRes.data?.portions?.find((p: any) => p.name === "Small")?.price === 80);
+  check("Patched item has 2 portions with stable IDs", patchRes.data?.portions?.length === 2 && patchRes.data?.portions?.[0]?.id === "small");
+  check("Patched item base price synced to ₹80", patchRes.data?.price === 80, patchRes.data?.price);
+
+  // Verify DB trigger deduplicates direct SQL writes
+  const { data: sqlRow, error: sqlErr } = await admin
+    .from("menu_items")
+    .update({
+      price: 999,
+      portions: [
+        { name: "half", price: 60 },
+        { name: "HALF", price: 95 },
+        { name: "full", price: 120 },
+      ],
+    })
+    .eq("id", dishId)
+    .select("price, portions")
+    .single();
+  check("Direct SQL write succeeded", !sqlErr && Boolean(sqlRow), sqlErr);
+  check("DB trigger deduplicated 'half'/'HALF' to 2 portions", Array.isArray(sqlRow?.portions) && sqlRow.portions.length === 2, sqlRow?.portions);
+  check("DB trigger synced base price to 60 (not 999)", sqlRow?.price === 60, sqlRow?.price);
+
+  console.log(`
+── 11. Frontend Portion Helpers Verification ──`);
+  const { formatDishPriceLabel, normalizePortions, normalizePortionKey } = await import("../src/lib/portions.ts");
+  check(
+    "Single-portion price label does not duplicate price ('₹100.00', never '₹100–₹100.00')",
+    formatDishPriceLabel(100, [{ name: "Full", price: 100 }], "₹") === "₹100.00",
+  );
+  check(
+    "Multi-portion price label formats range cleanly ('₹50.00 – ₹100.00')",
+    formatDishPriceLabel(90, [{ name: "Half", price: 50 }, { name: "full", price: 100 }], "₹") === "₹50.00 – ₹100.00",
+  );
+  check(
+    "normalizePortions deduplicates case-insensitively and canonicalises names",
+    normalizePortions([{ name: "half", price: 50 }, { name: "Half", price: 60 }]).length === 1 &&
+      normalizePortions([{ name: "full", price: 100 }])[0]?.name === "Full",
+  );
+  check(
+    "normalizePortionKey matches 'Full' and 'full'",
+    normalizePortionKey("Full") === normalizePortionKey("full"),
+  );
 
 } finally {
   console.log(`

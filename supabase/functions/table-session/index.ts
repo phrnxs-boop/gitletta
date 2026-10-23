@@ -4,6 +4,7 @@ import { guard, tableSession } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
 import { normaliseMenuTheme } from "../_shared/menu-theme.ts";
 import { body, json, preflight, subPath } from "../_shared/http.ts";
+import { effectiveDishBasePrice, normalizeStoredPortions } from "../_shared/portions.ts";
 
 /**
  * /functions/v1/table-session
@@ -338,14 +339,15 @@ function mapCategory(row: any) {
 
 function mapMenuItem(row: any) {
   const category = Array.isArray(row.category) ? row.category[0] : row.category;
+  const portions = normalizeStoredPortions(row.portions);
   return {
     id: row.id,
     tenantId: row.tenant_id,
     categoryId: row.category_id,
     name: row.name,
     description: row.description,
-    price: row.price,
-    portions: Array.isArray(row.portions) ? row.portions : null,
+    price: effectiveDishBasePrice(row.price, portions),
+    portions,
     image: row.image,
     available: row.available,
     prepTime: row.prep_time,

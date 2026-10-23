@@ -3,6 +3,13 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useApp, type MenuItem, type Category } from '@/components/app/data-context'
 import { cn } from '@/lib/utils'
+import {
+  PORTION_PRESETS,
+  canonicalPortionName,
+  formatDishPriceLabel,
+  normalizePortions,
+  portionIdFromName,
+} from '@/lib/portions'
 import { useScrollCollapse } from '@/lib/use-scroll-collapse'
 import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
@@ -58,7 +65,7 @@ interface MenuFormState {
   name: string
   description: string
   price: string
-  portions: { name: string; price: string }[]
+  portions: { id: string; name: string; price: string }[]
   categoryId: string
   prepTime: string
   calories: string
@@ -204,12 +211,19 @@ export function MenuView() {
   }
 
   const openEdit = (item: MenuItem) => {
+    const normPortions = normalizePortions(item.portions)
+    const minPortionPrice =
+      normPortions.length > 0 ? Math.min(...normPortions.map((p) => p.price)) : item.price
     setEditingItem(item)
     setForm({
       name: item.name,
       description: item.description || '',
-      price: String(item.price ?? ''),
-      portions: (item.portions || []).map((p) => ({ name: p.name, price: String(p.price) })),
+      price: String(minPortionPrice ?? ''),
+      portions: normPortions.map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: String(p.price),
+      })),
       categoryId: item.categoryId,
       prepTime: String(item.prepTime ?? 15),
       calories: item.calories != null ? String(item.calories) : '',
@@ -225,6 +239,26 @@ export function MenuView() {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
+  const addPortionOption = (presetName?: string) => {
+    setForm((f) => {
+      if (f.portions.length >= 8) return f
+      const cleanPreset = presetName ? canonicalPortionName(presetName) : ''
+      if (
+        cleanPreset &&
+        f.portions.some((p) => p.name.trim().toLowerCase() === cleanPreset.toLowerCase())
+      ) {
+        return f
+      }
+      const id = cleanPreset
+        ? portionIdFromName(cleanPreset)
+        : `custom-${Date.now()}-${f.portions.length + 1}`
+      return {
+        ...f,
+        portions: [...f.portions, { id, name: cleanPreset, price: '' }],
+      }
+    })
+  }
+
   const handleSave = async () => {
     if (!form.name.trim()) {
       toast.error('Item name is required')
@@ -234,14 +268,16 @@ export function MenuView() {
       toast.error('Please select a category')
       return
     }
-    const price = parseFloat(form.price)
-    if (Number.isNaN(price) || price < 0) {
-      toast.error('Enter a valid price')
-      return
-    }
     const portions = form.portions
       .filter((p) => p.name.trim() || p.price.trim())
-      .map((p) => ({ name: p.name.trim(), price: parseFloat(p.price) }))
+      .map((p) => {
+        const name = canonicalPortionName(p.name)
+        return {
+          id: portionIdFromName(name, p.id),
+          name,
+          price: parseFloat(p.price),
+        }
+      })
     if (portions.some((p) => !p.name)) {
       toast.error('Every portion needs a name')
       return
@@ -252,14 +288,23 @@ export function MenuView() {
     }
     const names = portions.map((p) => p.name.toLowerCase())
     if (new Set(names).size !== names.length) {
-      toast.error('Two portions have the same name')
+      toast.error('Each portion name must be unique')
       return
     }
+
+    let price = parseFloat(form.price)
+    if (portions.length > 0) {
+      price = Math.min(...portions.map((p) => p.price))
+    } else if (Number.isNaN(price) || price < 0) {
+      toast.error('Enter a valid price')
+      return
+    }
+
     const body = {
       name: form.name.trim(),
       description: form.description.trim() || null,
       price,
-      portions: portions.map((p) => ({ name: p.name, price: p.price })),
+      portions: portions.length > 0 ? portions : null,
       categoryId: form.categoryId,
       prepTime: parseInt(form.prepTime || '15', 10) || 15,
       calories: form.calories ? parseInt(form.calories, 10) : null,
@@ -655,80 +700,121 @@ export function MenuView() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="m-price">Price *</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                  {currency}
-                </span>
-                <Input
-                  id="m-price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.price}
-                  onChange={(e) => setField('price', e.target.value)}
-                  placeholder="0.00"
-                  className="bg-secondary/50 border-0 pl-7"
-                />
+            {form.portions.length === 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="m-price">Price *</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                    {currency}
+                  </span>
+                  <Input
+                    id="m-price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.price}
+                    onChange={(e) => setField('price', e.target.value)}
+                    placeholder="0.00"
+                    className="bg-secondary/50 border-0 pl-7"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Portions — Quarter/Half/Full or custom sizes, each with its own
-                price. Empty list = a normal single-price dish. */}
-            <div className="space-y-2 rounded-lg border border-border/60 p-3 bg-secondary/20">
-              <div className="flex items-center justify-between">
-                <Label>Portions / sizes</Label>
-                <span className="text-[10px] text-muted-foreground">optional</span>
+                price. When portions are defined, the dish uses portion pricing
+                exclusively so there is never a duplicate standalone price field. */}
+            <div
+              className={cn(
+                'space-y-2.5 rounded-lg border border-border/60 p-3 bg-secondary/20',
+                form.portions.length > 0 && 'sm:col-span-2',
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Label>Portions / sizes</Label>
+                  {form.portions.length > 0 && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {form.portions.length} {form.portions.length === 1 ? 'portion' : 'portions'}
+                    </Badge>
+                  )}
+                </div>
+                {form.portions.length === 0 ? (
+                  <span className="text-[10px] text-muted-foreground">optional</span>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
+                    onClick={() => setField('portions', [])}
+                  >
+                    Switch to single price
+                  </Button>
+                )}
               </div>
-              {form.portions.length === 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {['Quarter', 'Half', 'Full'].map((preset) => (
+
+              <div className="flex flex-wrap gap-1.5">
+                {PORTION_PRESETS.map((preset) => {
+                  const alreadyAdded = form.portions.some(
+                    (p) => p.name.trim().toLowerCase() === preset.toLowerCase(),
+                  )
+                  return (
                     <Button
                       key={preset}
                       type="button"
-                      variant="outline"
+                      variant={alreadyAdded ? 'secondary' : 'outline'}
                       size="sm"
+                      disabled={alreadyAdded || form.portions.length >= 8}
                       className="h-7 text-xs"
-                      onClick={() => setField('portions', [{ name: preset, price: '' }])}
+                      onClick={() => addPortionOption(preset)}
                     >
-                      + {preset}
+                      {alreadyAdded ? `✓ ${preset}` : `+ ${preset}`}
                     </Button>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setField('portions', [{ name: '', price: '' }])}
-                  >
-                    + Custom size
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {form.portions.map((p, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
+                  )
+                })}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={form.portions.length >= 8}
+                  className="h-7 text-xs"
+                  onClick={() => addPortionOption()}
+                >
+                  + Custom size
+                </Button>
+              </div>
+
+              {form.portions.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  {form.portions.map((p) => (
+                    <div key={p.id} className="flex items-center gap-2">
                       <Input
                         value={p.name}
                         onChange={(e) => {
-                          const next = [...form.portions]
-                          next[idx] = { ...p, name: e.target.value }
-                          setField('portions', next)
+                          setField(
+                            'portions',
+                            form.portions.map((row) =>
+                              row.id === p.id ? { ...row, name: e.target.value } : row,
+                            ),
+                          )
                         }}
                         placeholder="Portion name (e.g. Half)"
                         className="bg-secondary/50 border-0 h-9"
                       />
-                      <div className="relative w-28 shrink-0">
+                      <div className="relative w-32 shrink-0">
                         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                           {currency}
                         </span>
                         <Input
                           value={p.price}
                           onChange={(e) => {
-                            const next = [...form.portions]
-                            next[idx] = { ...p, price: e.target.value }
-                            setField('portions', next)
+                            setField(
+                              'portions',
+                              form.portions.map((row) =>
+                                row.id === p.id ? { ...row, price: e.target.value } : row,
+                              ),
+                            )
                           }}
                           type="number"
                           step="0.01"
@@ -741,34 +827,19 @@ export function MenuView() {
                         type="button"
                         variant="ghost"
                         size="icon"
+                        aria-label={`Remove ${p.name || 'portion'}`}
                         className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => setField('portions', form.portions.filter((_, i) => i !== idx))}
+                        onClick={() =>
+                          setField(
+                            'portions',
+                            form.portions.filter((row) => row.id !== p.id),
+                          )
+                        }
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   ))}
-                  <div className="flex items-center justify-between">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-muted-foreground"
-                      disabled={form.portions.length >= 8}
-                      onClick={() => setField('portions', [...form.portions, { name: '', price: '' }])}
-                    >
-                      + Add portion
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-muted-foreground hover:text-destructive"
-                      onClick={() => setField('portions', [])}
-                    >
-                      Remove all
-                    </Button>
-                  </div>
                 </div>
               )}
             </div>
@@ -1234,14 +1305,24 @@ function MenuCard({
       {/* Price + category */}
       <div className="mt-3 flex items-center justify-between">
         <span className="text-lg font-bold text-primary">
-          {item.portions && item.portions.length > 0
-            ? `${currency}${Math.min(...item.portions.map((p) => p.price)).toFixed(0)}–${currency}${Math.max(...item.portions.map((p) => p.price)).toFixed(2)}`
-            : `${currency}${item.price.toFixed(2)}`}
+          {formatDishPriceLabel(item.price, item.portions, currency)}
         </span>
         <Badge variant="secondary" className="text-[10px]">
           {categoryIcon} {categoryName}
         </Badge>
       </div>
+      {normalizePortions(item.portions).length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {normalizePortions(item.portions).map((p) => (
+            <span
+              key={p.id}
+              className="rounded-md bg-secondary/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+            >
+              {p.name}: <span className="font-semibold text-foreground">{currency}{p.price.toFixed(2)}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Tags */}
       {tags.length > 0 && (

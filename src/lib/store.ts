@@ -1,6 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
+import { canonicalPortionName, normalizePortionKey } from '@/lib/portions'
 
 export type ViewKey =
   | 'dashboard' | 'orders' | 'analytics' | 'promos' | 'qr'
@@ -9,7 +10,8 @@ export type ViewKey =
 export interface CartItem {
   menuItemId: string
   name: string
-  /** Which portion (size) was chosen, for dishes sold per portion. */
+  /** Stable portion ID and display name for dishes sold per portion. */
+  portionId?: string | null
   portion?: string | null
   price: number
   image?: string | null
@@ -18,11 +20,17 @@ export interface CartItem {
 }
 
 /**
- * A cart line is one dish in one portion. The same dish ordered in two
- * portions is two lines, so every lookup matches menuItemId AND portion.
+ * A cart line is one dish in one portion. Case-insensitive normalised key
+ * ensures "Full" and "full" or matching portionId always merge into one line.
  */
-const sameLine = (c: CartItem, menuItemId: string, portion?: string | null) =>
-  c.menuItemId === menuItemId && (c.portion ?? null) === (portion ?? null)
+const sameLine = (
+  c: CartItem,
+  menuItemId: string,
+  portion?: string | null,
+  portionId?: string | null,
+) =>
+  c.menuItemId === menuItemId &&
+  normalizePortionKey(c.portion, c.portionId) === normalizePortionKey(portion, portionId)
 
 interface AppState {
   // tenant context
@@ -73,15 +81,24 @@ export const useStore = create<AppState>((set) => ({
   cart: [],
   addToCart: (item, qty = 1) =>
     set((s) => {
-      const existing = s.cart.find((c) => sameLine(c, item.menuItemId, item.portion))
+      const cleanPortion = item.portion ? canonicalPortionName(item.portion) : null
+      const cleanPortionId = item.portionId || (cleanPortion ? normalizePortionKey(cleanPortion) : null)
+      const existing = s.cart.find((c) => sameLine(c, item.menuItemId, cleanPortion, cleanPortionId))
       if (existing) {
         return {
           cart: s.cart.map((c) =>
-            sameLine(c, item.menuItemId, item.portion) ? { ...c, quantity: c.quantity + qty } : c
+            sameLine(c, item.menuItemId, cleanPortion, cleanPortionId)
+              ? { ...c, price: item.price, portion: cleanPortion, portionId: cleanPortionId, quantity: c.quantity + qty }
+              : c
           ),
         }
       }
-      return { cart: [...s.cart, { ...item, quantity: qty }] }
+      return {
+        cart: [
+          ...s.cart,
+          { ...item, portion: cleanPortion, portionId: cleanPortionId, quantity: qty },
+        ],
+      }
     }),
   updateCartQty: (menuItemId, qty, portion) =>
     set((s) => ({

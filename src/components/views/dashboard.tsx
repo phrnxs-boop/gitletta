@@ -6,6 +6,7 @@ import { useT } from '@/lib/i18n'
 import { useStore } from '@/lib/store'
 import { edgeFetch } from '@/lib/edge'
 import { cn } from '@/lib/utils'
+import { normalizePortions, type MenuPortion } from '@/lib/portions'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -238,6 +239,7 @@ export function DashboardView() {
           orderType,
           items: cart.map((c) => ({
             menuItemId: c.menuItemId,
+            portionId: c.portionId || undefined,
             portion: c.portion || undefined,
             quantity: c.quantity,
             notes: c.notes,
@@ -372,6 +374,7 @@ export function DashboardView() {
                   addToCart({
                     menuItemId: item.id,
                     name: item.name,
+                    portionId: portion.id,
                     portion: portion.name,
                     price: portion.price,
                     image: item.image,
@@ -594,12 +597,17 @@ function MenuCard({
   item: any
   inCart: number
   onAdd: () => void
-  /** Dishes sold per portion: tapping a portion chip adds that portion. */
-  onAddPortion: (portion: { name: string; price: number }) => void
+  /** Dishes sold per portion: select a portion, then add that portion. */
+  onAddPortion: (portion: MenuPortion) => void
   currencySymbol?: string
 }) {
   const tags = item.tags ? item.tags.split(',') : []
-  const portions = Array.isArray(item.portions) ? item.portions : []
+  const portions = useMemo(() => normalizePortions(item.portions), [item.portions])
+  const [selectedPortionId, setSelectedPortionId] = useState<string>(() => portions[0]?.id ?? '')
+  const activePortion =
+    portions.find((p) => p.id === selectedPortionId) ?? portions[0] ?? null
+  const displayPrice = activePortion ? activePortion.price : Number(item.price || 0)
+
   const body = (
     <>
       {inCart > 0 && (
@@ -633,9 +641,7 @@ function MenuCard({
             instead of spilling outside the card. */}
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1">
           <span className="font-bold text-base text-gradient-primary">
-            {portions.length > 0
-              ? `${currencySymbol}${Math.min(...portions.map((p: any) => p.price))}–${currencySymbol}${Math.max(...portions.map((p: any) => p.price))}`
-              : `${currencySymbol}${item.price.toFixed(2)}`}
+            {currencySymbol}{displayPrice.toFixed(2)}
           </span>
           {tags[0] && <Tag label={tags[0]} />}
         </div>
@@ -655,24 +661,39 @@ function MenuCard({
     </>
   )
 
-  // A dish with portions is not a single tap-to-add card: the portion is part
-  // of what is being ordered, so each portion is its own button. A dish
-  // without portions keeps the one-tap behaviour the POS had before.
-  if (portions.length > 0) {
+  if (portions.length > 0 && activePortion) {
     return (
-      <div className="group relative card-premium rounded-2xl border border-border p-3 md:p-4 text-left transition-premium hover:border-primary/40 hover:-translate-y-1 hover:shadow-elevated">
+      <div className="group relative card-premium rounded-2xl border border-border p-3 md:p-4 text-left transition-premium hover:border-primary/40 hover:-translate-y-1 hover:shadow-elevated flex flex-col">
         {body}
-        <div className="pt-2 flex flex-wrap gap-1.5">
-          {portions.map((p: any) => (
-            <button
-              key={p.name}
-              onClick={() => onAddPortion(p)}
-              className="flex-1 min-w-[72px] rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/15 px-2 py-1.5 text-[11px] font-semibold text-primary transition-colors"
-            >
-              {p.name}
-              <span className="block text-[10px] font-bold text-primary/80">{currencySymbol}{p.price}</span>
-            </button>
-          ))}
+        <div className="pt-2.5 mt-auto space-y-1.5">
+          <div className="flex flex-wrap gap-1" role="group" aria-label={`Portion options for ${item.name}`}>
+            {portions.map((p) => {
+              const selected = p.id === activePortion.id
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedPortionId(p.id)}
+                  className={cn(
+                    'flex-1 min-w-[56px] rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors',
+                    selected
+                      ? 'border-primary bg-primary text-primary-foreground shadow-xs'
+                      : 'border-border bg-secondary/50 text-muted-foreground hover:text-foreground hover:border-primary/40',
+                  )}
+                >
+                  {p.name}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => onAddPortion(activePortion)}
+            className="w-full rounded-lg border border-primary/30 bg-primary/10 hover:bg-primary/20 px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors flex items-center justify-center gap-1"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Add {activePortion.name}</span>
+          </button>
         </div>
       </div>
     )

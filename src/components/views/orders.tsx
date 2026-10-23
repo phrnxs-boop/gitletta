@@ -404,6 +404,30 @@ export function OrdersView() {
           {payOrder && (
             <div className="space-y-4">
               <div className="rounded-xl bg-secondary/50 p-3 space-y-1.5">
+                {payOrder.items.length > 0 && (
+                  <>
+                    <div className="space-y-1 pb-1">
+                      {payOrder.items.map((it) => (
+                        <div key={it.id} className="flex justify-between text-xs">
+                          <span className="min-w-0 truncate pr-2">
+                            <span className="text-muted-foreground font-medium">{it.quantity}× </span>
+                            {it.name}
+                            {it.portion && (
+                              <span className="ml-1.5 rounded bg-primary/10 border border-primary/20 px-1 py-px text-[10px] font-semibold text-primary align-middle">
+                                {it.portion}
+                              </span>
+                            )}
+                          </span>
+                          <span className="whitespace-nowrap font-medium">
+                            {cs}
+                            {(it.price * it.quantity).toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <Separator className="my-1" />
+                  </>
+                )}
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Subtotal</span>
                   <span>

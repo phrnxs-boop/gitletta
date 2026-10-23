@@ -5,6 +5,7 @@ import { admin } from "../_shared/db.ts";
 import { MENU_THEME_KEY, normaliseMenuTheme } from "../_shared/menu-theme.ts";
 import { PERMISSION_KEYS } from "../_shared/permissions.ts";
 import { body, json, preflight } from "../_shared/http.ts";
+import { effectiveDishBasePrice, normalizeStoredPortions } from "../_shared/portions.ts";
 
 /**
  * /functions/v1/onboarding  (POST, any signed-in session)
@@ -250,25 +251,20 @@ Deno.serve(async (req: Request) => {
           // Portion options extracted from the menu photo (Quarter/Half/Full…),
           // each with its own price. Entries without a readable price are
           // dropped rather than guessed — the same rule the extractor applies.
-          const portions = (Array.isArray(item.variants) ? item.variants : [])
-            .filter((v: any) => v && String(v.name ?? "").trim() && Number.isFinite(Number(v.price)) && Number(v.price) >= 0)
-            .slice(0, 8)
-            .map((v: any) => ({
-              name: String(v.name).trim().slice(0, 40),
-              price: Math.round(Number(v.price) * 100) / 100,
-            }));
+          const portions = normalizeStoredPortions(item.variants ?? item.portions);
+          const resolvedPrice = effectiveDishBasePrice(item.price, portions);
 
           const { error } = await db.from("menu_items").insert({
             tenant_id: tenantId,
             category_id: catDbId,
             name: item.name,
             description: item.description || null,
-            price: Number(item.price) || 0,
+            price: resolvedPrice,
             available: true,
             sort_order: i,
             image: item.image || null,
             tags: tagList.join(","),
-            portions: portions.length > 0 ? portions : null,
+            portions,
           });
           if (error) return json(req, { error: error.message }, 500);
         }

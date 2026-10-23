@@ -26,6 +26,12 @@ import {
 import { cn } from '@/lib/utils'
 import { edgeFetch } from '@/lib/edge'
 import {
+  canonicalPortionName,
+  normalizePortionKey,
+  normalizePortions,
+  type MenuPortion,
+} from '@/lib/portions'
+import {
   applyMenuTheme,
   cacheMenuTheme,
   cachedMenuTheme,
@@ -79,7 +85,7 @@ type MenuItem = {
   name: string
   description?: string | null
   price: number
-  portions?: { name: string; price: number }[] | null
+  portions?: { id?: string; name: string; price: number }[] | null
   image?: string | null
   prepTime: number
   tags?: string | null
@@ -91,6 +97,7 @@ type MenuItem = {
 type CartItem = {
   menuItemId: string
   name: string
+  portionId?: string | null
   portion?: string | null
   price: number
   image?: string | null
@@ -98,6 +105,15 @@ type CartItem = {
   notes?: string
   prepTime?: number
 }
+
+const sameCartLine = (
+  c: CartItem,
+  menuItemId: string,
+  portion?: string | null,
+  portionId?: string | null,
+) =>
+  c.menuItemId === menuItemId &&
+  normalizePortionKey(c.portion, c.portionId) === normalizePortionKey(portion, portionId)
 
 type PlacedOrder = {
   orderNumber: number
@@ -490,17 +506,25 @@ export function PublicMenu() {
   }, [cart, cartKey])
 
   // ----- Cart actions -----
-  function addToCart(item: MenuItem, portion?: { name: string; price: number } | null) {
-    const linePortion = portion?.name ?? null
+  function addToCart(item: MenuItem, portion?: { id?: string; name: string; price: number } | null) {
+    const linePortion = portion?.name ? canonicalPortionName(portion.name) : null
+    const linePortionId =
+      portion?.id || (linePortion ? normalizePortionKey(linePortion) : null)
     const linePrice = portion ? portion.price : item.price
     setCart((prev) => {
-      const existing = prev.find(
-        (c) => c.menuItemId === item.id && (c.portion ?? null) === linePortion,
+      const existing = prev.find((c) =>
+        sameCartLine(c, item.id, linePortion, linePortionId),
       )
       if (existing) {
         return prev.map((c) =>
-          c.menuItemId === item.id && (c.portion ?? null) === linePortion
-            ? { ...c, quantity: c.quantity + 1 }
+          sameCartLine(c, item.id, linePortion, linePortionId)
+            ? {
+                ...c,
+                portion: linePortion,
+                portionId: linePortionId,
+                price: linePrice,
+                quantity: c.quantity + 1,
+              }
             : c,
         )
       }
@@ -509,6 +533,7 @@ export function PublicMenu() {
         {
           menuItemId: item.id,
           name: item.name,
+          portionId: linePortionId,
           portion: linePortion,
           price: linePrice,
           image: item.image,
@@ -522,39 +547,34 @@ export function PublicMenu() {
     })
   }
 
-  function decrement(item: MenuItem, portion?: string | null) {
-    const linePortion = portion ?? null
+  function decrement(item: MenuItem, portion?: string | null, portionId?: string | null) {
     setCart((prev) => {
-      const existing = prev.find(
-        (c) => c.menuItemId === item.id && (c.portion ?? null) === linePortion,
+      const existing = prev.find((c) =>
+        sameCartLine(c, item.id, portion, portionId),
       )
       if (!existing) return prev
       if (existing.quantity <= 1) {
-        return prev.filter(
-          (c) => !(c.menuItemId === item.id && (c.portion ?? null) === linePortion),
-        )
+        return prev.filter((c) => !sameCartLine(c, item.id, portion, portionId))
       }
       return prev.map((c) =>
-        c.menuItemId === item.id && (c.portion ?? null) === linePortion
+        sameCartLine(c, item.id, portion, portionId)
           ? { ...c, quantity: c.quantity - 1 }
           : c,
       )
     })
   }
 
-  function setItemNotes(menuItemId: string, notes: string, portion?: string | null) {
-    const linePortion = portion ?? null
+  function setItemNotes(menuItemId: string, notes: string, portion?: string | null, portionId?: string | null) {
     setCart((prev) =>
       prev.map((c) =>
-        c.menuItemId === menuItemId && (c.portion ?? null) === linePortion ? { ...c, notes } : c
+        sameCartLine(c, menuItemId, portion, portionId) ? { ...c, notes } : c
       )
     )
   }
 
-  function removeFromCart(menuItemId: string, portion?: string | null) {
-    const linePortion = portion ?? null
+  function removeFromCart(menuItemId: string, portion?: string | null, portionId?: string | null) {
     setCart((prev) =>
-      prev.filter((c) => !(c.menuItemId === menuItemId && (c.portion ?? null) === linePortion))
+      prev.filter((c) => !sameCartLine(c, menuItemId, portion, portionId))
     )
   }
 
@@ -738,6 +758,7 @@ export function PublicMenu() {
           orderType: 'DINE_IN',
           items: cart.map((c) => ({
             menuItemId: c.menuItemId,
+            portionId: c.portionId || undefined,
             portion: c.portion || undefined,
             quantity: c.quantity,
             notes: c.notes || '',
@@ -1186,9 +1207,11 @@ export function PublicMenu() {
                           item={item}
                           currency={currency}
                           inCartQty={totalQty}
+                          itemLines={itemLines}
                           onAdd={() => addToCart(item)}
                           onDecrement={() => decrement(item)}
                           onAddPortion={(portion) => addToCart(item, portion)}
+                          onDecrementPortion={(portion) => decrement(item, portion.name, portion.id)}
                         />
                       )
                     })}
@@ -1341,19 +1364,24 @@ export function PublicMenu() {
                   <div className="px-5 py-4 space-y-4">
                     {cart.map((c) => (
                       <CartLine
-                        key={`${c.menuItemId}::${c.portion ?? ''}`}
+                        key={`${c.menuItemId}::${c.portionId || c.portion || ''}`}
                         item={c}
                         currency={currency}
                         onAdd={() => {
                           const mi = menuItems.find((m) => m.id === c.menuItemId)
-                          if (mi) addToCart(mi, c.portion ? { name: c.portion, price: c.price } : null)
+                          if (mi) {
+                            addToCart(
+                              mi,
+                              c.portion ? { id: c.portionId ?? undefined, name: c.portion, price: c.price } : null,
+                            )
+                          }
                         }}
                         onDecrement={() => {
                           const mi = menuItems.find((m) => m.id === c.menuItemId)
-                          if (mi) decrement(mi, c.portion)
+                          if (mi) decrement(mi, c.portion, c.portionId)
                         }}
-                        onRemove={() => removeFromCart(c.menuItemId, c.portion)}
-                        onNotesChange={(n) => setItemNotes(c.menuItemId, n, c.portion)}
+                        onRemove={() => removeFromCart(c.menuItemId, c.portion, c.portionId)}
+                        onNotesChange={(n) => setItemNotes(c.menuItemId, n, c.portion, c.portionId)}
                       />
                     ))}
 
@@ -1466,20 +1494,31 @@ function MenuItemCard({
   item,
   currency,
   inCartQty,
+  itemLines = [],
   onAdd,
   onDecrement,
   onAddPortion,
+  onDecrementPortion,
 }: {
   item: MenuItem
   currency: string
   inCartQty: number
+  itemLines?: CartItem[]
   onAdd: () => void
   onDecrement: () => void
-  onAddPortion?: (portion: { name: string; price: number }) => void
+  onAddPortion?: (portion: MenuPortion) => void
+  onDecrementPortion?: (portion: MenuPortion) => void
 }) {
   const tags = parseTags(item.tags)
-  const portions = Array.isArray(item.portions) ? item.portions : []
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const portions = useMemo(() => normalizePortions(item.portions), [item.portions])
+  const [selectedPortionId, setSelectedPortionId] = useState<string>(() => portions[0]?.id ?? '')
+  const activePortion =
+    portions.find((p) => p.id === selectedPortionId) ?? portions[0] ?? null
+  const activeLine = activePortion
+    ? itemLines.find((c) => sameCartLine(c, item.id, activePortion.name, activePortion.id))
+    : undefined
+  const activeQty = activePortion ? (activeLine?.quantity ?? 0) : inCartQty
+  const displayPrice = activePortion ? activePortion.price : item.price
   return (
     <article className="flex gap-3 rounded-2xl bg-card p-3 shadow-sm border border-border hover:shadow-md transition-shadow">
       {/* Image */}
@@ -1552,34 +1591,64 @@ function MenuItemCard({
           </div>
         )}
 
+        {/* Portion selector pills — customer picks portion before adding */}
+        {portions.length > 0 && activePortion && (
+          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={`Select portion for ${item.name}`}>
+            {portions.map((p) => {
+              const selected = p.id === activePortion.id
+              const pQty =
+                itemLines.find((c) => sameCartLine(c, item.id, p.name, p.id))?.quantity ?? 0
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedPortionId(p.id)}
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all',
+                    selected
+                      ? 'text-white shadow-xs'
+                      : 'border-border bg-card-elevated text-foreground hover:border-primary/40',
+                  )}
+                  style={selected ? { background: CORAL, borderColor: CORAL } : undefined}
+                >
+                  <span>{p.name}</span>
+                  {pQty > 0 && (
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 py-px text-[10px] font-bold',
+                        selected ? 'bg-white/25 text-white' : 'bg-primary/15 text-primary',
+                      )}
+                    >
+                      ×{pQty}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {/* Price + action */}
         <div className="mt-auto pt-2 flex items-center justify-between">
           <span className="font-bold text-base" style={{ color: INK }}>
-            {portions.length > 0
-              ? `${formatPrice(Math.min(...portions.map((p) => p.price)), currency)} – ${formatPrice(Math.max(...portions.map((p) => p.price)), currency)}`
-              : formatPrice(item.price, currency)}
+            {formatPrice(displayPrice, currency)}
           </span>
-          {portions.length > 0 ? (
+          {activeQty === 0 ? (
             <button
-              onClick={() => setPickerOpen((v) => !v)}
-              className="px-3 py-1.5 rounded-full text-white text-xs font-semibold shadow-sm flex items-center gap-1 transition-transform active:scale-95"
-              style={{ background: CORAL }}
-              aria-label={`Select size for ${item.name}`}
-            >
-              <Plus className="size-3.5" />
-              <span>Options</span>
-              {inCartQty > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 bg-white/30 rounded-full text-[10px]">
-                  {inCartQty}
-                </span>
-              )}
-            </button>
-          ) : inCartQty === 0 ? (
-            <button
-              onClick={onAdd}
+              onClick={() => {
+                if (activePortion) {
+                  onAddPortion?.(activePortion)
+                } else {
+                  onAdd()
+                }
+              }}
               className="size-8 rounded-full text-white shadow-sm flex items-center justify-center transition-transform active:scale-90"
               style={{ background: CORAL }}
-              aria-label={`Add ${item.name} to cart`}
+              aria-label={
+                activePortion
+                  ? `Add ${item.name} (${activePortion.name}) to cart`
+                  : `Add ${item.name} to cart`
+              }
             >
               <Plus className="size-4" />
             </button>
@@ -1589,17 +1658,29 @@ function MenuItemCard({
               style={{ background: CORAL }}
             >
               <button
-                onClick={onDecrement}
+                onClick={() => {
+                  if (activePortion) {
+                    onDecrementPortion?.(activePortion)
+                  } else {
+                    onDecrement()
+                  }
+                }}
                 className="size-7 rounded-full bg-card/20 flex items-center justify-center transition active:scale-90"
                 aria-label="Decrease quantity"
               >
                 <Minus className="size-3.5" />
               </button>
               <span className="min-w-5 text-center text-xs font-bold tabular-nums">
-                {inCartQty}
+                {activeQty}
               </span>
               <button
-                onClick={onAdd}
+                onClick={() => {
+                  if (activePortion) {
+                    onAddPortion?.(activePortion)
+                  } else {
+                    onAdd()
+                  }
+                }}
                 className="size-7 rounded-full bg-card/20 flex items-center justify-center transition active:scale-90"
                 aria-label="Increase quantity"
               >
@@ -1608,25 +1689,6 @@ function MenuItemCard({
             </div>
           )}
         </div>
-
-        {portions.length > 0 && pickerOpen && (
-          <div className="mt-2.5 pt-2.5 border-t border-border/60 flex flex-wrap gap-1.5 animate-in fade-in-50 duration-200">
-            {portions.map((p) => (
-              <button
-                key={p.name}
-                onClick={() => {
-                  onAddPortion?.(p)
-                }}
-                className="flex items-center gap-1.5 rounded-lg border border-border bg-card-elevated hover:border-primary/50 px-2.5 py-1.5 text-xs font-medium transition active:scale-95"
-              >
-                <span>{p.name}</span>
-                <span className="font-bold" style={{ color: CORAL }}>
-                  {formatPrice(p.price, currency)}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </article>
   )
