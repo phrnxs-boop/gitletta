@@ -16,7 +16,6 @@ import { PromosView } from '@/components/views/promos'
 import { RolesView } from '@/components/views/roles'
 import { SecurityView } from '@/components/views/security'
 import { SettingsView } from '@/components/views/settings'
-import { BillingView } from '@/components/views/billing'
 import { TrialBanner } from '@/components/app/trial-banner'
 
 function ViewRouter() {
@@ -31,14 +30,13 @@ function ViewRouter() {
     case 'roles': return <RolesView />
     case 'security': return <SecurityView />
     case 'settings': return <SettingsView />
-    case 'billing': return <BillingView />
     default: return <DashboardView />
   }
 }
 
 const VIEW_KEYS = new Set<string>([
   'dashboard', 'orders', 'analytics', 'promos', 'qr',
-  'menu', 'settings', 'security', 'roles', 'billing',
+  'menu', 'settings', 'security', 'roles',
 ])
 
 function ShellContent() {

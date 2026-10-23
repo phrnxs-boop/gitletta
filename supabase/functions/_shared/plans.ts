@@ -166,6 +166,12 @@ export async function resolvePlan(tenantId: string): Promise<EffectivePlan> {
     paidPlan !== null &&
     (periodEnd === null || periodEnd > now);
 
+  // A cancelled subscription still gives access until the period ends.
+  const cancelledActive =
+    status === "cancelled" &&
+    paidPlan !== null &&
+    (periodEnd === null || periodEnd > now);
+
   // A renewal that failed keeps access for a grace period, and then it is
   // restricted.
   const pastDueActive =
@@ -176,11 +182,11 @@ export async function resolvePlan(tenantId: string): Promise<EffectivePlan> {
   const chosen =
     trialActive && trialPlan
       ? trialPlan
-      : (paidActive || pastDueActive) && paidPlan
+      : (paidActive || cancelledActive || pastDueActive) && paidPlan
         ? paidPlan
         : (fallback ?? trialPlan);
 
-  const isPaid = (paidActive || pastDueActive) && paidPlan !== null;
+  const isPaid = (paidActive || cancelledActive || pastDueActive) && paidPlan !== null;
   const isTrial = trialActive;
 
   return {
