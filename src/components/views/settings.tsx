@@ -398,7 +398,7 @@ export function SettingsView() {
                 </Button>
               </>
             ) : (
-              <Button size="sm" onClick={() => {}} className="bg-primary hover:bg-primary/90">
+              <Button size="sm" onClick={handleConnect} className="bg-primary hover:bg-primary/90">
                 <ExternalLink className="h-4 w-4 mr-1.5" /> Start Collecting Reviews
               </Button>
             )}
@@ -622,8 +622,8 @@ export function SettingsView() {
                             className="bg-background/60 border-border text-sm resize-none"
                           />
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => { () => {} }}>Cancel</Button>
-                            <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => {}} disabled={false}>
+                            <Button variant="ghost" size="sm" onClick={() => { setReplyingTo(null); setReplyText('') }}>Cancel</Button>
+                            <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => handleReply(r.id)} disabled={!replyText.trim()}>
                               <Send className="h-3 w-3 mr-1" /> Update Reply
                             </Button>
                           </div>
@@ -643,6 +643,29 @@ export function SettingsView() {
                       )}
                     </div>
                   )}
+                  {!r.reply && (
+                    <div className="mt-2">
+                      {replyingTo === r.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            placeholder="Write a reply…"
+                            rows={2}
+                            className="bg-secondary/50 border-border text-sm resize-none"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => { setReplyingTo(null); setReplyText('') }}>Cancel</Button>
+                            <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => handleReply(r.id)} disabled={!replyText.trim()}>
+                              <Send className="h-3 w-3 mr-1" /> Post Reply
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={() => { setReplyingTo(r.id); setReplyText('') }}>
+                          <MessageSquare className="h-3.5 w-3.5 mr-1" /> Reply
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -652,7 +675,7 @@ export function SettingsView() {
         </>
       )}
 
-      {false && (
+      {!connected && (
         <Card className="rounded-2xl bg-card border-border p-4 md:p-4 md:p-6">
           <div className="text-center py-8">
             <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center mx-auto mb-4">
@@ -661,7 +684,7 @@ export function SettingsView() {
             <h3 className="font-semibold text-lg">Customer Reviews</h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Collect and display customer reviews with star ratings. Let your diners share their experiences and help others choose your restaurant.</p>
             <div className="flex items-center justify-center gap-2 mt-4">
-              <Button onClick={() => {}} className="bg-primary hover:bg-primary\/90">Start Collecting Reviews</Button>
+              <Button onClick={handleConnect} className="bg-primary hover:bg-primary\/90">Start Collecting Reviews</Button>
             </div>
             <p className="text-[11px] text-muted-foreground mt-3">
               Secure OAuth · Reviews are stored independently from customer sessions
