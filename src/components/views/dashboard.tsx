@@ -601,54 +601,74 @@ function MenuCard({
   onAddPortion: (portion: MenuPortion) => void
   currencySymbol?: string
 }) {
-  const tags = item.tags ? item.tags.split(',') : []
+  const tags = item.tags ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
   const portions = useMemo(() => normalizePortions(item.portions), [item.portions])
   const [selectedPortionId, setSelectedPortionId] = useState<string>(() => portions[0]?.id ?? '')
   const activePortion =
     portions.find((p) => p.id === selectedPortionId) ?? portions[0] ?? null
   const displayPrice = activePortion ? activePortion.price : Number(item.price || 0)
 
-  const body = (
-    <>
+  const handleTriggerAdd = () => {
+    if (activePortion) {
+      onAddPortion(activePortion)
+    } else {
+      onAdd()
+    }
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={handleTriggerAdd}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          handleTriggerAdd()
+        }
+      }}
+      className="group relative card-premium rounded-2xl border border-border p-3 text-left transition-premium hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-elevated flex flex-col cursor-pointer select-none"
+    >
       {inCart > 0 && (
         <span className="absolute -top-1.5 -right-1.5 z-10 bg-gradient-to-br from-primary to-primary-hover text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-glow-primary ring-2 ring-background">
           {inCart}
         </span>
       )}
-      <div className="relative aspect-square mb-3">
+
+      {/* Compact circular thumbnail */}
+      <div className="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-2.5 shrink-0">
         {item.image ? (
-          <img src={item.image} alt={item.name} className="w-full h-full rounded-full object-cover ring-1 ring-white/5 transition-transform duration-500 group-hover:scale-105" />
+          <img
+            src={item.image}
+            alt={item.name}
+            className="w-full h-full rounded-full object-cover ring-1 ring-white/5 transition-transform duration-500 group-hover:scale-105"
+          />
         ) : (
-          // No photo on file: fall back to the category's icon so the grid
-          // reads as varied rather than 22 identical plates.
-          <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center text-3xl">
+          <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center text-2xl sm:text-3xl">
             {item.category?.icon || '🍽️'}
           </div>
         )}
         <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/5 pointer-events-none" />
-        {/* rating overlay */}
         {item.rating > 0 && (
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-background/90 backdrop-blur border border-border px-1.5 py-0.5 text-[10px] font-medium">
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-background/90 backdrop-blur border border-border px-1.5 py-0.5 text-[10px] font-medium leading-none">
             <span className="text-amber-400">★</span>
             <span>{item.rating.toFixed(1)}</span>
           </div>
         )}
       </div>
-      <div className="space-y-1">
-        <h4 className="font-semibold text-sm leading-tight line-clamp-2 min-h-[2.5rem]">{item.name}</h4>
-        <p className="text-[11px] text-muted-foreground line-clamp-1">{item.description}</p>
-        {/* flex-wrap so a long badge (BESTSELLER) drops to a second line
-            instead of spilling outside the card. */}
-        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1">
-          <span className="font-bold text-base text-gradient-primary">
-            {currencySymbol}{displayPrice.toFixed(2)}
-          </span>
+
+      {/* Title, description & meta */}
+      <div className="space-y-0.5 flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-1.5">
+          <h4 className="font-semibold text-sm leading-snug truncate">{item.name}</h4>
           {tags[0] && <Tag label={tags[0]} />}
         </div>
-        <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+        {item.description && (
+          <p className="text-[11px] text-muted-foreground line-clamp-1">{item.description}</p>
+        )}
+        <p className="text-[10px] text-muted-foreground flex items-center gap-1 pt-0.5">
           <span className="opacity-60">⏱</span>
           <span>{item.prepTime} min</span>
-          {/* Only shown when the item actually has a calorie value. */}
           {item.calories ? (
             <>
               <span className="opacity-40">·</span>
@@ -658,53 +678,52 @@ function MenuCard({
           ) : null}
         </p>
       </div>
-    </>
-  )
 
-  if (portions.length > 0 && activePortion) {
-    return (
-      <div className="group relative card-premium rounded-2xl border border-border p-3 md:p-4 text-left transition-premium hover:border-primary/40 hover:-translate-y-1 hover:shadow-elevated flex flex-col">
-        {body}
-        <div className="pt-2.5 mt-auto space-y-1.5">
-          <div className="flex flex-wrap gap-1" role="group" aria-label={`Portion options for ${item.name}`}>
-            {portions.map((p) => {
-              const selected = p.id === activePortion.id
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setSelectedPortionId(p.id)}
-                  className={cn(
-                    'flex-1 min-w-[56px] rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors',
-                    selected
-                      ? 'border-primary bg-primary text-primary-foreground shadow-xs'
-                      : 'border-border bg-secondary/50 text-muted-foreground hover:text-foreground hover:border-primary/40',
-                  )}
-                >
-                  {p.name}
-                </button>
-              )
-            })}
-          </div>
-          <button
-            type="button"
-            onClick={() => onAddPortion(activePortion)}
-            className="w-full rounded-lg border border-primary/30 bg-primary/10 hover:bg-primary/20 px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors flex items-center justify-center gap-1"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add {activePortion.name}</span>
-          </button>
+      {/* Compact segmented portion selector (only when portions exist) */}
+      {portions.length > 0 && activePortion && (
+        <div
+          className="mt-2 grid grid-flow-col auto-cols-fr gap-1 rounded-lg bg-secondary/60 p-0.5"
+          role="group"
+          aria-label={`Portion options for ${item.name}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {portions.map((p) => {
+            const selected = p.id === activePortion.id
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSelectedPortionId(p.id)
+                }}
+                className={cn(
+                  'rounded-md px-1.5 py-1 text-[10px] font-semibold leading-none transition-all truncate',
+                  selected
+                    ? 'bg-primary text-primary-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {p.name}
+              </button>
+            )
+          })}
         </div>
+      )}
+
+      {/* Single bottom row: price + compact add button */}
+      <div className="mt-auto pt-2 flex items-center justify-between gap-2">
+        <span className="font-bold text-sm sm:text-base text-gradient-primary leading-none">
+          {currencySymbol}{displayPrice.toFixed(2)}
+        </span>
+        <span
+          className="h-7 px-2.5 rounded-lg border border-primary/25 bg-primary/10 group-hover:bg-primary group-hover:text-primary-foreground text-primary text-[11px] font-semibold inline-flex items-center gap-1 transition-colors shrink-0"
+        >
+          <Plus className="h-3 w-3" />
+          <span>{activePortion ? activePortion.name : 'Add'}</span>
+        </span>
       </div>
-    )
-  }
-  return (
-    <button
-      onClick={onAdd}
-      className="group relative card-premium rounded-2xl border border-border p-3 md:p-4 text-left transition-premium hover:border-primary/40 hover:-translate-y-1 hover:shadow-elevated"
-    >
-      {body}
-    </button>
+    </div>
   )
 }
 
