@@ -147,6 +147,29 @@ export function SettingsView() {
 
   const [saving, setSaving] = useState(false)
 
+  // Internal reviews state
+  const [connected, setConnected] = useState(false)
+  const [connection, setConnection] = useState<any>(null)
+  const [reviews, setReviews] = useState<any[]>([])
+  const [settings, setSettings] = useState({
+    enabled: true,
+    autoSync: false,
+    syncIntervalMins: 60,
+    showPublic: true,
+    minRatingFilter: 0,
+  })
+  const [syncing, setSyncing] = useState(false)
+  const [demoMode, setDemoMode] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const [replyingTo, setReplyingTo] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState('')
+
+  const [locationGroups, setLocationGroups] = useState<any[]>([])
+  const [locationsLoading, setLocationsLoading] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
+  const [choosingLocation, setChoosingLocation] = useState<string | null>(null)
+
   // Initialize from data
   useEffect(() => {
     if (!data) return
@@ -234,12 +257,12 @@ export function SettingsView() {
     return false
   }, [data, tenantForm, taxRate, serviceCharge, openingHours, timezone, opToggles, prefs])
 
-  if (!data) return null
+  const currentPlan = data?.tenant?.plan || 'STARTER'
 
-  const currentPlan = data.tenant.plan || 'STARTER'
+  const tenantId = data?.tenant?.id ?? ''
 
   const save = async () => {
-    if (!dirty) return
+    if (!dirty || !data?.tenant) return
     setSaving(true)
     try {
       const t = data.tenant
@@ -290,6 +313,41 @@ export function SettingsView() {
       toast.error('Failed to disconnect')
     }
   }
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const res = await edgeFetch('/api/reviews', { headers: { 'x-tenant-id': tenantId } })
+      const data = await res.json()
+      if (data.error) {
+        toast.error(data.error)
+      } else {
+        setReviews(data.reviews || [])
+        setSettings({
+          enabled: data.connection?.enabled ?? true,
+          autoSync: data.connection?.autoSync ?? false,
+          syncIntervalMins: data.connection?.syncIntervalMins ?? 60,
+          showPublic: data.connection?.showPublic ?? true,
+          minRatingFilter: data.connection?.minRatingFilter ?? 0,
+        })
+        setConnected(!!data.connection)
+        setConnection(data.connection || null)
+        setDemoMode(!!data.connection?.demoMode)
+      }
+    } catch {
+      toast.error('Failed to load reviews')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Load initial reviews when connected state changes or tab becomes active
+  useEffect(() => {
+    if (connected && tenantId) {
+      load()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, tenantId])
 
   const handleSync = async () => {
     setSyncing(true)
@@ -347,9 +405,93 @@ export function SettingsView() {
     }
   }
 
+  const handleConnect = async () => {
+    try {
+      const res = await edgeFetch('/api/reviews/connect', { headers: { 'x-tenant-id': tenantId } })
+      const data = await res.json()
+      if (data.error) {
+        toast.error(data.error)
+      } else if (data.url) {
+        // Open OAuth URL in a new window
+        window.open(data.url, '_blank', 'width=600,height=700')
+        // Poll for connection after OAuth completes
+        const checkConnection = setInterval(async () => {
+          await load()
+          if (connected) clearInterval(checkConnection)
+        }, 2000)
+        setTimeout(() => clearInterval(checkConnection), 120000) // 2 min timeout
+      } else {
+        toast.success('Customer Reviews connected')
+        await load()
+      }
+    } catch {
+      toast.error('Failed to connect')
+    }
+  }
+
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect Customer Reviews? This removes all synced reviews.')) return
+    try {
+      await edgeFetch('/api/reviews/connect', { method: 'DELETE', headers: { 'x-tenant-id': tenantId } })
+      toast.success('Customer Reviews disconnected')
+      await load()
+    } catch {
+      toast.error('Failed to disconnect')
+    }
+  }
+
+  const handleSelectLocation = async (accountName: string, locationId: string, locationName: string) => {
+    setChoosingLocation(locationId)
+    try {
+      const res = await edgeFetch('/api/reviews/connect', {
+        method: 'POST',
+        headers: { 'x-tenant-id': tenantId },
+        body: JSON.stringify({ accountName, locationId, locationName }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        toast.error(data.error)
+      } else {
+        toast.success(`${locationName} connected`, { description: data.synced ? `Synced ${data.synced} review(s).` : undefined })
+        await load()
+      }
+    } catch {
+      toast.error('Failed to select location')
+    } finally {
+      setChoosingLocation(null)
+    }
+  }
+
+  const loadLocations = useCallback(async () => {
+    setLocationsLoading(true)
+    setLocationError(null)
+    try {
+      const res = await edgeFetch('/api/reviews/locations', { headers: { 'x-tenant-id': tenantId } })
+      const data = await res.json()
+      if (data.error) {
+        setLocationError(data.error)
+        setLocationGroups([])
+      } else {
+        setLocationGroups(data.groups || [])
+      }
+    } catch {
+      setLocationError('Failed to load locations')
+      setLocationGroups([])
+    } finally {
+      setLocationsLoading(false)
+    }
+  }, [tenantId])
+
+  // Load locations when connection needs it
+  useEffect(() => {
+    if (connection?.needsLocation) loadLocations()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection?.needsLocation, loadLocations])
+
   const avgRating = reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : '—'
   const ratingDist = [5, 4, 3, 2, 1].map(n => ({ stars: n, count: reviews.filter(r => r.rating === n).length }))
 
+  // Early return must come AFTER all hooks
   if (loading) {
     return (
       <div className="max-w-4xl space-y-4">
