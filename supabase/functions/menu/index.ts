@@ -58,6 +58,37 @@ function ratingInput(value: unknown): number | null {
   return Math.min(5, Math.max(0, Math.round(n * 10) / 10));
 }
 
+/**
+ * Portion options for a dish: [{name: "Half", price: 110}, ...].
+ *
+ * This is the only writer of `menu_items.portions`, so the shape is enforced
+ * here rather than in the database: names are trimmed, non-empty, unique
+ * (case-insensitive) and capped at 40 chars; prices are finite and >= 0; at
+ * most 8 portions. An empty array is normalised to null — a dish with no
+ * portions behaves exactly like every dish created before this column existed.
+ */
+function portionsInput(value: unknown): { ok: true; portions: { name: string; price: number }[] | null } | { ok: false; error: string } {
+  if (value === null || value === undefined) return { ok: true, portions: null };
+  if (!Array.isArray(value)) return { ok: false, error: "portions must be a list" };
+
+  const seen = new Set<string>();
+  const portions: { name: string; price: number }[] = [];
+  if (value.length > 8) return { ok: false, error: "A dish can have at most 8 portions" };
+  for (const raw of value) {
+    if (typeof raw !== "object" || raw === null) return { ok: false, error: "Each portion must have a name and price" };
+    const name = String((raw as any).name ?? "").trim();
+    const price = Number((raw as any).price);
+    if (!name) return { ok: false, error: "Every portion needs a name" };
+    if (name.length > 40) return { ok: false, error: "Portion names can be at most 40 characters" };
+    const key = name.toLowerCase();
+    if (seen.has(key)) return { ok: false, error: `Duplicate portion name: ${name}` };
+    if (!Number.isFinite(price) || price < 0) return { ok: false, error: `Enter a valid price for portion ${name}` };
+    seen.add(key);
+    portions.push({ name, price: Math.round(price * 100) / 100 });
+  }
+  return { ok: true, portions: portions.length > 0 ? portions : null };
+}
+
 async function list(req: Request): Promise<Response> {
   const g = await guard(req, { permission: "menu.view" });
   if (!g.ok) return g.response;
@@ -87,6 +118,9 @@ async function create(req: Request): Promise<Response> {
   const limit = await checkWriteLimit(g.session.tenantId, "menuItems");
   if (!limit.ok) return json(req, { error: limit.error }, 402);
 
+  const portions = portionsInput(b.portions);
+  if (!portions.ok) return json(req, { error: portions.error }, 400);
+
   const { data, error } = await admin()
     .from("menu_items")
     .insert({
@@ -102,6 +136,7 @@ async function create(req: Request): Promise<Response> {
       // Optional; the column defaults to 4.5 when omitted.
       ...(typeof ratingInput(b.rating) === "number" ? { rating: ratingInput(b.rating) } : {}),
       tags: b.tags ?? null,
+      portions: portions.portions,
     })
     .select(SELECT)
     .single();
@@ -129,6 +164,11 @@ async function update(req: Request, id: string | null): Promise<Response> {
   if (b.prepTime !== undefined) patch.prep_time = Number(b.prepTime);
   if (b.calories !== undefined) patch.calories = b.calories;
   if (b.rating !== undefined) patch.rating = ratingInput(b.rating);
+  if (b.portions !== undefined) {
+    const portions = portionsInput(b.portions);
+    if (!portions.ok) return json(req, { error: portions.error }, 400);
+    patch.portions = portions.portions;
+  }
 
   const { data, error } = await admin()
     .from("menu_items")

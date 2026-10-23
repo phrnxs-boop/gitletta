@@ -9,11 +9,20 @@ export type ViewKey =
 export interface CartItem {
   menuItemId: string
   name: string
+  /** Which portion (size) was chosen, for dishes sold per portion. */
+  portion?: string | null
   price: number
   image?: string | null
   quantity: number
   notes?: string
 }
+
+/**
+ * A cart line is one dish in one portion. The same dish ordered in two
+ * portions is two lines, so every lookup matches menuItemId AND portion.
+ */
+const sameLine = (c: CartItem, menuItemId: string, portion?: string | null) =>
+  c.menuItemId === menuItemId && (c.portion ?? null) === (portion ?? null)
 
 interface AppState {
   // tenant context
@@ -31,9 +40,9 @@ interface AppState {
   // POS cart
   cart: CartItem[]
   addToCart: (item: Omit<CartItem, 'quantity'>, qty?: number) => void
-  updateCartQty: (menuItemId: string, qty: number) => void
-  removeFromCart: (menuItemId: string) => void
-  setCartNotes: (menuItemId: string, notes: string) => void
+  updateCartQty: (menuItemId: string, qty: number, portion?: string | null) => void
+  removeFromCart: (menuItemId: string, portion?: string | null) => void
+  setCartNotes: (menuItemId: string, notes: string, portion?: string | null) => void
   clearCart: () => void
 
   // POS order type & table
@@ -64,22 +73,24 @@ export const useStore = create<AppState>((set) => ({
   cart: [],
   addToCart: (item, qty = 1) =>
     set((s) => {
-      const existing = s.cart.find((c) => c.menuItemId === item.menuItemId)
+      const existing = s.cart.find((c) => sameLine(c, item.menuItemId, item.portion))
       if (existing) {
         return {
           cart: s.cart.map((c) =>
-            c.menuItemId === item.menuItemId ? { ...c, quantity: c.quantity + qty } : c
+            sameLine(c, item.menuItemId, item.portion) ? { ...c, quantity: c.quantity + qty } : c
           ),
         }
       }
       return { cart: [...s.cart, { ...item, quantity: qty }] }
     }),
-  updateCartQty: (menuItemId, qty) =>
+  updateCartQty: (menuItemId, qty, portion) =>
     set((s) => ({
-      cart: qty <= 0 ? s.cart.filter((c) => c.menuItemId !== menuItemId) : s.cart.map((c) => (c.menuItemId === menuItemId ? { ...c, quantity: qty } : c)),
+      cart: qty <= 0
+        ? s.cart.filter((c) => !sameLine(c, menuItemId, portion))
+        : s.cart.map((c) => (sameLine(c, menuItemId, portion) ? { ...c, quantity: qty } : c)),
     })),
-  removeFromCart: (menuItemId) => set((s) => ({ cart: s.cart.filter((c) => c.menuItemId !== menuItemId) })),
-  setCartNotes: (menuItemId, notes) => set((s) => ({ cart: s.cart.map((c) => (c.menuItemId === menuItemId ? { ...c, notes } : c)) })),
+  removeFromCart: (menuItemId, portion) => set((s) => ({ cart: s.cart.filter((c) => !sameLine(c, menuItemId, portion)) })),
+  setCartNotes: (menuItemId, notes, portion) => set((s) => ({ cart: s.cart.map((c) => (sameLine(c, menuItemId, portion) ? { ...c, notes } : c)) })),
   clearCart: () => set({ cart: [] }),
 
   orderType: 'DINE_IN',

@@ -35,11 +35,31 @@ function mapOrderItem(row: any) {
     orderId: row.order_id,
     menuItemId: row.menu_item_id,
     name: row.name,
+    portion: row.portion ?? null,
     price: row.price,
     quantity: row.quantity,
     notes: row.notes,
     status: row.status,
   };
+}
+
+/**
+ * Resolve the price for one order line from the database — never from the
+ * client. A portion dish has a price per portion; anything else uses the base
+ * price. A portion name that does not exist on the item is rejected rather
+ * than silently charged at the wrong price.
+ */
+function resolveUnitPrice(
+  mi: { name: string; price: number; portions: { name: string; price: number }[] | null },
+  portion: unknown,
+): { ok: true; price: number; portion: string | null } | { ok: false; error: string } {
+  if (portion === null || portion === undefined || portion === "") {
+    return { ok: true, price: mi.price, portion: null };
+  }
+  const wanted = String(portion).trim().toLowerCase();
+  const match = (mi.portions ?? []).find((p) => p.name.toLowerCase() === wanted);
+  if (!match) return { ok: false, error: `${mi.name} has no portion named "${String(portion)}"` };
+  return { ok: true, price: match.price, portion: match.name };
 }
 
 function mapOrder(row: any) {
@@ -330,17 +350,20 @@ async function create(req: Request): Promise<Response> {
     for (const it of items || []) {
       const { data: mi } = await db
         .from("menu_items")
-        .select("id, tenant_id, name, price")
+        .select("id, tenant_id, name, price, portions")
         .eq("id", it.menuItemId)
         .maybeSingle();
       if (!mi) continue;
       if (mi.tenant_id !== tenantId) continue; // ensure item belongs to this tenant
+      const unit = resolveUnitPrice(mi, it.portion);
+      if (!unit.ok) return json(req, { error: unit.error }, 400);
       const qty = Math.max(1, Number(it.quantity) || 1);
-      itemsTotal += mi.price * qty;
+      itemsTotal += unit.price * qty;
       itemData.push({
         menu_item_id: mi.id,
         name: mi.name,
-        price: mi.price,
+        portion: unit.portion,
+        price: unit.price,
         quantity: qty,
         notes: it.notes || null,
         status: "PENDING",
@@ -584,7 +607,7 @@ async function addItem(req: Request, orderId: string): Promise<Response> {
 
   const { data: mi, error: miError } = await db
     .from("menu_items")
-    .select("id, name, price")
+    .select("id, name, price, portions")
     .eq("id", b.menuItemId)
     .eq("tenant_id", tenantId) // tenant scoping — see header
     .maybeSingle();
@@ -592,13 +615,17 @@ async function addItem(req: Request, orderId: string): Promise<Response> {
   if (miError) return json(req, { error: miError.message }, 500);
   if (!mi) return json(req, { error: "Menu item not found" }, 404);
 
+  const unit = resolveUnitPrice(mi, b.portion);
+  if (!unit.ok) return json(req, { error: unit.error }, 400);
+
   const { data: item, error: itemError } = await db
     .from("order_items")
     .insert({
       order_id: orderId,
       menu_item_id: mi.id,
       name: mi.name,
-      price: mi.price,
+      portion: unit.portion,
+      price: unit.price,
       quantity: b.quantity || 1,
       notes: b.notes,
       status: "PENDING",

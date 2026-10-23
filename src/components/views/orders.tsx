@@ -559,6 +559,11 @@ export function OrdersView() {
                     <span className="min-w-0">
                       <span className="text-muted-foreground font-medium">{it.quantity}× </span>
                       {it.name}
+                      {it.portion && (
+                        <span className="ml-1.5 rounded bg-primary/10 border border-primary/20 px-1 py-px text-[10px] font-semibold text-primary align-middle">
+                          {it.portion}
+                        </span>
+                      )}
                       {it.notes && <span className="block text-xs text-muted-foreground italic pl-5">“{it.notes}”</span>}
                     </span>
                     <span className="text-muted-foreground whitespace-nowrap ml-2">{cs}{(it.price * it.quantity).toFixed(2)}</span>
@@ -738,6 +743,11 @@ function OrderCard({
             <span className="text-foreground/90 truncate pr-2">
               <span className="text-muted-foreground font-medium">{it.quantity}× </span>
               {it.name}
+              {it.portion && (
+                <span className="ml-1.5 rounded bg-primary/10 border border-primary/20 px-1 py-px text-[10px] font-semibold text-primary align-middle">
+                  {it.portion}
+                </span>
+              )}
             </span>
             <span className="text-muted-foreground whitespace-nowrap">
               {currencySymbol}

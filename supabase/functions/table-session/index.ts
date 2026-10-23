@@ -345,6 +345,7 @@ function mapMenuItem(row: any) {
     name: row.name,
     description: row.description,
     price: row.price,
+    portions: Array.isArray(row.portions) ? row.portions : null,
     image: row.image,
     available: row.available,
     prepTime: row.prep_time,

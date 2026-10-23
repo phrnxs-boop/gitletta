@@ -67,6 +67,8 @@ export interface MenuItem {
   name: string
   description: string | null
   price: number
+  /** Portion options with a price each; null/empty = single-price dish. */
+  portions?: { name: string; price: number }[] | null
   image: string | null
   available: boolean
   prepTime: number
@@ -80,6 +82,7 @@ export interface OrderItem {
   id: string
   menuItemId: string
   name: string
+  portion?: string | null
   price: number
   quantity: number
   notes: string | null

@@ -122,6 +122,7 @@ async function get(req: Request, orderId: string | null): Promise<Response> {
     // Itemized items
     items: items.map((it: any) => ({
       name: it.name,
+      portion: it.portion ?? null,
       quantity: it.quantity,
       unitPrice: it.price,
       total: +(it.price * it.quantity).toFixed(2),

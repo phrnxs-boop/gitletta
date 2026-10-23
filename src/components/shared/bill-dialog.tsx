@@ -33,7 +33,7 @@ interface BillData {
   customerName: string | null
   customerPhone: string | null
   servedBy: string | null
-  items: { name: string; quantity: number; unitPrice: number; total: number; notes: string | null }[]
+  items: { name: string; portion?: string | null; quantity: number; unitPrice: number; total: number; notes: string | null }[]
   subtotal: number
   discount: number
   promoCode: string | null
@@ -90,7 +90,7 @@ function buildPrintHtml(bill: BillData): string {
     .map(
       (it) => `
         <tr>
-          <td class="item">${esc(it.name)}${it.notes ? `<div class="note">↳ ${esc(it.notes)}</div>` : ''}</td>
+          <td class="item">${esc(it.name)}${it.portion ? ` <span style="font-size:10px;color:#6b7280;font-weight:600">(${esc(it.portion)})</span>` : ''}${it.notes ? `<div class="note">↳ ${esc(it.notes)}</div>` : ''}</td>
           <td class="qty">${it.quantity}</td>
           <td class="num">${money(it.unitPrice)}</td>
           <td class="num strong">${money(it.total)}</td>
@@ -381,7 +381,10 @@ export function BillDialog({
                 {bill.items.map((it, i) => (
                   <tr key={i} className="border-b border-dotted border-gray-100">
                     <td className="py-1.5">
-                      {it.name}
+                      <span>{it.name}</span>
+                      {it.portion && (
+                        <span className="ml-1 text-[10px] text-gray-500 font-medium">({it.portion})</span>
+                      )}
                       {it.notes && <p className="text-[9px] text-gray-400 italic">↳ {it.notes}</p>}
                     </td>
                     <td className="text-center py-1.5">{it.quantity}</td>

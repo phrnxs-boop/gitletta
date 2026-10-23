@@ -58,6 +58,7 @@ interface MenuFormState {
   name: string
   description: string
   price: string
+  portions: { name: string; price: string }[]
   categoryId: string
   prepTime: string
   calories: string
@@ -71,6 +72,7 @@ const EMPTY_FORM: MenuFormState = {
   name: '',
   description: '',
   price: '',
+  portions: [],
   categoryId: '',
   prepTime: '15',
   calories: '',
@@ -196,6 +198,7 @@ export function MenuView() {
     setForm({
       ...EMPTY_FORM,
       categoryId: categories[0]?.id ?? '',
+      portions: [],
     })
     setItemDialogOpen(true)
   }
@@ -206,6 +209,7 @@ export function MenuView() {
       name: item.name,
       description: item.description || '',
       price: String(item.price ?? ''),
+      portions: (item.portions || []).map((p) => ({ name: p.name, price: String(p.price) })),
       categoryId: item.categoryId,
       prepTime: String(item.prepTime ?? 15),
       calories: item.calories != null ? String(item.calories) : '',
@@ -235,10 +239,27 @@ export function MenuView() {
       toast.error('Enter a valid price')
       return
     }
+    const portions = form.portions
+      .filter((p) => p.name.trim() || p.price.trim())
+      .map((p) => ({ name: p.name.trim(), price: parseFloat(p.price) }))
+    if (portions.some((p) => !p.name)) {
+      toast.error('Every portion needs a name')
+      return
+    }
+    if (portions.some((p) => Number.isNaN(p.price) || p.price < 0)) {
+      toast.error('Enter a valid price for every portion')
+      return
+    }
+    const names = portions.map((p) => p.name.toLowerCase())
+    if (new Set(names).size !== names.length) {
+      toast.error('Two portions have the same name')
+      return
+    }
     const body = {
       name: form.name.trim(),
       description: form.description.trim() || null,
       price,
+      portions: portions.map((p) => ({ name: p.name, price: p.price })),
       categoryId: form.categoryId,
       prepTime: parseInt(form.prepTime || '15', 10) || 15,
       calories: form.calories ? parseInt(form.calories, 10) : null,
@@ -264,12 +285,15 @@ export function MenuView() {
           body: JSON.stringify(body),
         })
       }
-      if (!res.ok) throw new Error('Failed')
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.error || 'Failed')
+      }
       toast.success(editingItem ? 'Item updated' : 'Item created')
       setItemDialogOpen(false)
       await refresh()
-    } catch {
-      toast.error('Something went wrong')
+    } catch (e: any) {
+      toast.error(e?.message || 'Something went wrong')
     } finally {
       setSaving(false)
     }
@@ -648,6 +672,105 @@ export function MenuView() {
                   className="bg-secondary/50 border-0 pl-7"
                 />
               </div>
+            </div>
+
+            {/* Portions — Quarter/Half/Full or custom sizes, each with its own
+                price. Empty list = a normal single-price dish. */}
+            <div className="space-y-2 rounded-lg border border-border/60 p-3 bg-secondary/20">
+              <div className="flex items-center justify-between">
+                <Label>Portions / sizes</Label>
+                <span className="text-[10px] text-muted-foreground">optional</span>
+              </div>
+              {form.portions.length === 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {['Quarter', 'Half', 'Full'].map((preset) => (
+                    <Button
+                      key={preset}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setField('portions', [{ name: preset, price: '' }])}
+                    >
+                      + {preset}
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setField('portions', [{ name: '', price: '' }])}
+                  >
+                    + Custom size
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {form.portions.map((p, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <Input
+                        value={p.name}
+                        onChange={(e) => {
+                          const next = [...form.portions]
+                          next[idx] = { ...p, name: e.target.value }
+                          setField('portions', next)
+                        }}
+                        placeholder="Portion name (e.g. Half)"
+                        className="bg-secondary/50 border-0 h-9"
+                      />
+                      <div className="relative w-28 shrink-0">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                          {currency}
+                        </span>
+                        <Input
+                          value={p.price}
+                          onChange={(e) => {
+                            const next = [...form.portions]
+                            next[idx] = { ...p, price: e.target.value }
+                            setField('portions', next)
+                          }}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          className="bg-secondary/50 border-0 pl-6 h-9"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => setField('portions', form.portions.filter((_, i) => i !== idx))}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground"
+                      disabled={form.portions.length >= 8}
+                      onClick={() => setField('portions', [...form.portions, { name: '', price: '' }])}
+                    >
+                      + Add portion
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => setField('portions', [])}
+                    >
+                      Remove all
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1111,8 +1234,9 @@ function MenuCard({
       {/* Price + category */}
       <div className="mt-3 flex items-center justify-between">
         <span className="text-lg font-bold text-primary">
-          {currency}
-          {item.price.toFixed(2)}
+          {item.portions && item.portions.length > 0
+            ? `${currency}${Math.min(...item.portions.map((p) => p.price)).toFixed(0)}–${currency}${Math.max(...item.portions.map((p) => p.price)).toFixed(2)}`
+            : `${currency}${item.price.toFixed(2)}`}
         </span>
         <Badge variant="secondary" className="text-[10px]">
           {categoryIcon} {categoryName}

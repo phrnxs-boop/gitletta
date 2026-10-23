@@ -236,7 +236,12 @@ export function DashboardView() {
         body: JSON.stringify({
           tableId: orderType === 'DINE_IN' ? selectedTableId : null,
           orderType,
-          items: cart.map((c) => ({ menuItemId: c.menuItemId, quantity: c.quantity, notes: c.notes })),
+          items: cart.map((c) => ({
+            menuItemId: c.menuItemId,
+            portion: c.portion || undefined,
+            quantity: c.quantity,
+            notes: c.notes,
+          })),
           promoCode: promoCode || undefined,
           customerName: orderType !== 'DINE_IN' ? customerName : undefined,
           customerPhone: orderType !== 'DINE_IN' ? customerPhone : undefined,
@@ -361,8 +366,17 @@ export function DashboardView() {
                 key={item.id}
                 item={item}
                 currencySymbol={tenant.currencySymbol}
-                inCart={cart.find((c) => c.menuItemId === item.id)?.quantity || 0}
+                inCart={cart.filter((c) => c.menuItemId === item.id).reduce((s, c) => s + c.quantity, 0)}
                 onAdd={() => addToCart({ menuItemId: item.id, name: item.name, price: item.price, image: item.image })}
+                onAddPortion={(portion) =>
+                  addToCart({
+                    menuItemId: item.id,
+                    name: item.name,
+                    portion: portion.name,
+                    price: portion.price,
+                    image: item.image,
+                  })
+                }
               />
             ))}
             {filtered.length === 0 && (
@@ -570,13 +584,24 @@ function CategoryPill({ active, onClick, icon, label, count }: { active: boolean
   )
 }
 
-function MenuCard({ item, inCart, onAdd, currencySymbol = '₹' }: { item: any; inCart: number; onAdd: () => void; currencySymbol?: string }) {
+function MenuCard({
+  item,
+  inCart,
+  onAdd,
+  onAddPortion,
+  currencySymbol = '₹',
+}: {
+  item: any
+  inCart: number
+  onAdd: () => void
+  /** Dishes sold per portion: tapping a portion chip adds that portion. */
+  onAddPortion: (portion: { name: string; price: number }) => void
+  currencySymbol?: string
+}) {
   const tags = item.tags ? item.tags.split(',') : []
-  return (
-    <button
-      onClick={onAdd}
-      className="group relative card-premium rounded-2xl border border-border p-3 md:p-4 text-left transition-premium hover:border-primary/40 hover:-translate-y-1 hover:shadow-elevated"
-    >
+  const portions = Array.isArray(item.portions) ? item.portions : []
+  const body = (
+    <>
       {inCart > 0 && (
         <span className="absolute -top-1.5 -right-1.5 z-10 bg-gradient-to-br from-primary to-primary-hover text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-glow-primary ring-2 ring-background">
           {inCart}
@@ -607,7 +632,11 @@ function MenuCard({ item, inCart, onAdd, currencySymbol = '₹' }: { item: any; 
         {/* flex-wrap so a long badge (BESTSELLER) drops to a second line
             instead of spilling outside the card. */}
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1">
-          <span className="font-bold text-base text-gradient-primary">{currencySymbol}{item.price.toFixed(2)}</span>
+          <span className="font-bold text-base text-gradient-primary">
+            {portions.length > 0
+              ? `${currencySymbol}${Math.min(...portions.map((p: any) => p.price))}–${currencySymbol}${Math.max(...portions.map((p: any) => p.price))}`
+              : `${currencySymbol}${item.price.toFixed(2)}`}
+          </span>
           {tags[0] && <Tag label={tags[0]} />}
         </div>
         <p className="text-[10px] text-muted-foreground flex items-center gap-1">
@@ -623,6 +652,37 @@ function MenuCard({ item, inCart, onAdd, currencySymbol = '₹' }: { item: any; 
           ) : null}
         </p>
       </div>
+    </>
+  )
+
+  // A dish with portions is not a single tap-to-add card: the portion is part
+  // of what is being ordered, so each portion is its own button. A dish
+  // without portions keeps the one-tap behaviour the POS had before.
+  if (portions.length > 0) {
+    return (
+      <div className="group relative card-premium rounded-2xl border border-border p-3 md:p-4 text-left transition-premium hover:border-primary/40 hover:-translate-y-1 hover:shadow-elevated">
+        {body}
+        <div className="pt-2 flex flex-wrap gap-1.5">
+          {portions.map((p: any) => (
+            <button
+              key={p.name}
+              onClick={() => onAddPortion(p)}
+              className="flex-1 min-w-[72px] rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/15 px-2 py-1.5 text-[11px] font-semibold text-primary transition-colors"
+            >
+              {p.name}
+              <span className="block text-[10px] font-bold text-primary/80">{currencySymbol}{p.price}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  return (
+    <button
+      onClick={onAdd}
+      className="group relative card-premium rounded-2xl border border-border p-3 md:p-4 text-left transition-premium hover:border-primary/40 hover:-translate-y-1 hover:shadow-elevated"
+    >
+      {body}
     </button>
   )
 }
@@ -640,9 +700,9 @@ interface CartPanelProps {
   setCustomerPhone: (v: string) => void
   cart: any[]
   addToCart: (item: any, qty?: number) => void
-  updateCartQty: (id: string, qty: number) => void
-  removeFromCart: (id: string) => void
-  setCartNotes: (id: string, notes: string) => void
+  updateCartQty: (id: string, qty: number, portion?: string | null) => void
+  removeFromCart: (id: string, portion?: string | null) => void
+  setCartNotes: (id: string, notes: string, portion?: string | null) => void
   subtotal: number
   discount: number
   tax: number
@@ -732,14 +792,21 @@ function CartPanel(p: CartPanelProps) {
             </div>
             <Separator />
             {p.cart.map((c) => (
-              <div key={c.menuItemId} className="rounded-xl bg-secondary/30 p-3">
+              <div key={`${c.menuItemId}::${c.portion ?? ''}`} className="rounded-xl bg-secondary/30 p-3">
                 <div className="flex items-start gap-3">
                   <div className="w-12 h-12 rounded-full overflow-hidden shrink-0 bg-secondary">
                     {c.image ? <img src={c.image} alt={c.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center">🍽️</div>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start gap-2">
-                      <p className="text-sm font-medium leading-tight line-clamp-1">{c.name}</p>
+                      <p className="text-sm font-medium leading-tight line-clamp-1">
+                        {c.name}
+                        {c.portion && (
+                          <span className="ml-1.5 rounded bg-primary/10 border border-primary/20 px-1 py-px text-[10px] font-semibold text-primary align-middle">
+                            {c.portion}
+                          </span>
+                        )}
+                      </p>
                       <p className="text-sm font-semibold whitespace-nowrap">{p.currencySymbol}{(c.price * c.quantity).toFixed(2)}</p>
                     </div>
                     <p className="text-xs text-muted-foreground">{p.currencySymbol}{c.price.toFixed(2)} each</p>
@@ -747,21 +814,21 @@ function CartPanel(p: CartPanelProps) {
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   <div className="flex items-center bg-secondary rounded-lg">
-                    <button onClick={() => p.updateCartQty(c.menuItemId, c.quantity - 1)} className="p-1.5 hover:text-primary">
+                    <button onClick={() => p.updateCartQty(c.menuItemId, c.quantity - 1, c.portion)} className="p-1.5 hover:text-primary">
                       <Minus className="h-3.5 w-3.5" />
                     </button>
                     <span className="px-2 text-sm font-semibold min-w-[1.5rem] text-center">{c.quantity}</span>
-                    <button onClick={() => p.updateCartQty(c.menuItemId, c.quantity + 1)} className="p-1.5 hover:text-primary">
+                    <button onClick={() => p.updateCartQty(c.menuItemId, c.quantity + 1, c.portion)} className="p-1.5 hover:text-primary">
                       <Plus className="h-3.5 w-3.5" />
                     </button>
                   </div>
                   <input
                     value={c.notes || ''}
-                    onChange={(e) => p.setCartNotes(c.menuItemId, e.target.value)}
+                    onChange={(e) => p.setCartNotes(c.menuItemId, e.target.value, c.portion)}
                     placeholder="Order Note…"
                     className="flex-1 bg-secondary/60 rounded-lg px-2 py-1.5 text-xs outline-none placeholder:text-muted-foreground"
                   />
-                  <button onClick={() => p.removeFromCart(c.menuItemId)} className="p-1.5 text-destructive/70 hover:text-destructive">
+                  <button onClick={() => p.removeFromCart(c.menuItemId, c.portion)} className="p-1.5 text-destructive/70 hover:text-destructive">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>

@@ -247,6 +247,17 @@ Deno.serve(async (req: Request) => {
           const tagList: string[] = Array.isArray(item.tags) ? [...item.tags] : [];
           if (item.veg && !tagList.includes("veg")) tagList.push("veg");
 
+          // Portion options extracted from the menu photo (Quarter/Half/Full…),
+          // each with its own price. Entries without a readable price are
+          // dropped rather than guessed — the same rule the extractor applies.
+          const portions = (Array.isArray(item.variants) ? item.variants : [])
+            .filter((v: any) => v && String(v.name ?? "").trim() && Number.isFinite(Number(v.price)) && Number(v.price) >= 0)
+            .slice(0, 8)
+            .map((v: any) => ({
+              name: String(v.name).trim().slice(0, 40),
+              price: Math.round(Number(v.price) * 100) / 100,
+            }));
+
           const { error } = await db.from("menu_items").insert({
             tenant_id: tenantId,
             category_id: catDbId,
@@ -257,6 +268,7 @@ Deno.serve(async (req: Request) => {
             sort_order: i,
             image: item.image || null,
             tags: tagList.join(","),
+            portions: portions.length > 0 ? portions : null,
           });
           if (error) return json(req, { error: error.message }, 500);
         }
