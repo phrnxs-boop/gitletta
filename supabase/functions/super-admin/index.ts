@@ -1215,32 +1215,6 @@ async function testAiProvider(req: Request) {
  */
 async function saveGoogleConfig(req: Request, adminId: string) {
   return json(req, { error: "Not found" }, 404);
-}
-
-  const redirectUri = String(b.redirectUri ?? "").trim() || defaultRedirectUri();
-  if (!/^https:\/\//i.test(redirectUri)) {
-    return json(req, { error: "The redirect URI must start with https://" }, 400);
-  }
-
-  const { data, error } = await admin()
-    .from("google_oauth_config")
-    .upsert(
-      {
-        id: GOOGLE_CONFIG_ID,
-        redirect_uri: redirectUri,
-        updated_at: new Date().toISOString(),
-        updated_by: adminId,
-      },
-      { onConflict: "id" },
-    )
-    .select("id, redirect_uri, updated_at")
-    .single();
-  if (error) return json(req, { error: error.message }, 500);
-
-  await logAdminAction(adminId, "google_oauth.redirect_updated", { redirectUri });
-
-  return json(req, { ok: true, redirectUri: data.redirect_uri, updatedAt: data.updated_at });
-}
 
 
 
@@ -1370,3 +1344,4 @@ Deno.serve(async (req: Request) => {
     return json(req, { error: (err as Error).message ?? "Unexpected error" }, 500);
   }
 });
+}
