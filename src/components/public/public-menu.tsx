@@ -957,11 +957,7 @@ export function PublicMenu() {
               no bill button. */}
           {ended && sessionHasOrder === true && reviewsEnabled && (
             <SessionReviewCard
-              tenantId={tenant?.id || sessionTenantId}
-              tableId={table?.id || sessionTableId}
               sessionToken={sessionToken}
-              sessionTenantId={sessionTenantId}
-              sessionTableId={sessionTableId}
               onViewBill={handleOpenBill}
             />
           )}
@@ -1925,18 +1921,10 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function SessionReviewCard({
-  tenantId,
-  tableId,
   sessionToken,
-  sessionTenantId,
-  sessionTableId,
   onViewBill,
 }: {
-  tenantId: string | null
-  tableId: string | null
   sessionToken: string | null
-  sessionTenantId: string | null
-  sessionTableId: string | null
   onViewBill?: () => void
 }) {
   const [rating, setRating] = useState<number>(5)
@@ -1974,25 +1962,36 @@ function SessionReviewCard({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!sessionToken) {
+      toast.error('Your table session has ended. Please scan the QR code on your table again.')
+      return
+    }
     setSubmitting(true)
     try {
       const res = await edgeFetch('/api/reviews', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          tenantId: tenantId || sessionTenantId,
-          tableId: tableId || sessionTableId,
+          // The session token is the proof a real diner sat at this table;
+          // the server derives tenant, table and session from it.
+          tableSessionToken: sessionToken,
           rating,
-          authorName: name.trim() || 'Guest',
-          comment: comment.trim(),
+          authorName: name.trim() || undefined,
+          comment: comment.trim() || undefined,
           tags: selectedTags,
         }),
       })
-      if (!res.ok) throw new Error('Failed to submit review')
+      if (!res.ok) {
+        // Surface the server's reason (duplicate, collection paused) rather
+        // than hiding it behind the generic toast.
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || 'Failed to submit review')
+      }
       setSubmitted(true)
       toast.success('Thank you for rating and reviewing your experience!')
-    } catch {
-      toast.error('Could not submit review. Please try again.')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : ''
+      toast.error(message && message !== 'Failed to submit review' ? message : 'Could not submit review. Please try again.')
     } finally {
       setSubmitting(false)
     }
