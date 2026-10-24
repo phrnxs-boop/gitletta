@@ -7,7 +7,7 @@ import { PERMISSION_KEYS } from "./permissions.ts";
  * halves of the migration behave identically.
  *
  *   * owners — `Authorization: Bearer <supabase access token>`
- *   * staff  — `x-staff-session` header, or the `tablo-staff-session` cookie
+ *   * staff  — `x-staff-session` header, or the `toastly-staff-session` cookie
  *
  * `guard()` fails closed: no session, a deactivated account, a cross-tenant
  * `x-tenant-id`, or a missing permission all produce 401/403 rather than data.
@@ -74,8 +74,13 @@ function staffToken(req: Request): string | null {
   const header = req.headers.get("x-staff-session");
   if (header?.trim()) return header.trim();
   const cookie = req.headers.get("cookie") ?? "";
-  const match = cookie.match(/tablo-staff-session=([^;]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : null;
+  // The current name first, then the ones it has had — a staff session issued
+  // before the rename is still a staff session.
+  for (const name of ["toastly-staff-session", "tablo-staff-session"]) {
+    const match = cookie.match(new RegExp(`${name}=([^;]+)`));
+    if (match?.[1]) return decodeURIComponent(match[1]);
+  }
+  return null;
 }
 
 function claimedTenant(req: Request): string | null {

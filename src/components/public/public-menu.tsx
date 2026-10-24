@@ -25,6 +25,7 @@ import {
 
 import { cn } from '@/lib/utils'
 import { edgeFetch } from '@/lib/edge'
+import { keyName, readStored, removeStored, writeStored } from '@/lib/storage-keys'
 import {
   canonicalPortionName,
   normalizePortionKey,
@@ -197,7 +198,7 @@ function tagMeta(tag: string): { label: string; icon?: React.ReactNode; cls: str
 // can re-activate a session. From then on the session token in sessionStorage
 // is the only key, and it is re-validated by the server on every load.
 
-const DINER_SESSION_KEY = 'swixo-diner-session'
+
 
 type CachedDinerSession = { token: string; tenantId: string; tableId: string }
 
@@ -216,7 +217,7 @@ function stripScanParam() {
 
 function readCachedSession(): CachedDinerSession | null {
   try {
-    const raw = sessionStorage.getItem(DINER_SESSION_KEY)
+    const raw = readStored('dinerSession')
     return raw ? (JSON.parse(raw) as CachedDinerSession) : null
   } catch {
     return null
@@ -225,7 +226,7 @@ function readCachedSession(): CachedDinerSession | null {
 
 function writeCachedSession(session: CachedDinerSession) {
   try {
-    sessionStorage.setItem(DINER_SESSION_KEY, JSON.stringify(session))
+    writeStored('dinerSession', JSON.stringify(session))
   } catch {
     /* ignore */
   }
@@ -233,7 +234,7 @@ function writeCachedSession(session: CachedDinerSession) {
 
 function clearCachedSession() {
   try {
-    sessionStorage.removeItem(DINER_SESSION_KEY)
+    removeStored('dinerSession')
   } catch {
     /* ignore */
   }
@@ -490,14 +491,14 @@ export function PublicMenu() {
   // Switching tables / re-scanning creates a new session → fresh cart.
   const cartKey = useMemo(() => {
     if (!sessionToken) return null
-    return `public-cart-session-${sessionToken}`
+    return keyName('cart', sessionToken)
   }, [sessionToken])
 
   // load
   useEffect(() => {
     if (!cartKey) return
     try {
-      const raw = localStorage.getItem(cartKey)
+      const raw = readStored('cart', sessionToken ?? '')
       if (raw) {
         const parsed = JSON.parse(raw) as CartItem[]
         if (Array.isArray(parsed)) setCart(parsed)
@@ -511,7 +512,7 @@ export function PublicMenu() {
   useEffect(() => {
     if (!cartKey) return
     try {
-      localStorage.setItem(cartKey, JSON.stringify(cart))
+      writeStored('cart', JSON.stringify(cart), sessionToken ?? '')
     } catch {
       /* ignore */
     }
@@ -605,7 +606,7 @@ export function PublicMenu() {
     // 1. Same-device / cross-tab instant broadcast (0ms delay)
     let bc: BroadcastChannel | null = null
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      bc = new BroadcastChannel('swixo_orders_sync')
+      bc = new BroadcastChannel('toastly_orders_sync')
       bc.onmessage = (e) => {
         const msg = e.data
         if (!msg) return
@@ -794,14 +795,14 @@ export function PublicMenu() {
       if (order?.id) {
         setPlacedOrderId(order.id)
         try {
-          sessionStorage.setItem('swixo_last_order_id', order.id)
+          writeStored('lastOrderId', order.id)
         } catch {}
       }
 
       // Broadcast immediately across browser tabs/windows
       try {
         if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-          const bc = new BroadcastChannel('swixo_orders_sync')
+          const bc = new BroadcastChannel('toastly_orders_sync')
           bc.postMessage({
             type: 'ORDER_CREATED',
             tenantId: tenant?.id || sessionTenantId,
@@ -844,7 +845,7 @@ export function PublicMenu() {
         q.set('orderId', placedOrderId)
       } else {
         try {
-          const savedId = sessionStorage.getItem('swixo_last_order_id')
+          const savedId = readStored('lastOrderId')
           if (savedId) q.set('orderId', savedId)
         } catch {}
       }

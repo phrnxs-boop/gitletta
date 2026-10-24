@@ -11,7 +11,7 @@
  *  4. Generate QR (table count + grid preview)
  *  5. Go Live (success + confetti + action buttons)
  *
- * State is autosaved to `localStorage["tablo-onboarding"]` on every change
+ * State is autosaved to `localStorage["toastly-onboarding"]` on every change
  * and restored on mount. Back navigation never loses data because all steps
  * share the single `onboardingData` object.
  */
@@ -50,6 +50,7 @@ import {
 
 import { cn } from '@/lib/utils'
 import { edgeFetch } from '@/lib/edge'
+import { keyName, readStored, removeStored, writeStored } from '@/lib/storage-keys'
 import {
   MENU_THEMES as MENU_THEME_OPTIONS,
   normaliseMenuTheme,
@@ -152,7 +153,6 @@ interface OnboardingData {
 /* Constants                                                            */
 /* ------------------------------------------------------------------ */
 
-const STORAGE_KEY = 'tablo-onboarding'
 const TOTAL_STEPS = 5
 
 const STEP_META: { title: string; subtitle: string }[] = [
@@ -309,7 +309,7 @@ export function OnboardingFlow() {
   const [data, setData] = useState<OnboardingData>(() => {
     if (typeof window === 'undefined') return defaultData()
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY)
+      const raw = readStored('onboarding')
       return hydrate(raw ? (JSON.parse(raw) as Partial<OnboardingData>) : null)
     } catch {
       return defaultData()
@@ -319,7 +319,7 @@ export function OnboardingFlow() {
   // autosave on every change
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+      writeStored('onboarding', JSON.stringify(data))
     } catch {
       /* quota / private mode — ignore */
     }
@@ -331,7 +331,7 @@ export function OnboardingFlow() {
   const [hadStoredDraft] = useState(() => {
     if (typeof window === 'undefined') return false
     try {
-      return Boolean(window.localStorage.getItem(STORAGE_KEY))
+      return Boolean(readStored('onboarding'))
     } catch {
       return false
     }
@@ -2093,7 +2093,7 @@ function StepGoLive({
         }
       }
 
-      localStorage.removeItem('tablo-onboarding')
+      removeStored('onboarding')
       toast.success('Opening dashboard…')
       setTimeout(() => {
         window.location.href = '/?view=dashboard'

@@ -1,5 +1,7 @@
 'use client'
 
+import { readStored, removeStored, writeStored } from './storage-keys'
+
 /**
  * Client for the Supabase Edge Functions that now serve the API.
  *
@@ -144,13 +146,13 @@ let staffSession = false
  * when the tab closes and is not shared between tabs, so the token's exposure is
  * limited to the session that is actually using it.
  */
-const STAFF_TOKEN_KEY = 'swixo-staff-token'
+
 let staffToken: string | null = null
 
 export function rememberStaffToken(token: string): void {
   staffToken = token
   try {
-    window.sessionStorage.setItem(STAFF_TOKEN_KEY, token)
+    writeStored('staffToken', token)
   } catch {
     /* storage blocked — the cookie path still works where it is allowed */
   }
@@ -159,7 +161,7 @@ export function rememberStaffToken(token: string): void {
 export function forgetStaffToken(): void {
   staffToken = null
   try {
-    window.sessionStorage.removeItem(STAFF_TOKEN_KEY)
+    removeStored('staffToken')
   } catch {
     /* nothing to clear */
   }
@@ -169,7 +171,7 @@ function currentStaffToken(): string | null {
   if (staffToken) return staffToken
   if (typeof window === 'undefined') return null
   try {
-    staffToken = window.sessionStorage.getItem(STAFF_TOKEN_KEY)
+    staffToken = readStored('staffToken')
   } catch {
     staffToken = null
   }

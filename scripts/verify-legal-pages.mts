@@ -16,7 +16,7 @@ const PORT = Number(process.env.CDP_PORT ?? 9271);
 const PAGES = [
   { path: "/privacy", heading: "Privacy Policy", must: ["Digital Personal Data Protection Act", "Grievance officer"] },
   { path: "/terms", heading: "Terms & Conditions", must: ["Governing law and jurisdiction", "Free trial, subscriptions and payment"] },
-  { path: "/cookies", heading: "Cookie Policy", must: ["tablo-staff-session", "sb-…-auth-token"] },
+  { path: "/cookies", heading: "Cookie Policy", must: ["toastly-staff-session", "sb-…-auth-token"] },
   { path: "/contact", heading: "Contact us", must: ["Grievance officer", "Product support"] },
 ];
 

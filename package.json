@@ -22,7 +22,8 @@
     "test:trial": "tsx --env-file=.env.local scripts/test-trial.mts",
     "test:trial-display": "tsx --env-file=.env.local scripts/verify-trial-display.mts",
     "test:legal-pages": "tsx scripts/verify-legal-pages.mts",
-    "test:cookie-banner": "tsx scripts/verify-cookie-banner.mts"
+    "test:cookie-banner": "tsx scripts/verify-cookie-banner.mts",
+    "test:storage-migration": "tsx --env-file=.env.local scripts/test-storage-migration.mts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -10,9 +10,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { Bell, ChefHat, CalendarClock, PackageX, ShieldAlert, CheckCircle2, Inbox } from 'lucide-react'
+import { readStored, writeStored } from '@/lib/storage-keys'
 
 /** How long a "seen" mark lasts before everything counts as unread again. */
-const SEEN_KEY = 'swixo-notifications-seen'
+
 
 type Kind = 'order' | 'ready' | 'reservation' | 'soldout' | 'security'
 
@@ -64,7 +65,7 @@ export function Notifications() {
   const [open, setOpen] = useState(false)
   const [seenAt, setSeenAt] = useState<number>(() => {
     if (typeof window === 'undefined') return 0
-    return Number(window.localStorage.getItem(SEEN_KEY) || 0)
+    return Number(readStored('notificationsSeen') || 0)
   })
 
   const notices = useMemo<Notice[]>(() => {
@@ -155,7 +156,7 @@ export function Notifications() {
     if (next) {
       const now = Date.now()
       setSeenAt(now)
-      try { window.localStorage.setItem(SEEN_KEY, String(now)) } catch { /* storage blocked */ }
+      writeStored('notificationsSeen', String(now))
     }
   }
 

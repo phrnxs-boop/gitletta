@@ -73,8 +73,8 @@ export default function CookiePolicyPage() {
             life="Minutes, then deleted"
           />
           <Row
-            name="tablo-staff-session"
-            purpose="The staff PIN session. Set when a staff member signs in with a PIN, and marked HttpOnly so it cannot be read by scripts in the page. It is what lets a shared floor device stay signed in as that staff member."
+            name="toastly-staff-session"
+            purpose="The staff PIN session. Set when a staff member signs in with a PIN, and marked HttpOnly so it cannot be read by scripts in the page. It is what lets a shared floor device stay signed in as that staff member. A device that signed in before the rename is still recognised through the cookie's previous name, which is cleared the next time that staff member signs in or out."
             life="Until sign-out or expiry"
           />
         </div>
@@ -84,32 +84,32 @@ export default function CookiePolicyPage() {
         <div>
           <TableHeader first="Key" second="What it does" third="Lasts" />
           <Row
-            name="tablo-theme"
+            name="toastly-theme"
             purpose="Remembers whether you chose the light or dark interface, so the dashboard does not flash the wrong theme on every visit."
             life="Until cleared"
           />
           <Row
-            name="tablo-menu-theme"
+            name="toastly-menu-theme"
             purpose="A cached copy of the restaurant's customer-menu theme, so the menu a diner opens appears in the right colours immediately."
             life="Until cleared"
           />
           <Row
-            name="tablo-onboarding"
+            name="toastly-onboarding"
             purpose="A draft of the setup wizard, so a half-finished menu import or restaurant profile is not lost if the page is closed."
             life="Until setup is completed"
           />
           <Row
-            name="swixo-diner-session"
+            name="toastly-diner-session"
             purpose="The diner's table session token. It keeps the menu open when a diner refreshes the page or their phone wakes up, without asking them to scan the QR code again."
             life="Until the table session ends"
           />
           <Row
-            name="tablo-cart-session-…"
+            name="toastly-cart-session-…"
             purpose="The diner's cart for that table session, so items are not lost on a refresh. It is keyed to the session, so a new scan starts a new cart."
             life="Until the table session ends"
           />
           <Row
-            name="swixo-notifications-seen"
+            name="toastly-notifications-seen"
             purpose="The last time the owner opened their notifications, so the unread badge does not keep counting things already seen."
             life="Until cleared"
           />
@@ -119,15 +119,16 @@ export default function CookiePolicyPage() {
             life="Until cleared"
           />
           <Row
-            name="swixo-staff-token"
+            name="toastly-staff-token"
             purpose="The staff session token, kept for browsers that block the staff cookie. It authorises staff-only requests on that device."
             life="Until sign-out"
           />
         </div>
         <p>
-          A few key names still begin with an older brand name. They are kept exactly as they are:
-          changing them would sign every staff device out and empty the cart of any diner whose
-          menu is open, which is not a change worth making to a label.
+          These names changed with the product. If you visited before the rename you may still see
+          an entry under the older name in your browser&apos;s storage viewer — it is read once,
+          copied to the name above, and then removed, so your theme, your half-finished setup and a
+          diner&apos;s open cart all survive the change. Nothing is signed out by it.
         </p>
         {/* If error monitoring or product analytics are ever switched on, they
             almost certainly set their own storage — add a row here when they do. */}

@@ -70,7 +70,18 @@ export default function RootLayout({
           __html: `
             (function() {
               try {
-                var stored = localStorage.getItem('tablo-theme');
+                var stored = localStorage.getItem('toastly-theme');
+                if (!stored) {
+                  // The key was renamed with the product; carry an existing
+                  // choice across once, so a returning visitor does not see the
+                  // wrong theme flash before the app has mounted.
+                  var previous = localStorage.getItem('tablo-theme');
+                  if (previous) {
+                    stored = previous;
+                    localStorage.setItem('toastly-theme', previous);
+                    localStorage.removeItem('tablo-theme');
+                  }
+                }
                 var theme = stored || 'dark';
                 if (theme === 'dark') {
                   document.documentElement.classList.add('dark');

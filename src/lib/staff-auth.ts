@@ -10,7 +10,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'crypto'
  * Security:
  *  - PINs are hashed with scrypt + per-staff salt (never plaintext)
  *  - Rate limiting: 5 failed attempts → 15 min lockout
- *  - Staff sessions use their own cookie (tablo-staff-session), never shared
+ *  - Staff sessions use their own cookie (toastly-staff-session), never shared
  *    with owner sessions
  *  - All staff actions are logged to staff_activities
  */
@@ -242,6 +242,7 @@ export function hasAnyPermission(permissions: string[], perms: string[]): boolea
 /** Read the staff session token from a request's cookies. */
 export function staffTokenFromRequest(req: Request): string | null {
   const cookieHeader = req.headers.get('cookie') || ''
-  const match = cookieHeader.match(/tablo-staff-session=([^;]+)/)
-  return match?.[1] ? decodeURIComponent(match[1]) : null
+  const match = cookieHeader.match(/toastly-staff-session=([^;]+)|tablo-staff-session=([^;]+)/)
+  const value = match?.[1] ?? match?.[2]
+  return value ? decodeURIComponent(value) : null
 }

@@ -1,4 +1,5 @@
 'use client'
+import { readStored, writeStored } from './storage-keys'
 
 /**
  * Theme management utility.
@@ -7,8 +8,6 @@
  */
 
 export type Theme = 'dark' | 'light' | 'system'
-
-const STORAGE_KEY = 'tablo-theme'
 
 /**
  * Apply the theme to the document. Call this on the client side.
@@ -26,11 +25,7 @@ export function applyTheme(theme: Theme) {
     root.classList.remove('dark')
   }
 
-  try {
-    localStorage.setItem(STORAGE_KEY, theme)
-  } catch {
-    /* ignore */
-  }
+  writeStored('theme', theme)
 }
 
 /**
@@ -38,7 +33,7 @@ export function applyTheme(theme: Theme) {
  */
 export function getStoredTheme(): Theme {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = readStored('theme')
     if (stored === 'light' || stored === 'dark' || stored === 'system') {
       return stored
     }

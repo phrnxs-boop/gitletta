@@ -285,10 +285,10 @@ try {
   // ---- the theme picker --------------------------------------------------
   console.log("\n── the theme picker ──");
   await evaluate(sid, `(() => {
-    const raw = localStorage.getItem('tablo-onboarding');
+    const raw = localStorage.getItem('toastly-onboarding');
     const d = raw ? JSON.parse(raw) : {};
     d.step = 3;
-    localStorage.setItem('tablo-onboarding', JSON.stringify(d));
+    localStorage.setItem('toastly-onboarding', JSON.stringify(d));
     return 'ok';
   })()`);
   await send("Page.navigate", { url: `${SITE}/?view=onboarding` }, sid);
@@ -330,18 +330,18 @@ try {
     return 'clicked';
   })()`);
   await sleep(900);
-  const themeNow = await evaluate(sid, "(() => { const raw = localStorage.getItem('tablo-onboarding'); return raw ? JSON.parse(raw).customize.theme : null })()");
+  const themeNow = await evaluate(sid, "(() => { const raw = localStorage.getItem('toastly-onboarding'); return raw ? JSON.parse(raw).customize.theme : null })()");
   check("picking the dark theme is instant", darkClicked === 'clicked' && themeNow === 'dark', `${darkClicked} / ${themeNow}`);
 
   // ---- the number fields -------------------------------------------------
   console.log("\n── the number fields ──");
   // Go to step 4 (the table count).
   const reached4 = await evaluate(sid, `(() => {
-    const raw = localStorage.getItem('tablo-onboarding');
+    const raw = localStorage.getItem('toastly-onboarding');
     if (!raw) return 'no draft';
     const d = JSON.parse(raw);
     d.step = 4;
-    localStorage.setItem('tablo-onboarding', JSON.stringify(d));
+    localStorage.setItem('toastly-onboarding', JSON.stringify(d));
     return 'ok';
   })()`);
   await send("Page.navigate", { url: `${SITE}/?view=onboarding` }, sid);
@@ -361,7 +361,7 @@ try {
   await sleep(400);
   const replaced = JSON.stringify({
     shown: await controlValue(sid, 'Number of tables', 'input'),
-    model: await evaluate(sid, "(() => { const raw = localStorage.getItem('tablo-onboarding'); return raw ? JSON.parse(raw).qr.tableCount : null })()"),
+    model: await evaluate(sid, "(() => { const raw = localStorage.getItem('toastly-onboarding'); return raw ? JSON.parse(raw).qr.tableCount : null })()"),
   });
   console.log("  ", replaced);
   const r = JSON.parse(String(replaced));
@@ -373,7 +373,7 @@ try {
   await sleep(400);
   const decimal = JSON.stringify({
     shown: await controlValue(sid, 'Number of tables', 'input'),
-    model: await evaluate(sid, "(() => { const raw = localStorage.getItem('tablo-onboarding'); return raw ? JSON.parse(raw).qr.tableCount : null })()"),
+    model: await evaluate(sid, "(() => { const raw = localStorage.getItem('toastly-onboarding'); return raw ? JSON.parse(raw).qr.tableCount : null })()"),
   });
   console.log("  ", decimal);
   check("a decimal can be typed", JSON.parse(String(decimal)).shown === "12.5", String(decimal));
@@ -381,10 +381,10 @@ try {
   // ---- back and next -----------------------------------------------------
   console.log("\n── back and next ──");
   await evaluate(sid, `(() => {
-    const raw = localStorage.getItem('tablo-onboarding');
+    const raw = localStorage.getItem('toastly-onboarding');
     const d = JSON.parse(raw);
     d.step = 1;
-    localStorage.setItem('tablo-onboarding', JSON.stringify(d));
+    localStorage.setItem('toastly-onboarding', JSON.stringify(d));
     return 'ok';
   })()`);
   await send("Page.navigate", { url: `${SITE}/?view=onboarding` }, sid);
@@ -398,7 +398,7 @@ try {
   await sleep(8000);
   const afterReload = JSON.stringify({
     ownerName: await controlValue(sid, 'Your Name'),
-    step: await evaluate(sid, "(() => { const raw = localStorage.getItem('tablo-onboarding'); return raw ? JSON.parse(raw).step : null })()"),
+    step: await evaluate(sid, "(() => { const raw = localStorage.getItem('toastly-onboarding'); return raw ? JSON.parse(raw).step : null })()"),
   });
   console.log("  ", afterReload);
   const ar = JSON.parse(String(afterReload));

@@ -15,6 +15,7 @@
  * menu's wrapper — and a sheet in the wrong palette would be obvious.
  */
 
+import { readStored, writeStored } from './storage-keys'
 import {
   normaliseMenuTheme,
   type MenuTheme,
@@ -71,7 +72,7 @@ export function applyMenuTheme(theme: MenuTheme) {
   root.classList.remove('light')
 }
 
-const CACHE_KEY = 'tablo-menu-theme'
+
 
 /**
  * The theme this diner was last shown, for this restaurant.
@@ -82,7 +83,7 @@ const CACHE_KEY = 'tablo-menu-theme'
 export function cachedMenuTheme(tenantId?: string | null): MenuTheme | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = window.localStorage.getItem(CACHE_KEY)
+    const raw = readStored('menuTheme')
     if (!raw) return null
     const map = JSON.parse(raw) as Record<string, string>
     const value = tenantId ? map[tenantId] : map.__last
@@ -96,11 +97,11 @@ export function cachedMenuTheme(tenantId?: string | null): MenuTheme | null {
 export function cacheMenuTheme(tenantId: string | null | undefined, theme: MenuTheme) {
   if (typeof window === 'undefined') return
   try {
-    const raw = window.localStorage.getItem(CACHE_KEY)
+    const raw = readStored('menuTheme')
     const map = (raw ? JSON.parse(raw) : {}) as Record<string, string>
     map[tenantId || '__last'] = theme
     map.__last = theme
-    window.localStorage.setItem(CACHE_KEY, JSON.stringify(map))
+    writeStored('menuTheme', JSON.stringify(map))
   } catch {
     /* private mode — the theme is only a nicety */
   }

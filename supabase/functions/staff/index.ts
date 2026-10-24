@@ -30,7 +30,16 @@ import { checkWriteLimit } from "../_shared/plans.ts";
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
 const SESSION_HOURS = 12;
-const STAFF_COOKIE = "tablo-staff-session";
+/**
+ * The staff session cookie, under the product's current name.
+ *
+ * The cookie had two other names before it (tablo-, then the older product
+ * name). A staff device that signed in before the rename still holds one of
+ * those, and it is still a valid session — so all of them are read, and only
+ * the current name is written. A staff member is never signed out by a rename.
+ */
+const STAFF_COOKIE = "toastly-staff-session";
+const STAFF_COOKIE_LEGACY = ["tablo-staff-session"];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ---------------------------------------------------------------------------
@@ -57,13 +66,23 @@ function staffTokenFromRequest(req: Request): string | null {
   const header = req.headers.get("x-staff-session");
   if (header?.trim()) return header.trim();
   const cookieHeader = req.headers.get("cookie") || "";
-  const match = cookieHeader.match(/tablo-staff-session=([^;]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : null;
+  for (const name of [STAFF_COOKIE, ...STAFF_COOKIE_LEGACY]) {
+    const match = cookieHeader.match(new RegExp(`${name}=([^;]+)`));
+    if (match?.[1]) return decodeURIComponent(match[1]);
+  }
+  return null;
 }
 
-function jsonWithCookie(req: Request, data: unknown, setCookie: string, status = 200): Response {
+function jsonWithCookie(
+  req: Request,
+  data: unknown,
+  setCookie: string | string[],
+  status = 200,
+): Response {
   const res = json(req, data, status);
-  res.headers.append("Set-Cookie", setCookie);
+  for (const cookie of Array.isArray(setCookie) ? setCookie : [setCookie]) {
+    res.headers.append("Set-Cookie", cookie);
+  }
   return res;
 }
 
@@ -86,8 +105,18 @@ function sessionCookie(token: string): string {
   }; SameSite=None; Secure; Partitioned`;
 }
 
-function clearCookie(): string {
-  return `${STAFF_COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=None; Secure; Partitioned`;
+/** The old names, expired, so a rename never leaves two copies of a session. */
+function retireLegacyCookies(): string[] {
+  return STAFF_COOKIE_LEGACY.map(
+    (name) => `${name}=; HttpOnly; Path=/; Max-Age=0; SameSite=None; Secure; Partitioned`,
+  );
+}
+
+function clearCookie(): string[] {
+  return [
+    `${STAFF_COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=None; Secure; Partitioned`,
+    ...retireLegacyCookies(),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -372,7 +401,7 @@ async function loginPost(req: Request): Promise<Response> {
       roleId: result.staff.role_id,
     },
     token: result.token,
-  }, sessionCookie(result.token));
+  }, [sessionCookie(result.token), ...retireLegacyCookies()]);
 }
 
 // ---------------------------------------------------------------------------

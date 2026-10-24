@@ -8,7 +8,7 @@ import { validateStaffSession } from './staff-auth'
  *
  * The app has two audiences and therefore two session shapes:
  *   * owners — Supabase Auth cookie, permission set from their `roles` row
- *   * staff  — `tablo-staff-session` cookie, permission set from their role
+ *   * staff  — `toastly-staff-session` cookie, permission set from their role
  *
  * `guard()` is the only thing a dashboard route should use. It fails closed:
  * no session, a deactivated account, a cross-tenant `x-tenant-id`, or a
@@ -40,8 +40,11 @@ const UUID_RE =
 
 export function staffTokenFrom(req: Request): string | null {
   const cookie = req.headers.get('cookie') || ''
-  const match = cookie.match(/tablo-staff-session=([^;]+)/)
-  return match?.[1] ? decodeURIComponent(match[1]) : null
+  // Either name: the cookie the app issues now, or the one it used to — a
+  // staff session issued before the rename is still a staff session.
+  const match = cookie.match(/toastly-staff-session=([^;]+)|tablo-staff-session=([^;]+)/)
+  const value = match?.[1] ?? match?.[2]
+  return value ? decodeURIComponent(value) : null
 }
 
 /** Roles store permissions as a comma string, but some legacy rows are JSON. */

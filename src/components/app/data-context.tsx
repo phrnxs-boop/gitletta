@@ -435,7 +435,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     // 1. Cross-Tab Broadcast Channel (instantaneous local sync)
     try {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-        bc = new BroadcastChannel('swixo_orders_sync')
+        bc = new BroadcastChannel('toastly_orders_sync')
         bc.onmessage = (event) => {
           if (!event.data || isCancelled) return
           if (event.data.tenantId && event.data.tenantId !== activeTenantId) return

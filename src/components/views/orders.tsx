@@ -185,7 +185,7 @@ export function OrdersView() {
         // 1. Broadcast immediately across browser tabs for zero-delay instant session end
         try {
           if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-            const bc = new BroadcastChannel('swixo_orders_sync')
+            const bc = new BroadcastChannel('toastly_orders_sync')
             bc.postMessage({
               type: 'SESSION_ENDED',
               tenantId: tenant.id,
