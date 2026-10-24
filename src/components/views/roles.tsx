@@ -24,7 +24,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
-  Shield, ShieldCheck, ShieldPlus, Users, Plus, Lock, Check, ChevronDown, ChevronRight, Save, Trash2, MoreVertical, Crown, KeyRound, UserPlus, Power, AlertTriangle,
+  Shield, ShieldCheck, ShieldPlus, Users, Plus, Lock, Check, ChevronDown, ChevronRight, Save, Trash2, MoreVertical, Crown, KeyRound, UserPlus, Power, AlertTriangle, Loader2,
 } from 'lucide-react'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -705,7 +705,7 @@ function RoleDetail({
               Discard
             </Button>
             <Button size="sm" disabled={!dirty || saving} onClick={save} className="bg-primary hover:bg-primary/90">
-              {saving ? <><span className="animate-spin mr-1">⏳</span> Saving…</> : <><Save className="h-3.5 w-3.5" /> Save Changes</>}
+              {saving ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Saving…</> : <><Save className="h-3.5 w-3.5" /> Save Changes</>}
             </Button>
           </div>
         </div>

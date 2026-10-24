@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { StatusBadge, OrderTypeBadge, Tag } from '@/components/shared/badges'
-import { Search, Plus, Minus, Trash2, ShoppingBag, X, Check, CreditCard, Ticket, Clock, LogOut } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingBag, X, Check, CreditCard, Ticket, Clock, LogOut, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function DashboardView() {
@@ -925,7 +925,7 @@ function CartPanel(p: CartPanelProps) {
           className="w-full h-10 text-sm font-semibold bg-gradient-to-r from-primary to-primary-hover hover:shadow-glow-primary transition-premium border-0"
         >
           {p.submitting ? (
-            <><span className="animate-spin mr-2">⏳</span> Placing order…</>
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Placing order…</>
           ) : (
             <><CreditCard className="h-4 w-4 mr-2" /> {tr('pos.checkout')} · {p.currencySymbol}{p.total.toFixed(2)}</>
           )}

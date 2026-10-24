@@ -288,7 +288,9 @@ export function SettingsView() {
   const tenantId = data?.tenant?.id ?? ''
 
   const save = async () => {
-    if (!dirty || !data?.tenant) return
+    // One save at a time: the buttons disable themselves, but a form submit by
+    // keyboard or a fast double-click should not start a second request.
+    if (saving || !dirty || !data?.tenant) return
     setSaving(true)
     try {
       const t = data.tenant
@@ -333,10 +335,21 @@ export function SettingsView() {
         headers,
         body: JSON.stringify(body),
       })
-      if (!res.ok) throw new Error('Failed')
-      toast.success("Customer reviews collection paused", { description: "Customer reviews submission has been stopped." })
-    } catch {
-      toast.error('Failed to disconnect')
+      const payload = await res.json().catch(() => null)
+      if (!res.ok || payload?.error) {
+        throw new Error(payload?.error || 'Could not save your settings')
+      }
+      toast.success('Settings saved')
+      // Re-read them, so the form matches what the database now holds and the
+      // Save button stops offering a save that has already happened.
+      await refresh()
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not save your settings')
+    } finally {
+      // The flag used to be cleared nowhere on either path — the reviews-tab
+      // rewrite dropped it. The button then read "Saving…" for ever and stayed
+      // disabled, so Settings could not be saved again without a reload.
+      setSaving(false)
     }
   }
 
@@ -737,7 +750,7 @@ export function SettingsView() {
             </Button>
           )}
           <Button onClick={save} disabled={!dirty || saving} className="bg-primary hover:bg-primary/90">
-            {saving ? <><span className="animate-spin mr-1">⏳</span> Saving…</> : <><Save className="h-4 w-4" /> Save Changes</>}
+            {saving ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Saving…</> : <><Save className="h-4 w-4" /> Save Changes</>}
           </Button>
         </div>
       </div>
@@ -1775,7 +1788,7 @@ export function SettingsView() {
           </Button>
         )}
         <Button onClick={save} disabled={!dirty || saving} className="bg-primary hover:bg-primary/90 flex-1">
-          {saving ? <><span className="animate-spin mr-1">⏳</span> Saving…</> : <><Save className="h-4 w-4" /> Save Changes</>}
+          {saving ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Saving…</> : <><Save className="h-4 w-4" /> Save Changes</>}
         </Button>
       </div>
 
