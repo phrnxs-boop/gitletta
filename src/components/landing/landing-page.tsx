@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { ArrowRight, ArrowUpRight, Check, QrCode, BarChart3, Users, Smartphone } from 'lucide-react'
 import { edgeFetch } from '@/lib/edge'
@@ -82,7 +83,7 @@ function PhoneFrame({ src, alt, className }: { src: string; alt: string; classNa
 /*  Nav                                                                        */
 /* -------------------------------------------------------------------------- */
 
-function Nav() {
+export function LandingNav() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
@@ -513,7 +514,7 @@ function FinalCta() {
   )
 }
 
-function Footer() {
+export function LandingFooter() {
   return (
     <footer className="border-t border-white/[0.06]">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-5 px-5 py-9 sm:flex-row sm:px-8">
@@ -533,6 +534,34 @@ function Footer() {
           </span>
         </div>
       </div>
+
+      {/* The policies and the way to reach us. Kept on their own row so the
+          links above stay where they are, and wrapped so a phone can read them
+          without a second column. */}
+      <div className="border-t border-white/[0.06]">
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-5 py-5 text-xs text-muted-foreground sm:flex-row sm:justify-between sm:gap-6 sm:px-8">
+          <span className="order-2 text-center sm:order-1 sm:text-left">
+            © {new Date().getFullYear()} Swixo · All rights reserved
+          </span>
+          <nav
+            aria-label="Legal"
+            className="order-1 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 sm:order-2 sm:justify-end"
+          >
+            <Link href="/privacy" className="transition-colors hover:text-foreground">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="transition-colors hover:text-foreground">
+              Terms &amp; Conditions
+            </Link>
+            <Link href="/cookies" className="transition-colors hover:text-foreground">
+              Cookie Policy
+            </Link>
+            <Link href="/contact" className="transition-colors hover:text-foreground">
+              Contact Us
+            </Link>
+          </nav>
+        </div>
+      </div>
     </footer>
   )
 }
@@ -542,7 +571,7 @@ function Footer() {
 export function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Nav />
+      <LandingNav />
       <main>
         <Hero />
         <Features />
@@ -551,7 +580,7 @@ export function LandingPage() {
         <Faq />
         <FinalCta />
       </main>
-      <Footer />
+      <LandingFooter />
     </div>
   )
 }
