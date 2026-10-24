@@ -32,9 +32,6 @@ import {
  *   GET    search?q=            restaurants and people
  *   GET    issues               support issues
  *   GET    ai-provider          the AI provider settings, key masked
- *   GET    google               the Google OAuth configuration, secret masked
- *   POST   google               save or update the Google OAuth configuration
- *   POST   google/test          check the Google credentials against Google
  *   POST   ai-provider          save or update the provider settings
  *   POST   ai-provider/test     test the stored key against the provider
  *   PATCH  issues/:id           change an issue's status
@@ -1207,18 +1204,6 @@ async function testAiProvider(req: Request) {
 
 
 /**
- * Change the redirect URI.
- *
- * The client id and the client secret are not accepted here — they are edge
- * function secrets. The request is refused with an explanation rather than
- * silently ignored.
- */
-async function saveGoogleConfig(req: Request, adminId: string) {
-  return json(req, { error: "Not found" }, 404);
-
-
-
-/**
  * Set the Razorpay plan id for a plan.
  *
  * The id comes from the Razorpay dashboard and is the one thing the
@@ -1299,8 +1284,6 @@ Deno.serve(async (req: Request) => {
           return await getIssues(req);
         case "ai-provider":
           return await getAiProvider(req);
-        case "google":
-          return await getGoogleConfigSettings(req);
         default:
           return json(req, { error: "Not found" }, 404);
       }
@@ -1313,10 +1296,6 @@ Deno.serve(async (req: Request) => {
       if (route === "issues") return await createIssue(req, adminId);
       if (route === "plans" && segments[1]) {
         return await updatePlan(req, adminId, segments[1]);
-      }
-      if (route === "google") {
-        if (segments[1] === "test") return await testGoogleConfig(req);
-        return await saveGoogleConfig(req, adminId);
       }
       if (route === "ai-provider") {
         // POST /ai-provider/test is the Test Connection button. Without this
@@ -1344,4 +1323,3 @@ Deno.serve(async (req: Request) => {
     return json(req, { error: (err as Error).message ?? "Unexpected error" }, 500);
   }
 });
-}

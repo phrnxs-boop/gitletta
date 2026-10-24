@@ -11,7 +11,7 @@
     "test:promo": "tsx scripts/test-promo.mts",
     "test:superadmin": "tsx scripts/test-superadmin-security.mts && tsx scripts/test-superadmin-api.mts",
     "test:gemini": "tsx scripts/test-gemini.mts",
-    "test:google-reviews": "tsx scripts/test-google-reviews.mts",
+    "test:reviews": "tsx --env-file=.env.local scripts/test-reviews.mts",
     "test:subscriptions": "tsx scripts/test-subscriptions.mts",
     "test:superadmin-stats": "tsx scripts/test-superadmin-stats.mts && tsx scripts/test-superadmin-contract.mts",
     "test:qr": "tsx scripts/test-qr-flow.mts",

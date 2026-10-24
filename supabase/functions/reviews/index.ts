@@ -98,6 +98,19 @@ async function create(req: Request): Promise<Response> {
     const tableId = sessionRow.table_id;
     const sessionId = sessionRow.id;
 
+    // The owner can turn review collection off. The session-end page hides
+    // the form in that case; this is the server-side gate that keeps a
+    // replayed or stale form from slipping a review in anyway.
+    const { data: enabledRow } = await admin()
+      .from("settings")
+      .select("value")
+      .eq("tenant_id", tenantId)
+      .eq("key", "reviews_enabled")
+      .maybeSingle();
+    if (enabledRow?.value === "false") {
+      return json(req, { error: "This restaurant is not collecting reviews right now." }, 403);
+    }
+
     // Check if client passed mismatched tenant
     if (b.tenantId && b.tenantId !== tenantId) {
       return json(req, { error: "Session does not match restaurant." }, 403);
@@ -193,14 +206,18 @@ async function list(req: Request): Promise<Response> {
     const { data: reviewsData, error: reviewsErr } = await query;
     if (reviewsErr) {
       console.error("Error fetching reviews:", reviewsErr);
-      return json(req, { reviews: [], stats: { averageRating: 0, totalReviews: 0, distribution: [], feedbackCount: 0 } });
+      return json(req, { error: reviewsErr.message }, 500);
     }
 
     // All reviews for statistics calculation
-    const { data: allStatsData } = await admin()
+    const { data: allStatsData, error: statsErr } = await admin()
       .from("customer_reviews")
       .select("id, rating, comment")
       .eq("tenant_id", tenantId);
+    if (statsErr) {
+      console.error("Error fetching review stats:", statsErr);
+      return json(req, { error: statsErr.message }, 500);
+    }
 
     const allReviews = allStatsData ?? [];
     const totalReviews = allReviews.length;
@@ -223,7 +240,7 @@ async function list(req: Request): Promise<Response> {
     });
   } catch (err: any) {
     console.error("Error in reviews list:", err);
-    return json(req, { reviews: [], stats: { averageRating: 0, totalReviews: 0, distribution: [], feedbackCount: 0 } });
+    return json(req, { error: (err as Error)?.message ?? "Unexpected error" }, 500);
   }
 }
 

@@ -15,11 +15,18 @@
 
 begin;
 
+-- Usage, billing and AI log tables reference tenants without a cascade, so
+-- they have to go first or the tenant delete below fails.
+delete from public.feature_usage;
+delete from public.subscription_payments;
+delete from public.subscription_audit_logs;
+delete from public.subscription_webhook_events;
+delete from public.ai_request_logs;
+
 -- Deleting the tenant cascades to every tenant-scoped table:
 --   roles, profiles, staff, staff_sessions, staff_activities, categories,
 --   menu_items, tables, table_sessions, orders, order_items, reservations,
---   promo_codes, settings, security_logs, user_sessions, google_connections,
---   google_reviews, customer_reviews
+--   promo_codes, settings, security_logs, user_sessions, customer_reviews
 delete from public.tenants;
 
 -- Owner logins live in auth.users, outside the tenant cascade. This clears the

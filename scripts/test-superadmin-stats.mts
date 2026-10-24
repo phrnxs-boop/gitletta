@@ -81,7 +81,6 @@ const ENDPOINTS = [
   "search?q=a",
   "issues",
   "ai-provider",
-  "google",
 ];
 const responses: Record<string, any> = {};
 for (const ep of ENDPOINTS) {

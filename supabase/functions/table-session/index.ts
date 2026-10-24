@@ -413,7 +413,7 @@ async function startSession(req: Request): Promise<Response> {
 }
 
 /**
- * The order a session produced, if any.
+ * The order a session produced, if any, plus the tenant it belongs to.
  *
  * A table session can be ended without a single order on it — the POS ends
  * sessions for tables that were abandoned. The diner's "session ended" screen
@@ -421,22 +421,23 @@ async function startSession(req: Request): Promise<Response> {
  * comes from the orders table rather than from the browser's memory.
  *
  * The session is found by its token and the order by the session it belongs
- * to, so an order can never be attributed to the wrong table.
+ * to, so an order can never be attributed to the wrong table. The tenant id
+ * rides along so the same lookup also serves the review summary below.
  */
 async function orderForSession(sessionToken: string | null): Promise<{
-  id: string;
-  order_number: string | null;
-} | null> {
-  if (!sessionToken) return null;
+  order: { id: string; order_number: string | null } | null;
+  tenantId: string | null;
+}> {
+  if (!sessionToken) return { order: null, tenantId: null };
 
   const db = admin();
 
   const { data: session } = await db
     .from("table_sessions")
-    .select("id")
+    .select("id, tenant_id")
     .eq("token", sessionToken)
     .maybeSingle();
-  if (!session) return null;
+  if (!session) return { order: null, tenantId: null };
 
   const { data: order } = await db
     .from("orders")
@@ -446,7 +447,39 @@ async function orderForSession(sessionToken: string | null): Promise<{
     .limit(1)
     .maybeSingle();
 
-  return order ?? null;
+  return { order: order ?? null, tenantId: session.tenant_id };
+}
+
+/**
+ * What the "session ended" screen needs to render the review block: whether
+ * the restaurant collects reviews at all, and its live average so the badge
+ * never has to invent a number. No rows yet means no badge number, not a
+ * made-up five stars.
+ */
+async function reviewSummaryForTenant(tenantId: string | null): Promise<{
+  enabled: boolean;
+  averageRating: number | null;
+  reviewCount: number;
+}> {
+  if (!tenantId) return { enabled: true, averageRating: null, reviewCount: 0 };
+
+  const db = admin();
+  const [{ data: setting }, { data: rows }] = await Promise.all([
+    db.from("settings")
+      .select("value")
+      .eq("tenant_id", tenantId)
+      .eq("key", "reviews_enabled")
+      .maybeSingle(),
+    db.from("customer_reviews").select("rating").eq("tenant_id", tenantId),
+  ]);
+
+  const ratings = (rows ?? [])
+    .map((r) => Number(r.rating))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const count = ratings.length;
+  const average = count > 0 ? +(ratings.reduce((a, b) => a + b, 0) / count).toFixed(1) : null;
+
+  return { enabled: setting?.value !== "false", averageRating: average, reviewCount: count };
 }
 
 /** GET /table-session/validate — PUBLIC. Session check + menu payload. */
@@ -460,8 +493,10 @@ async function validate(req: Request): Promise<Response> {
   if (!result.ok) {
     // The session is not usable, but the diner still needs to know whether
     // there is a bill waiting for them. Saying so here saves the page a
-    // second round trip.
-    const order = await orderForSession(sessionToken);
+    // second round trip — and the same lookup feeds the review block that
+    // sits on the "session ended" screen.
+    const { order, tenantId: sessionTenantId } = await orderForSession(sessionToken);
+    const reviewSummary = await reviewSummaryForTenant(sessionTenantId);
     return json(
       req,
       {
@@ -470,6 +505,9 @@ async function validate(req: Request): Promise<Response> {
         hasOrder: Boolean(order),
         orderId: order?.id ?? null,
         orderNumber: order?.order_number ?? null,
+        reviewsEnabled: reviewSummary.enabled,
+        averageRating: reviewSummary.averageRating,
+        reviewCount: reviewSummary.reviewCount,
       },
       result.status,
     );

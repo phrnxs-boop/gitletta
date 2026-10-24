@@ -147,28 +147,22 @@ export function SettingsView() {
 
   const [saving, setSaving] = useState(false)
 
-  // Internal reviews state
-  const [connected, setConnected] = useState(false)
-  const [connection, setConnection] = useState<any>(null)
+  // Internal reviews state. Diners rate their visit when their table session
+  // ends; the reviews land in our own customer_reviews table and the owner
+  // reads and replies to them here. There is nothing to connect or sync.
   const [reviews, setReviews] = useState<any[]>([])
-  const [settings, setSettings] = useState({
-    enabled: true,
-    autoSync: false,
-    syncIntervalMins: 60,
-    showPublic: true,
-    minRatingFilter: 0,
-  })
-  const [syncing, setSyncing] = useState(false)
-  const [demoMode, setDemoMode] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [reviewStats, setReviewStats] = useState<{
+    averageRating: number
+    totalReviews: number
+    distribution: { stars: number; count: number }[]
+    feedbackCount: number
+  }>({ averageRating: 0, totalReviews: 0, distribution: [], feedbackCount: 0 })
+  const [reviewsEnabled, setReviewsEnabled] = useState(true)
+  const [reviewsEnabledSaving, setReviewsEnabledSaving] = useState(false)
+  const [reviewsLoading, setReviewsLoading] = useState(false)
 
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
-
-  const [locationGroups, setLocationGroups] = useState<any[]>([])
-  const [locationsLoading, setLocationsLoading] = useState(false)
-  const [locationError, setLocationError] = useState<string | null>(null)
-  const [choosingLocation, setChoosingLocation] = useState<string | null>(null)
 
   // Billing state
   const [plans, setPlans] = useState<Array<{
@@ -231,6 +225,8 @@ export function SettingsView() {
       toggles[t.key] = data.settings[t.key] === 'true'
     }
     setOpToggles(toggles)
+    // Review collection is on unless the owner has explicitly turned it off.
+    setReviewsEnabled(data.settings.reviews_enabled !== 'false')
     // profile
     const u = data.currentUser
     setProfileForm({ name: u.name || '', email: u.email || '', phone: u.phone || '', avatar: u.avatar || '' })
@@ -345,7 +341,8 @@ export function SettingsView() {
   }
 
   const load = async () => {
-    setLoading(true)
+    if (!tenantId) return
+    setReviewsLoading(true)
     try {
       const res = await edgeFetch('/api/reviews', { headers: { 'x-tenant-id': tenantId } })
       const data = await res.json()
@@ -353,31 +350,21 @@ export function SettingsView() {
         toast.error(data.error)
       } else {
         setReviews(data.reviews || [])
-        setSettings({
-          enabled: data.connection?.enabled ?? true,
-          autoSync: data.connection?.autoSync ?? false,
-          syncIntervalMins: data.connection?.syncIntervalMins ?? 60,
-          showPublic: data.connection?.showPublic ?? true,
-          minRatingFilter: data.connection?.minRatingFilter ?? 0,
-        })
-        setConnected(!!data.connection)
-        setConnection(data.connection || null)
-        setDemoMode(!!data.connection?.demoMode)
+        setReviewStats(data.stats || { averageRating: 0, totalReviews: 0, distribution: [], feedbackCount: 0 })
       }
     } catch {
       toast.error('Failed to load reviews')
     } finally {
-      setLoading(false)
+      setReviewsLoading(false)
     }
   }
 
-  // Load initial reviews when connected state changes or tab becomes active
+  // Reviews load with the page — there is no connection step to wait for.
   useEffect(() => {
-    if (connected && tenantId) {
+    if (tenantId) {
       load()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, tenantId])
+  }, [tenantId])
 
   // Billing load
   const loadBilling = useCallback(async () => {
@@ -404,24 +391,6 @@ export function SettingsView() {
     loadBilling()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadBilling])
-
-  const handleSync = async () => {
-    setSyncing(true)
-    try {
-      const res = await edgeFetch('/api/reviews/sync', { method: 'POST', headers: { 'x-tenant-id': tenantId } })
-      const data = await res.json()
-      if (data.error) {
-        toast.error(data.error)
-      } else {
-        toast.success(`Synced ${data.synced} review(s)`)
-        await load()
-      }
-    } catch {
-      toast.error('Sync failed')
-    } finally {
-      setSyncing(false)
-    }
-  }
 
   // Billing helpers
   const STATUS_LABEL: Record<string, string> = {
@@ -566,17 +535,26 @@ export function SettingsView() {
     }
   }
 
-  const handleSaveSettings = async () => {
+  // The one review setting that exists: whether the session-end page asks
+  // the diner for a rating at all. Saved to the tenant's settings and
+  // enforced server-side when a review is submitted.
+  const toggleReviewsEnabled = async (v: boolean) => {
+    setReviewsEnabled(v)
+    setReviewsEnabledSaving(true)
     try {
-      await edgeFetch('/api/reviews/settings', {
+      const res = await edgeFetch('/api/settings', {
         method: 'PUT',
         headers,
-        body: JSON.stringify(settings),
+        body: JSON.stringify({ settings: { reviews_enabled: String(v) } }),
       })
-      toast.success('Review settings saved')
-      await load()
-    } catch {
-      toast.error('Failed to save settings')
+      const data = await res.json().catch(() => null)
+      if (!res.ok || data?.error) throw new Error(data?.error || 'Failed to save')
+      toast.success(v ? 'Review collection turned on' : 'Review collection turned off')
+    } catch (e: any) {
+      setReviewsEnabled(!v)
+      toast.error(e?.message || 'Failed to save settings')
+    } finally {
+      setReviewsEnabledSaving(false)
     }
   }
 
@@ -604,102 +582,14 @@ export function SettingsView() {
     }
   }
 
-  const handleConnect = async () => {
-    try {
-      const res = await edgeFetch('/api/reviews/connect', { headers: { 'x-tenant-id': tenantId } })
-      const data = await res.json()
-      if (data.error) {
-        toast.error(data.error)
-      } else if (data.url) {
-        // Open OAuth URL in a new window
-        window.open(data.url, '_blank', 'width=600,height=700')
-        // Poll for connection after OAuth completes
-        const checkConnection = setInterval(async () => {
-          await load()
-          if (connected) clearInterval(checkConnection)
-        }, 2000)
-        setTimeout(() => clearInterval(checkConnection), 120000) // 2 min timeout
-      } else {
-        toast.success('Customer Reviews connected')
-        await load()
-      }
-    } catch {
-      toast.error('Failed to connect')
-    }
-  }
 
-  const handleDisconnect = async () => {
-    if (!confirm('Disconnect Customer Reviews? This removes all synced reviews.')) return
-    try {
-      await edgeFetch('/api/reviews/connect', { method: 'DELETE', headers: { 'x-tenant-id': tenantId } })
-      toast.success('Customer Reviews disconnected')
-      await load()
-    } catch {
-      toast.error('Failed to disconnect')
-    }
-  }
 
-  const handleSelectLocation = async (accountName: string, locationId: string, locationName: string) => {
-    setChoosingLocation(locationId)
-    try {
-      const res = await edgeFetch('/api/reviews/connect', {
-        method: 'POST',
-        headers: { 'x-tenant-id': tenantId },
-        body: JSON.stringify({ accountName, locationId, locationName }),
-      })
-      const data = await res.json()
-      if (data.error) {
-        toast.error(data.error)
-      } else {
-        toast.success(`${locationName} connected`, { description: data.synced ? `Synced ${data.synced} review(s).` : undefined })
-        await load()
-      }
-    } catch {
-      toast.error('Failed to select location')
-    } finally {
-      setChoosingLocation(null)
-    }
-  }
-
-  const loadLocations = useCallback(async () => {
-    setLocationsLoading(true)
-    setLocationError(null)
-    try {
-      const res = await edgeFetch('/api/reviews/locations', { headers: { 'x-tenant-id': tenantId } })
-      const data = await res.json()
-      if (data.error) {
-        setLocationError(data.error)
-        setLocationGroups([])
-      } else {
-        setLocationGroups(data.groups || [])
-      }
-    } catch {
-      setLocationError('Failed to load locations')
-      setLocationGroups([])
-    } finally {
-      setLocationsLoading(false)
-    }
-  }, [tenantId])
-
-  // Load locations when connection needs it
-  useEffect(() => {
-    if (connection?.needsLocation) loadLocations()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connection?.needsLocation, loadLocations])
-
-  const avgRating = reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : '—'
-  const ratingDist = [5, 4, 3, 2, 1].map(n => ({ stars: n, count: reviews.filter(r => r.rating === n).length }))
-
-  // Early return must come AFTER all hooks
-  if (loading) {
-    return (
-      <div className="max-w-4xl space-y-4">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="h-32 rounded-2xl bg-secondary/30 animate-pulse" />
-        ))}
-      </div>
-    )
-  }
+  // The rating overview is the server's own aggregate over every review the
+  // restaurant has, not just the newest page of them.
+  const avgRating = reviewStats.totalReviews > 0 ? reviewStats.averageRating.toFixed(1) : '—'
+  const ratingDist = reviewStats.distribution.length
+    ? reviewStats.distribution
+    : [5, 4, 3, 2, 1].map(n => ({ stars: n, count: 0 }))
 
   if (!data) return null
 
@@ -1663,336 +1553,183 @@ export function SettingsView() {
 
           <TabsContent value="reviews" className="flex-1 mt-3 min-h-0">
             <div className="max-w-4xl space-y-4">
-              {/* Connection status card */}
+              {/* Header card — reviews come from our own diners, nothing to connect */}
               <Card className="rounded-2xl bg-card border-border p-4 md:p-4 md:p-6">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0">
-                      <svg className="w-7 h-7" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                    <div className="w-12 h-12 rounded-xl bg-amber-400/10 flex items-center justify-center shrink-0">
+                      <Star className="w-6 h-6 fill-amber-400 text-amber-400" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-semibold flex items-center gap-2">
-                        Customer Reviews
-                        {connected && (
-                          <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Connected
-                          </Badge>
-                        )}
-                        {demoMode && <Badge variant="secondary" className="bg-amber-500/15 text-amber-400">Demo</Badge>}
-                      </h3>
+                      <h3 className="font-semibold">Customer Reviews</h3>
                       <p className="text-sm text-muted-foreground mt-0.5">
-                        {connected
-                          ? connection?.locationName || 'Customer Reviews linked'
-                          : 'Connect your Customer Reviews to sync and manage reviews'}
+                        Diners rate their visit when their table session ends — the reviews land here.
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {connected ? (
-                      <>
-                        <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
-                          <RefreshCw className={cn('h-4 w-4 mr-1.5', syncing && 'animate-spin')} />
-                          {syncing ? 'Syncing…' : 'Sync Now'}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={handleDisconnect} className="text-destructive">
-                          Disconnect
-                        </Button>
-                      </>
-                    ) : (
-                      <Button size="sm" onClick={handleConnect} className="bg-primary hover:bg-primary/90">
-                        <ExternalLink className="h-4 w-4 mr-1.5" /> Start Collecting Reviews
-                      </Button>
-                    )}
+                  <div className="flex items-center gap-2.5 rounded-xl border border-border bg-secondary/30 px-3 py-2">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {reviewsEnabled ? 'Collecting' : 'Paused'}
+                    </span>
+                    <Switch
+                      checked={reviewsEnabled}
+                      disabled={reviewsEnabledSaving}
+                      onCheckedChange={toggleReviewsEnabled}
+                    />
                   </div>
                 </div>
-
-                {connection?.lastSyncedAt && (
+                {!reviewsEnabled && (
                   <p className="text-xs text-muted-foreground mt-3">
-                    Last synced: {new Date(connection.lastSyncedAt).toLocaleString()}
-                    {connection.lastSyncError && <span className="text-destructive ml-2">· Error: {connection.lastSyncError}</span>}
+                    While paused, the session-end page shows no review form and new reviews are declined.
                   </p>
                 )}
               </Card>
 
-              {connected && connection?.needsLocation && (
-                /* The owner has chosen Customer Reviews but has not said which of their
-                   locations this restaurant is. Nothing can be synced until they do. */
-                <Card className="rounded-2xl bg-card border-border p-4 md:p-6">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-                      <MapPin className="h-5 w-5 text-primary" />
+              {/* Rating overview */}
+              <Card className="rounded-2xl bg-card border-border p-4 md:p-4 md:p-6">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <p className="text-4xl font-bold text-gradient-primary">{avgRating}</p>
+                      <div className="flex items-center gap-0.5 mt-1 justify-center">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <Star key={n} className={cn('h-3.5 w-3.5', n <= Math.round(parseFloat(avgRating)) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30')} />
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{reviewStats.totalReviews} reviews</p>
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="font-semibold">Choose your business location</h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        Pick the Customer Reviews that belongs to this restaurant. Only the
-                        profiles your customer account can manage are listed.
-                      </p>
+                    <Separator orientation="vertical" className="h-20" />
+                    <div className="flex-1 min-w-[180px] space-y-1">
+                      {ratingDist.map(r => (
+                        <div key={r.stars} className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-8">{r.stars}★</span>
+                          <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+                            <div className="h-full bg-amber-400 rounded-full" style={{ width: `${reviewStats.totalReviews ? (r.count / reviewStats.totalReviews) * 100 : 0}%` }} />
+                          </div>
+                          <span className="text-xs text-muted-foreground w-6 text-right">{r.count}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                </div>
+              </Card>
 
-                  {locationError && (
-                    <p className="mt-3 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-[12.5px] leading-relaxed text-destructive">
-                      {locationError}
-                    </p>
-                  )}
-
-                  {locationsLoading ? (
-                    <div className="mt-4 space-y-2">
+              {/* Reviews list */}
+              <Card className="rounded-2xl bg-card border-border p-4 md:p-4 md:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold">Recent Reviews</h3>
+                    <Badge variant="secondary">{reviews.length}</Badge>
+                  </div>
+                </div>
+                <div className="space-y-3 max-h-[500px] overflow-y-auto scrollbar-thin">
+                  {reviewsLoading ? (
+                    <div className="space-y-3">
                       {[1, 2, 3].map(i => (
-                        <div key={i} className="h-14 rounded-xl bg-secondary/30 animate-pulse" />
+                        <div key={i} className="h-24 rounded-xl bg-secondary/30 animate-pulse" />
                       ))}
                     </div>
-                  ) : locationGroups.length === 0 ? (
-                    <p className="mt-4 rounded-lg bg-secondary/50 px-3 py-3 text-[12.5px] leading-relaxed text-muted-foreground">
-                      No business locations came back for this Customer account. A location has to be
-                      verified and your account has to be a manager of it, or Google will not list it.
+                  ) : reviews.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No reviews yet. When a diner rates their visit at the end of a table session, the review appears here.
                     </p>
-                  ) : (
-                    <div className="mt-4 space-y-4">
-                      {locationGroups.map(group => (
-                        <div key={group.accountName}>
-                          <p className="mb-1.5 text-[11.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            {group.accountTitle || group.accountName}
-                          </p>
-                          <div className="space-y-1.5">
-                            {group.locations.map((loc: any) => (
-                              <button
-                                key={loc.locationId}
-                                onClick={() => handleSelectLocation(group.accountName, loc.locationId, loc.locationName)}
-                                disabled={choosingLocation !== null}
-                                className="flex w-full items-center gap-3 rounded-xl border border-border bg-secondary/20 px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-primary/5 disabled:opacity-60"
-                              >
-                                <Store className="h-4 w-4 shrink-0 text-primary" />
-                                <span className="min-w-0 flex-1">
-                                  <span className="block truncate text-sm font-medium">{loc.locationName}</span>
-                                  {(loc.address || loc.storeCode) && (
-                                    <span className="block truncate text-[11.5px] text-muted-foreground">
-                                      {[loc.address, loc.storeCode].filter(Boolean).join(' · ')}
-                                    </span>
-                                  )}
-                                </span>
-                                {choosingLocation === loc.locationId ? (
-                                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                )}
-                              </button>
-                            ))}
+                  ) : reviews.map((r) => (
+                    <div key={r.id} className="rounded-xl border border-border bg-secondary/20 p-4">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-semibold shrink-0">
+                            {r.authorName?.[0] || '?'}
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="mt-4 flex justify-end">
-                    <Button variant="outline" size="sm" onClick={loadLocations} disabled={locationsLoading}>
-                      <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', locationsLoading && 'animate-spin')} />
-                      Refresh locations
-                    </Button>
-                  </div>
-                </Card>
-              )}
-
-              {connected && !connection?.needsLocation && (
-                <>
-                  {/* Rating overview */}
-                  <Card className="rounded-2xl bg-card border-border p-4 md:p-4 md:p-6">
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                      <div className="flex items-center gap-4">
-                        <div className="text-center">
-                          <p className="text-4xl font-bold text-gradient-primary">{avgRating}</p>
-                          <div className="flex items-center gap-0.5 mt-1 justify-center">
-                            {[1, 2, 3, 4, 5].map(n => (
-                              <Star key={n} className={cn('h-3.5 w-3.5', n <= Math.round(parseFloat(avgRating)) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30')} />
-                            ))}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">{reviews.length} reviews</p>
-                        </div>
-                        <Separator orientation="vertical" className="h-20" />
-                        <div className="flex-1 min-w-[180px] space-y-1">
-                          {ratingDist.map(r => (
-                            <div key={r.stars} className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground w-8">{r.stars}★</span>
-                              <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
-                                <div className="h-full bg-amber-400 rounded-full" style={{ width: `${reviews.length ? (r.count / reviews.length) * 100 : 0}%` }} />
-                              </div>
-                              <span className="text-xs text-muted-foreground w-6 text-right">{r.count}</span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {r.authorName || 'Anonymous'}
+                              {r.tableName && (
+                                <span className="font-normal text-muted-foreground"> · {r.tableName}{r.tableArea ? ` (${r.tableArea})` : ''}</span>
+                              )}
+                            </p>
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4, 5].map(n => (
+                                <Star key={n} className={cn('h-3 w-3', n <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30')} />
+                              ))}
+                              <span className="text-[10px] text-muted-foreground ml-1">
+                                {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}
+                              </span>
                             </div>
+                          </div>
+                        </div>
+                      </div>
+                      {r.comment && <p className="text-sm text-foreground/80 mb-2">{r.comment}</p>}
+                      {r.tags && (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {String(r.tags).split(',').map((t: string) => t.trim()).filter(Boolean).map((t: string) => (
+                            <span key={t} className="rounded-full bg-secondary px-2 py-0.5 text-[10.5px] text-muted-foreground">{t}</span>
                           ))}
                         </div>
-                      </div>
-                    </div>
-                  </Card>
-
-                  {/* Settings */}
-                  <Card className="rounded-2xl bg-card border-border p-4 md:p-4 md:p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Settings className="h-5 w-5 text-primary" />
-                      <h3 className="font-semibold">Review Settings</h3>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/30 p-3">
-                        <div>
-                          <p className="text-sm font-medium">Enable Customer Reviews</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">Master toggle for the integration</p>
-                        </div>
-                        <Switch checked={settings.enabled} onCheckedChange={(v) => setSettings(s => ({ ...s, enabled: v }))} />
-                      </div>
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/30 p-3">
-                        <div>
-                          <p className="text-sm font-medium">Auto-sync reviews</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">Automatically fetch new reviews every {settings.syncIntervalMins} min</p>
-                        </div>
-                        <Switch checked={settings.autoSync} onCheckedChange={(v) => setSettings(s => ({ ...s, autoSync: v }))} />
-                      </div>
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/30 p-3">
-                        <div>
-                          <p className="text-sm font-medium">Show on public menu</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">Display customer reviews on the customer-facing menu</p>
-                        </div>
-                        <Switch checked={settings.showPublic} onCheckedChange={(v) => setSettings(s => ({ ...s, showPublic: v }))} />
-                      </div>
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/30 p-3">
-                        <div>
-                          <p className="text-sm font-medium">Minimum rating to show</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">Only display reviews with this rating or higher on the public menu</p>
-                        </div>
-                        <Select value={String(settings.minRatingFilter)} onValueChange={(v) => setSettings(s => ({ ...s, minRatingFilter: parseInt(v) }))}>
-                          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="0">All</SelectItem>
-                            <SelectItem value="3">3+ ★</SelectItem>
-                            <SelectItem value="4">4+ ★</SelectItem>
-                            <SelectItem value="5">5 ★</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="flex justify-end mt-4">
-                      <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={handleSaveSettings}>
-                        <Save className="h-3.5 w-3.5 mr-1.5" /> Save Settings
-                      </Button>
-                    </div>
-                  </Card>
-
-                  {/* Reviews list */}
-                  <Card className="rounded-2xl bg-card border-border p-4 md:p-4 md:p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <MessageSquare className="h-5 w-5 text-primary" />
-                        <h3 className="font-semibold">Recent Reviews</h3>
-                        <Badge variant="secondary">{reviews.length}</Badge>
-                      </div>
-                    </div>
-                    <div className="space-y-3 max-h-[500px] overflow-y-auto scrollbar-thin">
-                      {reviews.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-8">No reviews yet. Click "Sync Now" to fetch.</p>
-                      ) : reviews.map((r) => (
-                        <div key={r.id} className="rounded-xl border border-border bg-secondary/20 p-4">
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-semibold shrink-0">
-                                {r.authorName?.[0] || '?'}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{r.authorName || 'Anonymous'}</p>
-                                <div className="flex items-center gap-1">
-                                  {[1, 2, 3, 4, 5].map(n => (
-                                    <Star key={n} className={cn('h-3 w-3', n <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30')} />
-                                  ))}
-                                  <span className="text-[10px] text-muted-foreground ml-1">
-                                    {r.createTime ? new Date(r.createTime).toLocaleDateString() : ''}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            {r.flagged && <Badge variant="secondary" className="bg-red-500/15 text-red-400">Flagged</Badge>}
-                          </div>
-                          {r.comment && <p className="text-sm text-foreground/80 mb-2">{r.comment}</p>}
-                          {r.reply && (
-                            <div className="rounded-lg bg-primary/5 border border-primary/10 p-2.5 mt-2">
-                              <p className="text-[10px] font-semibold text-primary mb-0.5">OWNER REPLY</p>
-                              {replyingTo === r.id ? (
-                                <div className="space-y-2">
-                                  <Textarea
-                                    value={replyText}
-                                    onChange={(e) => setReplyText(e.target.value)}
-                                    placeholder="Edit your reply…"
-                                    rows={2}
-                                    className="bg-background/60 border-border text-sm resize-none"
-                                  />
-                                  <div className="flex justify-end gap-2">
-                                    <Button variant="ghost" size="sm" onClick={() => { setReplyingTo(null); setReplyText('') }}>Cancel</Button>
-                                    <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => handleReply(r.id)} disabled={!replyText.trim()}>
-                                      <Send className="h-3 w-3 mr-1" /> Update Reply
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  <p className="text-xs text-foreground/80 whitespace-pre-wrap">{r.reply}</p>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 px-2 mt-1 text-[11.5px] text-primary"
-                                    onClick={() => { setReplyingTo(r.id); setReplyText(r.reply || '') }}
-                                  >
-                                    Edit reply
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          )}
-                          {!r.reply && (
-                            <div className="mt-2">
-                              {replyingTo === r.id ? (
-                                <div className="space-y-2">
-                                  <Textarea
-                                    value={replyText}
-                                    onChange={(e) => setReplyText(e.target.value)}
-                                    placeholder="Write a reply…"
-                                    rows={2}
-                                    className="bg-secondary/50 border-border text-sm resize-none"
-                                  />
-                                  <div className="flex justify-end gap-2">
-                                    <Button variant="ghost" size="sm" onClick={() => { setReplyingTo(null); setReplyText('') }}>Cancel</Button>
-                                    <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => handleReply(r.id)} disabled={!replyText.trim()}>
-                                      <Send className="h-3 w-3 mr-1" /> Post Reply
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <Button variant="outline" size="sm" onClick={() => { setReplyingTo(r.id); setReplyText('') }}>
-                                  <MessageSquare className="h-3.5 w-3.5 mr-1" /> Reply
+                      )}
+                      {r.reply && (
+                        <div className="rounded-lg bg-primary/5 border border-primary/10 p-2.5 mt-2">
+                          <p className="text-[10px] font-semibold text-primary mb-0.5">OWNER REPLY</p>
+                          {replyingTo === r.id ? (
+                            <div className="space-y-2">
+                              <Textarea
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                placeholder="Edit your reply…"
+                                rows={2}
+                                className="bg-background/60 border-border text-sm resize-none"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => { setReplyingTo(null); setReplyText('') }}>Cancel</Button>
+                                <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => handleReply(r.id)} disabled={!replyText.trim()}>
+                                  <Send className="h-3 w-3 mr-1" /> Update Reply
                                 </Button>
-                              )}
+                              </div>
                             </div>
+                          ) : (
+                            <>
+                              <p className="text-xs text-foreground/80 whitespace-pre-wrap">{r.reply}</p>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 mt-1 text-[11.5px] text-primary"
+                                onClick={() => { setReplyingTo(r.id); setReplyText(r.reply || '') }}
+                              >
+                                Edit reply
+                              </Button>
+                            </>
                           )}
                         </div>
-                      ))}
+                      )}
+                      {!r.reply && (
+                        <div className="mt-2">
+                          {replyingTo === r.id ? (
+                            <div className="space-y-2">
+                              <Textarea
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                placeholder="Write a reply…"
+                                rows={2}
+                                className="bg-secondary/50 border-border text-sm resize-none"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => { setReplyingTo(null); setReplyText('') }}>Cancel</Button>
+                                <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => handleReply(r.id)} disabled={!replyText.trim()}>
+                                  <Send className="h-3 w-3 mr-1" /> Post Reply
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button variant="outline" size="sm" onClick={() => { setReplyingTo(r.id); setReplyText('') }}>
+                              <MessageSquare className="h-3.5 w-3.5 mr-1" /> Reply
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </Card>
-                </>
-              )}
-
-              {!connected && (
-                <Card className="rounded-2xl bg-card border-border p-4 md:p-4 md:p-6">
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-9 h-9" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                    </div>
-                    <h3 className="font-semibold text-lg">Customer Reviews</h3>
-                    <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Collect and display customer reviews with star ratings. Let your diners share their experiences and help others choose your restaurant.</p>
-                    <div className="flex items-center justify-center gap-2 mt-4">
-                      <Button onClick={handleConnect} className="bg-primary hover:bg-primary\/90">Start Collecting Reviews</Button>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-3">
-                      Secure OAuth · Reviews are stored independently from customer sessions
-                    </p>
-                  </div>
-                </Card>
-              )}
+                  ))}
+                </div>
+              </Card>
             </div>
           </TabsContent>
 

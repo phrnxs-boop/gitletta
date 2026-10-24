@@ -26,14 +26,6 @@ console.log("\n── Gemini ──");
   console.log("  models:", JSON.stringify({ text: g.body?.textModel, image: g.body?.imageModel, configured: g.body?.configured }));
 }
 
-console.log("\n── Google Business Profile ──");
-{
-  const r = await call("super-admin/google/test", "POST");
-  console.log("  test:", r.status, JSON.stringify(r.body).slice(0, 320));
-  const g = await call("super-admin/google");
-  console.log("  config:", JSON.stringify({ configured: g.body?.configured, redirect: g.body?.redirectUri }));
-}
-
 console.log("\n── Razorpay ──");
 {
   const r = await call("super-admin/payments");
