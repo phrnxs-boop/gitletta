@@ -7,6 +7,7 @@ import { json, preflight } from "../_shared/http.ts";
 import { resolvePlan } from "../_shared/plans.ts";
 import { PERMISSION_KEYS } from "../_shared/permissions.ts";
 import { effectiveDishBasePrice, normalizeStoredPortions } from "../_shared/portions.ts";
+import { listAuthSessions } from "../_shared/sessions.ts";
 
 /**
  * /functions/v1/bootstrap  (GET, dashboard.view)
@@ -118,17 +119,14 @@ Deno.serve(async (req: Request) => {
     if (securityLogsRes.error) return json(req, { error: securityLogsRes.error.message }, 500);
     if (staffRes.error) return json(req, { error: staffRes.error.message }, 500);
 
-    // Owner sessions belong to the profiles of this tenant.
-    const profileIds = (usersRes.data ?? []).map((u: any) => u.id);
-    let sessionsData: any[] = [];
-    if (profileIds.length > 0) {
-      const { data: sessions, error: sessionsError } = await db
-        .from("user_sessions")
-        .select("*, user:profiles(*)")
-        .in("user_id", profileIds)
-        .order("last_active", { ascending: false });
-      if (sessionsError) return json(req, { error: sessionsError.message }, 500);
-      sessionsData = sessions ?? [];
+    // Real owner sessions (auth.sessions), scoped to this tenant's profiles.
+    // The old query read `user_sessions`, a table nothing ever wrote to, so the
+    // Security page always showed 0 sessions.
+    let sessions;
+    try {
+      sessions = await listAuthSessions(db, tenantId, g.session.sessionId);
+    } catch (err) {
+      return json(req, { error: (err as Error).message }, 500);
     }
 
     const { data: settingsRows, error: settingsError } = await db
@@ -157,7 +155,6 @@ Deno.serve(async (req: Request) => {
     const orders = toCamel(ordersRes.data ?? []);
     const reservations = toCamel(reservationsRes.data ?? []);
     const promos = toCamel(promosRes.data ?? []);
-    const sessions = toCamel(sessionsData);
     const securityLogs = toCamel(securityLogsRes.data ?? []);
     const staff = toCamel(staffRes.data ?? []);
 

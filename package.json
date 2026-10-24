@@ -16,6 +16,7 @@
     "test:superadmin-stats": "tsx scripts/test-superadmin-stats.mts && tsx scripts/test-superadmin-contract.mts",
     "test:qr": "tsx scripts/test-qr-flow.mts",
     "test:portions": "tsx --env-file=.env.local scripts/test-portions.mts",
+    "test:security": "tsx scripts/test-security.mts",
     "test:smoke": "tsx scripts/test-smoke.mts"
   },
   "dependencies": {

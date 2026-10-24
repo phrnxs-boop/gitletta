@@ -20,6 +20,8 @@ export interface Session {
   tenantId: string;
   /** `profiles.id` for owners, `staff.id` for staff. */
   subjectId: string;
+  /** The caller's own auth session (`session_id` JWT claim), owners only. */
+  sessionId: string | null;
   name: string;
   email: string | null;
   roleName: string;
@@ -32,6 +34,20 @@ export type GuardResult =
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The `session_id` claim of a Supabase access token, without verifying it —
+ * `ownerSession()` only calls this after `auth.getUser()` has verified the
+ * token itself. Used to badge the caller's own session on the Security page. */
+function jwtSessionId(jwt: string): string | null {
+  try {
+    const payload = JSON.parse(
+      atob(jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    return typeof payload.session_id === "string" ? payload.session_id : null;
+  } catch {
+    return null;
+  }
+}
 
 export function splitPermissions(raw: unknown): string[] {
   const value = String(raw ?? "").trim();
@@ -102,6 +118,7 @@ async function ownerSession(req: Request): Promise<Session | null> {
       kind: "owner",
       tenantId: profile.tenant_id,
       subjectId: profile.id,
+      sessionId: jwtSessionId(jwt),
       name: profile.name,
       email: profile.email,
       roleName: role?.name ?? profile.role ?? "Owner",
@@ -150,6 +167,7 @@ async function staffSession(req: Request): Promise<Session | null> {
     kind: "staff",
     tenantId: staff.tenant_id,
     subjectId: staff.id,
+    sessionId: null,
     name: staff.name,
     email: null,
     roleName: staff.role?.name ?? "Staff",

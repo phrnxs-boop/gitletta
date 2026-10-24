@@ -160,7 +160,8 @@ export interface PromoCode {
 export interface Session {
   id: string
   userId: string
-  token: string
+  /** Not exposed by auth.sessions; kept optional for compatibility. */
+  token?: string
   device: string | null
   browser: string | null
   ip: string | null

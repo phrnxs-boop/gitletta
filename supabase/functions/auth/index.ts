@@ -134,6 +134,32 @@ async function login(req: Request): Promise<Response> {
   });
 
   if (authError || !authData?.user) {
+    // Audit the failed attempt. "Failed Logins" on the Security page used to
+    // count only staff PIN failures because nothing recorded owner password
+    // failures. If the email matches a profile, the attempt belongs to that
+    // tenant's log; unknown emails have no tenant to scope a row to and are
+    // skipped (Supabase rate-limits the sign-in attempts themselves). Best
+    // effort: logging must never block the auth response.
+    try {
+      const db = admin();
+      const { data: p } = await db
+        .from("profiles")
+        .select("id, tenant_id")
+        .eq("email", String(email).toLowerCase().trim())
+        .maybeSingle();
+      if (p?.tenant_id) {
+        await db.from("security_logs").insert({
+          tenant_id: p.tenant_id,
+          user_id: p.id,
+          action: "LOGIN_FAILED",
+          ip: req.headers.get("x-forwarded-for") || "unknown",
+          user_agent: req.headers.get("user-agent") || "unknown",
+          meta: "Failed password login",
+        });
+      }
+    } catch {
+      /* never fail the auth response over an audit row */
+    }
     return json(req, { error: "Invalid email or password" }, 401);
   }
 
