@@ -1,5 +1,5 @@
 /**
- * CORS and response helpers shared by every Swixo edge function.
+ * CORS and response helpers shared by every Toastly edge function.
  *
  * The browser app runs on Vercel (or localhost:3000) and calls these functions
  * cross-origin, sending cookies, so the origin must be echoed explicitly —

@@ -81,7 +81,7 @@ export function Sidebar({
             <ShieldCheck className="size-4.5" />
           </span>
           <div className="leading-tight">
-            <p className="text-[15px] font-semibold tracking-tight text-white">Swixo Admin</p>
+            <p className="text-[15px] font-semibold tracking-tight text-white">Toastly Admin</p>
             <p className="text-[11px] text-admin-rail-fg">Global control panel</p>
           </div>
         </div>

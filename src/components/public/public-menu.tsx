@@ -1269,7 +1269,7 @@ export function PublicMenu() {
               </div>
             )}
             <p className="mt-4 text-[10px] uppercase tracking-widest text-muted-foreground">
-              Powered by Swixo
+              Powered by Toastly
             </p>
           </footer>
         </main>

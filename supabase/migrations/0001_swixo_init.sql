@@ -1,5 +1,5 @@
 -- ============================================================================
--- Swixo — Multitenant Restaurant Platform
+-- Toastly — Multitenant Restaurant Platform
 -- Initial schema. Supabase-native: uuid PKs, RLS everywhere, realtime-ready.
 -- ============================================================================
 

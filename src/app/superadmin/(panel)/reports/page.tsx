@@ -75,7 +75,7 @@ export default function SuperAdminReports() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `swixo-${type}-${from}-to-${to}.csv`
+    a.download = `toastly-${type}-${from}-to-${to}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

@@ -481,7 +481,7 @@ export function SettingsView() {
         order_id: body.razorpayOrderId,
         amount: Math.round(body.amount * 100),
         currency: body.currency,
-        name: 'Swixo',
+        name: 'Toastly',
         description: `${body.planName} plan — monthly`,
         prefill: {
           name: restaurant.name ?? undefined,

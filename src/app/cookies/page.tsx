@@ -53,8 +53,9 @@ export default function CookiePolicyPage() {
         </p>
         <p>
           We do not use cookies to build advertising profiles, we do not sell data, and we do not
-          embed third-party advertising or social tracking pixels. Because we set no non-essential
-          cookies, there is no consent banner to dismiss — there is nothing for you to opt out of.
+          embed third-party advertising or social tracking pixels. Because the product sets only
+          essential cookies, that is all there is to consent to today — the banner below records
+          your answer, and it is what decides whether anything optional may ever be set.
         </p>
       </LegalSection>
 
@@ -113,16 +114,43 @@ export default function CookiePolicyPage() {
             life="Until cleared"
           />
           <Row
+            name="toastly-cookie-consent"
+            purpose="The answer you gave in the cookie banner — accept or reject optional cookies — with the date you gave it and which version of the question it answered. It is how the banner knows not to ask again, and how anything optional knows whether it is allowed to run. It holds no identifier and is never sent to us."
+            life="Until cleared"
+          />
+          <Row
             name="swixo-staff-token"
             purpose="The staff session token, kept for browsers that block the staff cookie. It authorises staff-only requests on that device."
             life="Until sign-out"
           />
         </div>
+        <p>
+          A few key names still begin with an older brand name. They are kept exactly as they are:
+          changing them would sign every staff device out and empty the cart of any diner whose
+          menu is open, which is not a change worth making to a label.
+        </p>
         {/* If error monitoring or product analytics are ever switched on, they
             almost certainly set their own storage — add a row here when they do. */}
       </LegalSection>
 
-      <LegalSection title="4. Cookies set by others">
+      <LegalSection title="4. Your choices">
+        <p>
+          On your first visit a banner asks whether to accept or reject optional cookies. Both
+          answers are recorded, and both are honoured: the banner does not appear again on a later
+          visit, and nothing optional is set unless you chose <em>Accept All</em>. &ldquo;Reject
+          All&rdquo; is a decision, not a dismissal — it is the setting that keeps optional
+          cookies off, and the product works exactly the same either way because it needs nothing
+          beyond the essential items listed above.
+        </p>
+        <p>
+          You can change your mind at any time using{' '}
+          <span className="text-foreground">Cookie settings</span> in the footer of any page, which
+          brings the banner back. If a future version of this policy covers something new, we ask
+          again rather than holding you to an answer you gave about something else.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="5. Cookies set by others">
         <p>
           One part of the product runs on someone else&apos;s site: when a restaurant pays for a
           subscription, the payment gateway&apos;s own checkout opens on its own domain and sets
@@ -136,25 +164,25 @@ export default function CookiePolicyPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="5. Controlling cookies and storage">
+      <LegalSection title="6. Controlling cookies and storage">
         <LegalList
           items={[
             'Every major browser lets you see, block and delete cookies and site data, and do so for individual sites. Clearing them signs you out of the dashboard and can empty a diner’s cart.',
             'The essential cookies are exactly the ones that keep people signed in. If they are blocked, the service cannot be used — signing in will appear to fail, or every page will ask again.',
             'Private or incognito windows keep this storage only until the window is closed, so nothing is remembered between visits.',
-            'Because we set no advertising or analytics cookies, there is nothing to opt out of beyond the essential items above.',
+            'You can change your cookie answer whenever you like with the “Cookie settings” control in the footer, and clearing your browser storage resets it to “not yet chosen”, so the banner asks once more.',
           ]}
         />
       </LegalSection>
 
-      <LegalSection title="6. Changes to this policy">
+      <LegalSection title="7. Changes to this policy">
         <p>
           If we add a cookie or a piece of storage that is not listed here, we will update this
           page and the effective date at the top before it is used.
         </p>
       </LegalSection>
 
-      <LegalSection title="7. Contact">
+      <LegalSection title="8. Contact">
         <p>
           Questions about this policy or about how we handle personal data should go to the
           privacy contact below. Our{' '}

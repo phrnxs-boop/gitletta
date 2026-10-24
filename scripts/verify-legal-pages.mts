@@ -119,7 +119,7 @@ try {
       check(`${page.path} renders`, p.h1 === page.heading, `h1 was "${p.h1}"`);
       check(`${page.path} has no sideways overflow`, p.overflow <= 1, `overflow ${p.overflow}px`);
       check(`${page.path} has a way back to the site`, p.backLink === true, "no link to /");
-      check(`${page.path} title is set`, p.title.includes(page.heading) || p.title.includes("Swixo"), p.title);
+      check(`${page.path} title is set`, p.title.includes(page.heading) || p.title.includes("Toastly"), p.title);
       for (const phrase of page.must) {
         // Case-insensitive: some labels are uppercased by CSS, and innerText
         // returns what is rendered, so a case-sensitive match reports a missing

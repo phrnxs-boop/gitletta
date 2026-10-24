@@ -1,4 +1,4 @@
-# Deploying Swixo
+# Deploying Toastly
 
 Two things get deployed:
 
@@ -37,7 +37,7 @@ Set these secrets on the project first:
 
 | Secret | Value | Needed by |
 |---|---|---|
-| `ALLOWED_ORIGINS` | your Vercel origin, e.g. `https://swixo.vercel.app` | every function |
+| `ALLOWED_ORIGINS` | your Vercel origin, e.g. `https://toastly.vercel.app` | every function |
 | `GEMINI_API_KEY` | the Google AI Studio key | `ai-extract-menu`, `ai-generate-image` |
 | `GOOGLE_CLIENT_ID` | the OAuth client id of a **Web application** | `google-reviews` |
 | `GOOGLE_CLIENT_SECRET` | the matching client secret | `google-reviews` |
@@ -93,7 +93,7 @@ node scripts/deploy-fn.mjs menu
 
 ## 3. Vercel
 
-Import `phrnxs-boop/swixo` and set these environment variables (Production and
+Import `phrnxs-boop/toastly` and set these environment variables (Production and
 Preview):
 
 | Variable | Notes |

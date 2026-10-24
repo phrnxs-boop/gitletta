@@ -151,7 +151,7 @@ function LoginInner() {
             <ShieldCheck className="size-6" />
           </span>
           <h1 className="mt-4 text-[22px] font-semibold tracking-tight text-white">
-            Swixo Admin
+            Toastly Admin
           </h1>
           <p className="mt-1 text-[13.5px] text-admin-rail-fg">
             Restricted access. Sign in with your administrator address.

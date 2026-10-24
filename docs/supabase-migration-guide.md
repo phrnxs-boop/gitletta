@@ -1,4 +1,4 @@
-# Swixo: Prisma → Supabase migration guide
+# Toastly: Prisma → Supabase migration guide
 
 Read this before touching any file. The data layer has been replaced.
 **`@/lib/db` no longer exists.** There is no Prisma at runtime.

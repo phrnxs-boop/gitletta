@@ -1,4 +1,4 @@
-# Swixo
+# Toastly
 
 A multitenant restaurant platform: point-of-sale, live order flow, QR table
 ordering, staff management, and analytics — built for Indian restaurants

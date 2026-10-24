@@ -7,6 +7,7 @@ import { edgeFetch } from '@/lib/edge'
 import { Button } from '@/components/ui/button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { cn } from '@/lib/utils'
+import { CookieSettingsButton } from '@/components/shared/cookie-consent'
 
 function startOnboarding() {
   window.location.href = '/?view=login&mode=register'
@@ -89,9 +90,9 @@ export function LandingNav() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
         <a href="/" className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-            S
+            T
           </div>
-          <span className="text-[15px] font-semibold tracking-tight">Swixo</span>
+          <span className="text-[15px] font-semibold tracking-tight">Toastly</span>
         </a>
 
         <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
@@ -146,7 +147,7 @@ function Hero() {
         <div className="relative mx-auto mt-16 max-w-5xl">
           <BrowserFrame
             src="/screenshots/dashboard.webp"
-            alt="Swixo point-of-sale dashboard with a live menu grid and active orders"
+            alt="Toastly point-of-sale dashboard with a live menu grid and active orders"
             priority
           />
           <PhoneFrame
@@ -520,9 +521,9 @@ export function LandingFooter() {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-5 px-5 py-9 sm:flex-row sm:px-8">
         <div className="flex items-center gap-2.5">
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground">
-            S
+            T
           </div>
-          <span className="text-sm text-muted-foreground">Swixo</span>
+          <span className="text-sm text-muted-foreground">Toastly</span>
         </div>
         <div className="flex items-center gap-6 text-xs text-muted-foreground">
           <a href="#product" className="transition-colors hover:text-foreground">Product</a>
@@ -541,7 +542,7 @@ export function LandingFooter() {
       <div className="border-t border-white/[0.06]">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-5 py-5 text-xs text-muted-foreground sm:flex-row sm:justify-between sm:gap-6 sm:px-8">
           <span className="order-2 text-center sm:order-1 sm:text-left">
-            © {new Date().getFullYear()} Swixo · All rights reserved
+            © {new Date().getFullYear()} Toastly · All rights reserved
           </span>
           <nav
             aria-label="Legal"
@@ -559,6 +560,9 @@ export function LandingFooter() {
             <Link href="/contact" className="transition-colors hover:text-foreground">
               Contact Us
             </Link>
+            {/* A way back to the banner, for anyone who wants to change the
+                choice they made. */}
+            <CookieSettingsButton />
           </nav>
         </div>
       </div>

@@ -13,7 +13,7 @@
  */
 export const BUSINESS = {
   /** The product, as it is branded on the site. */
-  productName: 'Swixo',
+  productName: 'Toastly',
   /** The registered business or company that operates it. */
   legalName: '[Registered business name]',
   entityType: '[Business type — e.g. Private Limited Company, LLP, sole proprietorship]',

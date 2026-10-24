@@ -151,9 +151,9 @@ export function LoginPage() {
 
         <div className="relative flex items-center gap-3 shrink-0">
           <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shadow-glow-primary">
-            <span className="text-white font-bold text-lg">S</span>
+            <span className="text-white font-bold text-lg">T</span>
           </div>
-          <span className="text-lg font-bold tracking-tight">Swixo</span>
+          <span className="text-lg font-bold tracking-tight">Toastly</span>
         </div>
 
         <h1 className="relative shrink-0 text-3xl xl:text-[2.4rem] font-bold tracking-tight leading-[1.15] max-w-[16ch]">
@@ -213,10 +213,10 @@ export function LoginPage() {
           {/* Compact branding, small screens only */}
           <div className="text-center mb-6 lg:hidden">
             <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-hover items-center justify-center shadow-glow-primary mb-3">
-              <span className="text-white font-bold text-2xl">S</span>
+              <span className="text-white font-bold text-2xl">T</span>
             </div>
             <h1 className="text-2xl font-bold tracking-tight">
-              {mode === 'register' ? 'Create your Swixo Account' : 'Welcome to Swixo'}
+              {mode === 'register' ? 'Create your Toastly Account' : 'Welcome to Toastly'}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               {mode === 'register'
@@ -387,7 +387,7 @@ export function LoginPage() {
         {/* Footer */}
         <div className="text-center mt-6 space-y-2">
           <p className="text-xs text-muted-foreground">
-            {mode === 'register' ? 'Already have an account? ' : 'New to Swixo? '}
+            {mode === 'register' ? 'Already have an account? ' : 'New to Toastly? '}
             <button
               onClick={() => {
                 setMode(mode === 'register' ? 'login' : 'register')

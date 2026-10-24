@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { CookieConsentBanner } from "@/components/shared/cookie-consent";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,17 +16,17 @@ const geistMono = Geist_Mono({
 });
 
 const DESCRIPTION =
-  "Swixo runs the floor for Indian restaurants: point-of-sale, live order flow, " +
+  "Toastly runs the floor for Indian restaurants: point-of-sale, live order flow, " +
   "QR table ordering, staff PIN sessions, reservations, analytics and GST-compliant bills.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: {
-    default: "Swixo — Restaurant POS & QR Ordering",
-    template: "%s · Swixo",
+    default: "Toastly — Restaurant POS & QR Ordering",
+    template: "%s · Toastly",
   },
   description: DESCRIPTION,
-  applicationName: "Swixo",
+  applicationName: "Toastly",
   keywords: [
     "restaurant POS",
     "QR ordering",
@@ -35,18 +36,18 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     type: "website",
-    siteName: "Swixo",
-    title: "Swixo — Restaurant POS & QR Ordering",
+    siteName: "Toastly",
+    title: "Toastly — Restaurant POS & QR Ordering",
     description: DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Swixo — Restaurant POS & QR Ordering",
+    title: "Toastly — Restaurant POS & QR Ordering",
     description: DESCRIPTION,
   },
   robots: { index: true, follow: true },
   icons: {
-    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff7e6b'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3ES%3C/text%3E%3C/svg%3E",
+    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff7e6b'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3ET%3C/text%3E%3C/svg%3E",
   },
 };
 
@@ -87,6 +88,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
         {children}
+        {/* Site-wide, so the same choice covers the public site and the
+            dashboard. It renders only when no choice is on record. */}
+        <CookieConsentBanner />
         <Toaster />
         <Sonner />
       </body>

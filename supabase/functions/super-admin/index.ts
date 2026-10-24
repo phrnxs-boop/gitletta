@@ -868,7 +868,7 @@ async function getCsvReport(req: Request) {
     return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="swixo-${type}-${from}-to-${to}.csv"`,
+        "Content-Disposition": `attachment; filename="toastly-${type}-${from}-to-${to}.csv"`,
       },
     });
   }
@@ -890,7 +890,7 @@ async function getCsvReport(req: Request) {
     return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="swixo-retention-${from}-to-${to}.csv"`,
+        "Content-Disposition": `attachment; filename="toastly-retention-${from}-to-${to}.csv"`,
       },
     });
   }
@@ -916,7 +916,7 @@ async function getCsvReport(req: Request) {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="swixo-restaurants.csv"`,
+      "Content-Disposition": `attachment; filename="toastly-restaurants.csv"`,
     },
   });
 }

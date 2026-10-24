@@ -15,7 +15,7 @@ export default function Error({
 }) {
   useEffect(() => {
     // Surfaces in the browser console and in Vercel's runtime logs.
-    console.error('[swixo] unhandled route error:', error)
+    console.error('[toastly] unhandled route error:', error)
   }, [error])
 
   return (

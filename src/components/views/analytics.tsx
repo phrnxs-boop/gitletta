@@ -142,7 +142,7 @@ export function AnalyticsView() {
     const blank = () => rows.push([])
     const money = (n: number) => n.toFixed(2)
 
-    push('Swixo sales report')
+    push('Toastly sales report')
     push('Restaurant', data.tenant.name)
     push('From', analytics.range?.from ?? '')
     push('To', analytics.range?.to ?? '')
@@ -191,7 +191,7 @@ export function AnalyticsView() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
     const link = document.createElement('a')
     link.href = url
-    link.download = `swixo-report_${analytics.range?.from ?? 'from'}_to_${analytics.range?.to ?? 'to'}.csv`
+    link.download = `toastly-report_${analytics.range?.from ?? 'from'}_to_${analytics.range?.to ?? 'to'}.csv`
     document.body.appendChild(link)
     link.click()
     link.remove()

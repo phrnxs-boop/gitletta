@@ -27,7 +27,7 @@ export default function GlobalError({
       >
         <div style={{ maxWidth: 420, padding: 32, textAlign: 'center' }}>
           <h1 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px' }}>
-            Swixo failed to load
+            Toastly failed to load
           </h1>
           <p style={{ fontSize: 14, opacity: 0.7, margin: '0 0 24px' }}>
             An unexpected error stopped the app from starting.
