@@ -117,13 +117,19 @@ async function put(req: Request): Promise<Response> {
 
   const settingsPayload = b.settings as Record<string, unknown> | undefined;
   if (settingsPayload) {
-    for (const [key, value] of Object.entries(settingsPayload)) {
+    // One upsert for every key. This used to await a separate upsert per key,
+    // so a tab that saves a dozen preferences made a dozen sequential round
+    // trips to Postgres and the Save button sat on "Saving…" for six seconds
+    // on a request that had nothing to do.
+    const rows = Object.entries(settingsPayload).map(([key, value]) => ({
+      tenant_id: tenantId,
+      key,
+      value: String(value),
+    }));
+    if (rows.length > 0) {
       const { error } = await db
         .from("settings")
-        .upsert(
-          { tenant_id: tenantId, key, value: String(value) },
-          { onConflict: "tenant_id,key" },
-        );
+        .upsert(rows, { onConflict: "tenant_id,key" });
       if (error) return json(req, { error: error.message }, 500);
     }
   }
@@ -133,8 +139,10 @@ async function put(req: Request): Promise<Response> {
     tenant_id: tenantId,
     action: "SETTINGS_CHANGE",
     meta: "Updated restaurant settings",
-    ip: "192.168.1.10",
-    user_agent: "Chrome on macOS",
+    // The request's own details, as every other audit entry records them —
+    // these two were hardcoded, which made the log look complete and be wrong.
+    ip: req.headers.get("x-forwarded-for") || "unknown",
+    user_agent: req.headers.get("user-agent") || "unknown",
   });
   if (logError) return json(req, { error: logError.message }, 500);
 

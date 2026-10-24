@@ -203,47 +203,81 @@ Deno.serve(async (req: Request) => {
     if (Array.isArray(categories) && categories.length > 0) {
       const categoryMap = new Map<string, string>();
 
-      for (let i = 0; i < categories.length; i++) {
-        const cat = categories[i];
-        const { data: existingCat, error: catLookupError } = await db
-          .from("categories")
-          .select("*")
-          .eq("tenant_id", tenantId)
-          .eq("name", cat.name)
-          .maybeSingle();
-        if (catLookupError) return json(req, { error: catLookupError.message }, 500);
-
-        let catRecord = existingCat;
-        if (!catRecord) {
-          const { data: created, error } = await db
+      // Everything here is batched: one lookup and one insert for the whole
+      // menu, instead of a round trip per category and per dish. A forty-dish
+      // menu used to make about ninety sequential round trips, which is what
+      // kept the setup button reading "Saving…" for tens of seconds.
+      const catNames = categories
+        .map((c: any) => String(c?.name ?? "").trim())
+        .filter(Boolean);
+      const { data: existingCats, error: catLookupError } = catNames.length
+        ? await db
             .from("categories")
-            .insert({ tenant_id: tenantId, name: cat.name, sort_order: i })
-            .select()
-            .single();
-          if (error) return json(req, { error: error.message }, 500);
-          catRecord = created;
-        }
-        categoryMap.set(cat.id, catRecord!.id);
-        categoryMap.set(String(cat.name).toLowerCase(), catRecord!.id);
+            .select("id, name")
+            .eq("tenant_id", tenantId)
+            .in("name", catNames)
+        : { data: [], error: null };
+      if (catLookupError) return json(req, { error: catLookupError.message }, 500);
+
+      const catIdByName = new Map<string, string>(
+        ((existingCats ?? []) as any[]).map((c) => [c.name, c.id]),
+      );
+
+      // A name repeated inside the payload is created once, exactly as the
+      // old per-category lookup made it behave.
+      const newCats: { name: string; sortOrder: number }[] = [];
+      categories.forEach((cat: any, i: number) => {
+        const name = String(cat?.name ?? "").trim();
+        if (!name || catIdByName.has(name)) return;
+        if (newCats.some((c) => c.name === name)) return;
+        newCats.push({ name, sortOrder: i });
+      });
+      if (newCats.length > 0) {
+        const { data: createdCats, error } = await db
+          .from("categories")
+          .insert(newCats.map((c) => ({ tenant_id: tenantId, name: c.name, sort_order: c.sortOrder })))
+          .select("id, name");
+        if (error) return json(req, { error: error.message }, 500);
+        for (const c of (createdCats ?? []) as any[]) catIdByName.set(c.name, c.id);
+      }
+
+      // The payload's own ids and names both have to lead to the database id:
+      // the AI extractor supplies a name, the setup wizard a client-side id.
+      for (const cat of categories as any[]) {
+        const dbId = catIdByName.get(String(cat?.name ?? "").trim());
+        if (!dbId) continue;
+        if (cat.id) categoryMap.set(String(cat.id), dbId);
+        categoryMap.set(String(cat?.name ?? "").toLowerCase(), dbId);
       }
 
       if (Array.isArray(menuItems) && menuItems.length > 0) {
-        for (let i = 0; i < menuItems.length; i++) {
-          const item = menuItems[i];
-          const catDbId = (item.categoryId ? categoryMap.get(item.categoryId) : null) ||
+        const firstCatId = Array.from(categoryMap.values())[0];
+        const itemNames = menuItems
+          .map((it: any) => String(it?.name ?? "").trim())
+          .filter(Boolean);
+        const { data: existingItems, error: itemLookupError } = itemNames.length
+          ? await db
+              .from("menu_items")
+              .select("name")
+              .eq("tenant_id", tenantId)
+              .in("name", itemNames)
+          : { data: [], error: null };
+        if (itemLookupError) return json(req, { error: itemLookupError.message }, 500);
+
+        // Names already in the database — and names repeated in this payload —
+        // are skipped, which is what the per-item lookup used to achieve.
+        const knownNames = new Set<string>(((existingItems ?? []) as any[]).map((r) => r.name));
+        const itemRows: Record<string, any>[] = [];
+        menuItems.forEach((item: any, i: number) => {
+          const name = String(item?.name ?? "").trim();
+          if (!name || knownNames.has(name)) return;
+
+          const catDbId =
+            (item.categoryId ? categoryMap.get(String(item.categoryId)) : null) ||
             (item.category ? categoryMap.get(String(item.category).toLowerCase()) : null) ||
-            Array.from(categoryMap.values())[0];
-
-          if (!catDbId) continue;
-
-          const { data: existingItem, error: itemLookupError } = await db
-            .from("menu_items")
-            .select("id")
-            .eq("tenant_id", tenantId)
-            .eq("name", item.name)
-            .maybeSingle();
-          if (itemLookupError) return json(req, { error: itemLookupError.message }, 500);
-          if (existingItem) continue;
+            firstCatId;
+          if (!catDbId) return;
+          knownNames.add(name);
 
           const tagList: string[] = Array.isArray(item.tags) ? [...item.tags] : [];
           if (item.veg && !tagList.includes("veg")) tagList.push("veg");
@@ -254,10 +288,10 @@ Deno.serve(async (req: Request) => {
           const portions = normalizeStoredPortions(item.variants ?? item.portions);
           const resolvedPrice = effectiveDishBasePrice(item.price, portions);
 
-          const { error } = await db.from("menu_items").insert({
+          itemRows.push({
             tenant_id: tenantId,
             category_id: catDbId,
-            name: item.name,
+            name,
             description: item.description || null,
             price: resolvedPrice,
             available: true,
@@ -266,6 +300,10 @@ Deno.serve(async (req: Request) => {
             tags: tagList.join(","),
             portions,
           });
+        });
+
+        if (itemRows.length > 0) {
+          const { error } = await db.from("menu_items").insert(itemRows);
           if (error) return json(req, { error: error.message }, 500);
         }
       }

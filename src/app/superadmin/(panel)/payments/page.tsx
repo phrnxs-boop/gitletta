@@ -69,30 +69,41 @@ export default function SuperAdminPayments() {
   }
 
   const savePlan = async (planId: string) => {
+    // The flag is cleared in `finally` so a throw can never strand the spinner.
     setSavingPlan(true)
-    const res = await superAdminFetch(`plans/${planId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ razorpayPlanId: planIdValue.trim() }),
-    })
-    setSavingPlan(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const res = await superAdminFetch(`plans/${planId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ razorpayPlanId: planIdValue.trim() }),
+      })
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setEditingPlan(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setSavingPlan(false)
     }
-    setEditingPlan(null)
-    await load()
   }
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await superAdminFetch<Payments>('payments')
-    setLoading(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const res = await superAdminFetch<Payments>('payments')
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setError(null)
+      setData(res.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setLoading(false)
     }
-    setError(null)
-    setData(res.data)
   }, [])
 
   useEffect(() => {

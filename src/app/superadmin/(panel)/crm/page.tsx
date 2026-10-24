@@ -43,19 +43,25 @@ export default function SuperAdminCrm() {
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    // The flag is cleared in `finally` so a throw can never strand the spinner.
     setLoading(true)
-    const params = new URLSearchParams()
-    if (query.trim()) params.set('q', query.trim())
-    if (status) params.set('status', status)
-    if (plan) params.set('plan', plan)
-    const res = await superAdminFetch<Restaurant[]>(`crm?${params.toString()}`)
-    setLoading(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const params = new URLSearchParams()
+      if (query.trim()) params.set('q', query.trim())
+      if (status) params.set('status', status)
+      if (plan) params.set('plan', plan)
+      const res = await superAdminFetch<Restaurant[]>(`crm?${params.toString()}`)
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setError(null)
+      setRows(res.data ?? [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setLoading(false)
     }
-    setError(null)
-    setRows(res.data ?? [])
   }, [query, status, plan])
 
   // Search is debounced so typing does not fire a request per keystroke.

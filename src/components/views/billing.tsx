@@ -84,23 +84,56 @@ const STATUS_LABEL: Record<string, string> = {
   none: 'No subscription',
 }
 
-/** Load Razorpay's checkout script once. */
+/**
+ * Load Razorpay's checkout script once.
+ *
+ * This promise has to settle every time it is asked, because the Upgrade
+ * button's whole busy state waits on it. Two ways it used to hang for ever:
+ * a tag that had already failed never fires `load` again, and a request that
+ * neither loads nor errors never fires anything at all. So a failed tag is
+ * replaced rather than reused, and the whole load has a deadline.
+ */
 function loadRazorpay(): Promise<void> {
   return new Promise((resolve, reject) => {
-    const w = window as any;
-    if (w.Razorpay) return resolve();
-    const existing = document.querySelector('script[data-razorpay]');
-    if (existing) {
-      existing.addEventListener('load', () => resolve());
-      existing.addEventListener('error', () => reject(new Error('Could not load the payment window.')));
-      return;
+    const w = window as any
+    if (w.Razorpay) return resolve()
+
+    let settled = false
+    let deadline: ReturnType<typeof setTimeout>
+    const settle = (fn: () => void) => {
+      if (settled) return
+      settled = true
+      clearTimeout(deadline)
+      fn()
     }
-    const script = document.createElement('script');
+    deadline = setTimeout(
+      () => settle(() => reject(new Error('The payment window took too long to load. Check your connection and try again.'))),
+      15_000,
+    )
+
+    const existing = document.querySelector('script[data-razorpay]')
+    if (existing && existing.getAttribute('data-state') !== 'error') {
+      existing.addEventListener('load', () => settle(resolve))
+      existing.addEventListener('error', () =>
+        settle(() => reject(new Error('Could not load the payment window.'))),
+      )
+      return
+    }
+    // A tag that failed before will never fire again — start over.
+    if (existing) existing.remove()
+
+    const script = document.createElement('script')
     script.src = 'https://checkout.razorpay.com/v1/checkout.js'
     script.async = true
     script.dataset.razorpay = 'true'
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Could not load the payment window.'))
+    script.onload = () => {
+      script.dataset.state = 'loaded'
+      settle(resolve)
+    }
+    script.onerror = () => {
+      script.dataset.state = 'error'
+      settle(() => reject(new Error('Could not load the payment window.')))
+    }
     document.body.appendChild(script)
   })
 }

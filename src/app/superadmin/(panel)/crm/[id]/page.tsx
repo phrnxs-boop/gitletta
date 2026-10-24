@@ -57,15 +57,21 @@ export default function RestaurantDetail({
   const [saved, setSaved] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    // The flag is cleared in `finally` so a throw can never strand the spinner.
     setLoading(true)
-    const res = await superAdminFetch<Detail>(`crm/${id}`)
-    setLoading(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const res = await superAdminFetch<Detail>(`crm/${id}`)
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setError(null)
+      setData(res.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setLoading(false)
     }
-    setError(null)
-    setData(res.data)
   }, [id])
 
   useEffect(() => {
@@ -76,36 +82,46 @@ export default function RestaurantDetail({
     const body = note.trim()
     if (!body) return
     setSaving(true)
-    const res = await superAdminFetch(`crm/${id}/notes`, {
-      method: 'POST',
-      body: JSON.stringify({ body, kind: 'note' }),
-    })
-    setSaving(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const res = await superAdminFetch(`crm/${id}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ body, kind: 'note' }),
+      })
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setNote('')
+      setSaved('Note added')
+      setTimeout(() => setSaved(null), 2500)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setSaving(false)
     }
-    setNote('')
-    setSaved('Note added')
-    setTimeout(() => setSaved(null), 2500)
-    load()
   }
 
   const updateTenant = async (patch: Record<string, unknown>) => {
     setSaving(true)
-    const res = await superAdminFetch(`tenants/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(patch),
-    })
-    setSaving(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const res = await superAdminFetch(`tenants/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      })
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setError(null)
+      setSaved('Updated')
+      setTimeout(() => setSaved(null), 2500)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setSaving(false)
     }
-    setError(null)
-    setSaved('Updated')
-    setTimeout(() => setSaved(null), 2500)
-    load()
   }
 
   const tenant = data?.tenant

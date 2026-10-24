@@ -21,7 +21,29 @@ function toEdgeUrl(path: string): string {
   return `${EDGE_BASE}${trimmed.startsWith('/') ? trimmed : `/${trimmed}`}`
 }
 
-export async function edgeFetch(path: string, init: RequestInit = {}): Promise<Response> {
+/**
+ * How long a request may take before it is given up on.
+ *
+ * A request that never settles is worse than one that fails: the caller has no
+ * error to show, so its button spins for ever. A deployed edge function that
+ * hangs (see the Super Admin outage) put an owner in front of exactly that —
+ * a "Saving…" pill with nothing behind it. The slow AI calls pass a longer
+ * deadline of their own.
+ */
+const DEFAULT_TIMEOUT_MS = 30_000
+
+/**
+ * How long resolving the caller's identity may take before the call goes out
+ * without a bearer. A missing token fails fast and visibly; a stall here would
+ * freeze the button, because it happens before the request is even sent.
+ */
+const IDENTITY_TIMEOUT_MS = 5_000
+
+export async function edgeFetch(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<Response> {
   const headers = new Headers(init.headers)
 
   headers.set('apikey', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '')
@@ -33,15 +55,27 @@ export async function edgeFetch(path: string, init: RequestInit = {}): Promise<R
   // Skipped entirely on a staff page, so the staff cookie is what authorises
   // the request rather than an owner session that happens to be in the browser.
   if (!staffSession) {
-    try {
-      const { createClient } = await import('./supabase/client')
-      const {
-        data: { session },
-      } = await createClient().auth.getSession()
-      if (session?.access_token) headers.set('Authorization', `Bearer ${session.access_token}`)
-    } catch {
-      /* no browser session — fall through to the staff token */
-    }
+    // Finding out who the caller is can itself stall: reading a session that
+    // decides to refresh its token goes to the network first. That happens
+    // before the fetch, so the fetch deadline cannot cover it — give it its
+    // own. If it runs out, send no bearer and let the call fail with a 401 the
+    // page can show, which is still better than a button that never finishes.
+    const bearer = await Promise.race([
+      (async () => {
+        try {
+          const { createClient } = await import('./supabase/client')
+          const {
+            data: { session },
+          } = await createClient().auth.getSession()
+          return session?.access_token ?? null
+        } catch {
+          /* no browser session — fall through to the staff token */
+          return null
+        }
+      })(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), IDENTITY_TIMEOUT_MS)),
+    ])
+    if (bearer) headers.set('Authorization', `Bearer ${bearer}`)
   } else {
     // A staff page: the staff token identifies the caller. Needed wherever the
     // cookie could not be stored, which is the whole point of the header.
@@ -49,7 +83,34 @@ export async function edgeFetch(path: string, init: RequestInit = {}): Promise<R
     if (token) headers.set('x-staff-session', token)
   }
 
-  return fetch(toEdgeUrl(path), { ...init, headers, credentials: 'include' })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  if (init.signal) {
+    if (init.signal.aborted) controller.abort()
+    else init.signal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
+
+  try {
+    return await fetch(toEdgeUrl(path), {
+      ...init,
+      headers,
+      credentials: 'include',
+      signal: controller.signal,
+    })
+  } catch (err) {
+    // An aborted fetch throws a DOMException reading "The operation was
+    // aborted", which means nothing to a restaurant owner and is what the
+    // callers toast. Say what actually happened instead — but only when the
+    // deadline is what fired: a caller that cancelled its own request already
+    // knows why, and must not be told the server was slow.
+    if (init.signal?.aborted) throw err
+    if (controller.signal.aborted) {
+      throw new Error('The server took too long to respond. Please try again.')
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /**

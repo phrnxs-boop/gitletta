@@ -54,9 +54,17 @@ export function ImageUpload({
     setLoading(true)
     const reader = new FileReader()
     reader.onload = () => {
-      onChange(reader.result as string)
-      setLoading(false)
-      toast.success('Image uploaded', { description: file.name })
+      // The flag clears in `finally` so a throw in the caller's onChange —
+      // which is where the value is parsed and stored — cannot leave the
+      // upload tile spinning for ever.
+      try {
+        onChange(reader.result as string)
+        toast.success('Image uploaded', { description: file.name })
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not use that image')
+      } finally {
+        setLoading(false)
+      }
     }
     reader.onerror = () => {
       setLoading(false)

@@ -356,11 +356,17 @@ export function MenuView() {
     setGenerating(true)
     setGenError(null)
     try {
-      const res = await edgeFetch('/api/ai-generate-image', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-tenant-id': tenant.id },
-        body: JSON.stringify({ itemId: editingItem.id }),
-      })
+      const res = await edgeFetch(
+        '/api/ai-generate-image',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-tenant-id': tenant.id },
+          body: JSON.stringify({ itemId: editingItem.id }),
+        },
+        // Generating an image takes far longer than a normal call; the default
+        // deadline would give up on work that is still going to succeed.
+        120_000,
+      )
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
         setGenError(body?.error || `Could not generate an image (${res.status})`)

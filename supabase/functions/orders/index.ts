@@ -328,13 +328,31 @@ async function create(req: Request): Promise<Response> {
     }
 
     // Compute item totals from the database (never from client prices)
-    const itemData: any[] = [];
-    for (const it of items || []) {
-      const { data: mi } = await db
+    // One read for every dish on the order rather than one per line: a six-line
+    // order used to make six sequential round trips before the bill could be
+    // added up. Malformed ids are dropped first so one bad line cannot fail the
+    // whole query — it just reads as a dish that was not found, as before.
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const wantedIds = Array.from(
+      new Set(
+        (items || [])
+          .map((it: any) => String(it?.menuItemId ?? ""))
+          .filter((id) => UUID.test(id)),
+      ),
+    );
+    const menuById = new Map<string, any>();
+    if (wantedIds.length > 0) {
+      const { data: menuRows, error: menuError } = await db
         .from("menu_items")
         .select("id, tenant_id, name, price, portions")
-        .eq("id", it.menuItemId)
-        .maybeSingle();
+        .in("id", wantedIds);
+      if (menuError) return json(req, { error: menuError.message }, 500);
+      for (const row of (menuRows ?? []) as any[]) menuById.set(row.id, row);
+    }
+
+    const itemData: any[] = [];
+    for (const it of items || []) {
+      const mi = menuById.get(String(it?.menuItemId ?? ""));
       if (!mi) continue;
       if (mi.tenant_id !== tenantId) continue; // ensure item belongs to this tenant
       const unit = resolveOrderUnitPrice(mi, it.portion, it.portionId);

@@ -1019,11 +1019,16 @@ function MenuAiUploader({
     }
     onProcessing()
     try {
-      const res = await edgeFetch('/api/ai-extract-menu', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ images }),
-      })
+      const res = await edgeFetch(
+        '/api/ai-extract-menu',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ images }),
+        },
+        // Reading a menu out of photos takes far longer than a normal call.
+        120_000,
+      )
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err?.error || `Extraction failed (${res.status})`)
@@ -2095,6 +2100,10 @@ function StepGoLive({
       }, 500)
     } catch (e: any) {
       toast.error(e.message || 'Failed to save setup')
+    } finally {
+      // On success the page is navigating away, so clearing the flag is
+      // harmless; on any failure it is what lets the owner press the button
+      // again instead of watching it spin.
       setSaving(false)
     }
   }

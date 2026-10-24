@@ -31,15 +31,21 @@ export default function SuperAdminConversion() {
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    // The flag is cleared in `finally` so a throw can never strand the spinner.
     setLoading(true)
-    const res = await superAdminFetch<Conversion>('conversion')
-    setLoading(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const res = await superAdminFetch<Conversion>('conversion')
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setError(null)
+      setData(res.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setLoading(false)
     }
-    setError(null)
-    setData(res.data)
   }, [])
 
   useEffect(() => {

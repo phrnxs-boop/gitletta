@@ -40,16 +40,22 @@ export default function SuperAdminReports() {
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    // The flag is cleared in `finally` so a throw can never strand the spinner.
     setLoading(true)
-    const params = new URLSearchParams({ from, to, type })
-    const res = await superAdminFetch<Report>(`reports?${params.toString()}`)
-    setLoading(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const params = new URLSearchParams({ from, to, type })
+      const res = await superAdminFetch<Report>(`reports?${params.toString()}`)
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setError(null)
+      setData(res.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setLoading(false)
     }
-    setError(null)
-    setData(res.data)
   }, [from, to, type])
 
   useEffect(() => {

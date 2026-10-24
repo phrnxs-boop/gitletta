@@ -55,8 +55,14 @@ export function GlobalSearch({
     const controller = new AbortController()
     const timer = setTimeout(async () => {
       setLoading(true)
-      const res = await superAdminFetch<SearchResult>(`search?q=${encodeURIComponent(term)}`)
-      controller.abort()
+      // The signal makes the request cancellable. Without it, a slow answer
+      // for an old query landed on top of a newer one and the box showed
+      // results for a word the user had already typed past.
+      const res = await superAdminFetch<SearchResult>(
+        `search?q=${encodeURIComponent(term)}`,
+        { signal: controller.signal },
+      )
+      if (controller.signal.aborted) return
       setLoading(false)
       if (!res.ok) {
         setError(res.error)

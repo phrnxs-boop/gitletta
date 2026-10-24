@@ -33,15 +33,21 @@ export default function SuperAdminIssues() {
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
+    // The flag is cleared in `finally` so a throw can never strand the spinner.
     setLoading(true)
-    const res = await superAdminFetch<Issue[]>('issues')
-    setLoading(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const res = await superAdminFetch<Issue[]>('issues')
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setError(null)
+      setIssues(res.data ?? [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setLoading(false)
     }
-    setError(null)
-    setIssues(res.data ?? [])
   }, [])
 
   useEffect(() => {
@@ -51,19 +57,24 @@ export default function SuperAdminIssues() {
   const create = async () => {
     if (!subject.trim()) return
     setSaving(true)
-    const res = await superAdminFetch('issues', {
-      method: 'POST',
-      body: JSON.stringify({ subject, detail, priority }),
-    })
-    setSaving(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const res = await superAdminFetch('issues', {
+        method: 'POST',
+        body: JSON.stringify({ subject, detail, priority }),
+      })
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setSubject('')
+      setDetail('')
+      setPriority('normal')
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setSaving(false)
     }
-    setSubject('')
-    setDetail('')
-    setPriority('normal')
-    load()
   }
 
   const setStatus = async (id: string, status: string) => {
