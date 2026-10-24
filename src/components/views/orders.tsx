@@ -234,26 +234,24 @@ export function OrdersView() {
       {/* Header — collapses on scroll to give order cards more room */}
       <div
         className={cn(
-          'px-3.5 md:px-6 transition-all duration-200 ease-out',
-          collapsed ? 'pt-1.5 pb-1.5' : 'pt-3 md:pt-6 pb-2.5',
+          'px-3.5 pb-2 md:px-6 md:transition-all md:duration-200 md:ease-out',
+          collapsed ? 'pt-3 md:pt-1.5 md:pb-1.5' : 'pt-3 md:pt-6 md:pb-2.5',
         )}
       >
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <h2
               className={cn(
-                'font-bold tracking-tight transition-all duration-200 ease-out',
-                collapsed ? 'text-base md:text-lg' : 'text-lg md:text-2xl',
+                'font-bold tracking-tight md:transition-all md:duration-200 md:ease-out',
+                collapsed ? 'text-lg md:text-base md:text-lg' : 'text-lg md:text-2xl',
               )}
             >
               Orders
             </h2>
             <p
               className={cn(
-                'text-sm text-muted-foreground transition-all duration-200 ease-out',
-                collapsed
-                  ? 'max-h-0 opacity-0 overflow-hidden'
-                  : 'max-h-8 opacity-100',
+                'text-sm text-muted-foreground md:transition-all md:duration-200 md:ease-out',
+                collapsed && 'md:max-h-0 md:overflow-hidden md:opacity-0',
               )}
             >
               {t('orders.title')}
@@ -261,10 +259,10 @@ export function OrdersView() {
           </div>
           <div
             className={cn(
-              'flex flex-wrap gap-2 transition-all duration-200 ease-out',
-              collapsed
-                ? 'max-h-0 opacity-0 overflow-hidden'
-                : 'max-h-20 opacity-100',
+              'flex flex-wrap gap-2 md:transition-all md:duration-200 md:ease-out',
+              // Visible in full below md: a clamped height is how these used to
+              // end up cut in half when the row wrapped on a narrow screen.
+              collapsed && 'md:max-h-0 md:overflow-hidden md:opacity-0',
             )}
           >
             <StatChip icon={ShoppingBag} label="Active" value={String(activeCount)} accent />
@@ -282,17 +280,18 @@ export function OrdersView() {
         </div>
       </div>
 
-      {/* Filter bar — collapses away when header is collapsed */}
-      <div
-        className={cn(
-          'px-3.5 md:px-6 transition-all duration-200 ease-out',
-          collapsed
-            ? 'max-h-0 pb-0 opacity-0 overflow-hidden'
-            : 'max-h-72 pb-3 opacity-100',
-        )}
-      >
-        <div className="rounded-2xl border border-border bg-card p-3 space-y-3">
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin -mx-1 px-1 pb-0.5">
+      {/* Filters — deliberately outside the collapse.
+          A box that animates its own height while clipping its overflow is how
+          the tabs and the search field ended up hidden under the cards: the
+          clamp cut them off mid-row, and every frame of the animation moved
+          everything below it. This block is now a fixed height that never
+          hides its content, so the cards always start below it. */}
+      <div data-orders-filters className="relative z-10 px-3.5 pb-2 md:px-6 md:pb-3">
+        <div className="space-y-2 rounded-xl border border-border bg-card p-2 md:space-y-3 md:rounded-2xl md:p-3">
+          <div
+            data-orders-tabs
+            className="-mx-0.5 flex items-center gap-1 overflow-x-auto overscroll-x-contain scrollbar-thin px-0.5 py-1"
+          >
             {STATUS_TABS.map((tab) => {
               const active = statusFilter === tab.key
               const count =
@@ -302,9 +301,10 @@ export function OrdersView() {
               return (
                 <button
                   key={tab.key}
+                  data-active={active}
                   onClick={() => setStatusFilter(tab.key)}
                   className={cn(
-                    'shrink-0 rounded-lg px-3 py-1.5 min-h-8 text-xs font-medium transition-all flex items-center gap-1.5',
+                    'shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors flex items-center gap-1 md:gap-1.5 md:px-3 md:py-1.5 md:text-xs',
                     active
                       ? 'bg-primary/15 text-primary'
                       : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -313,7 +313,9 @@ export function OrdersView() {
                   {tab.label}
                   <span
                     className={cn(
-                      'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                      // Tabular figures and a floor on the width: a count going
+                      // from 9 to 10 should not nudge every tab along.
+                      'min-w-[1.1rem] rounded-full px-1 py-px text-center text-[10px] font-semibold tabular-nums md:px-1.5 md:py-0.5',
                       active ? 'bg-primary/20 text-primary' : 'bg-secondary text-muted-foreground'
                     )}
                   >
@@ -323,23 +325,25 @@ export function OrdersView() {
               )
             })}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2 bg-secondary/60 rounded-xl px-3 py-2 flex-1 min-w-[180px]">
-              <Search className="h-4 w-4 text-muted-foreground" />
+          {/* One row, not two: the type filter used to wrap onto a line of its
+              own on a phone and cost ~44px of height for one control. */}
+          <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg bg-secondary/60 px-2 py-1 md:gap-2 md:rounded-xl md:px-3 md:py-2">
+              <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground md:h-4 md:w-4" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t('orders.search')}
-                className="bg-transparent outline-none text-sm h-8 flex-1 placeholder:text-muted-foreground"
+                className="h-6 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground md:h-8 md:text-sm"
               />
               {search && (
-                <button onClick={() => setSearch('')}>
-                  <span className="text-xs text-muted-foreground hover:text-foreground">Clear</span>
+                <button onClick={() => setSearch('')} className="shrink-0">
+                  <span className="text-[11px] text-muted-foreground hover:text-foreground md:text-xs">Clear</span>
                 </button>
               )}
             </div>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full sm:w-[160px] bg-secondary/60 border-0">
+              <SelectTrigger className="h-8 w-[118px] shrink-0 border-0 bg-secondary/60 text-[12px] md:h-9 md:w-[160px] md:text-sm">
                 <SelectValue placeholder="Order type" />
               </SelectTrigger>
               <SelectContent>
@@ -355,7 +359,15 @@ export function OrdersView() {
       </div>
 
       {/* Cards grid */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pb-4 md:pb-6">
+      {/* min-h-0 is load-bearing. A flex child defaults to a minimum height of
+          its own content, so without it this pane grows past the height it was
+          given and paints over the filters above it — which is exactly the
+          "cards behind the filters" this page kept showing. */}
+      <div
+        ref={scrollRef}
+        data-orders-list
+        className="relative z-0 min-h-0 flex-1 overflow-y-auto scrollbar-thin px-3.5 md:px-6 pb-4 md:pb-6"
+      >
         {filtered.length === 0 ? (
           <EmptyState
             icon={Inbox}
@@ -363,7 +375,7 @@ export function OrdersView() {
             description="Adjust your filters or check back later."
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pt-1">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
             {filtered.map((order) => (
               <OrderCard
                 key={order.id}
@@ -710,9 +722,15 @@ function OrderCard({
 
   return (
     <Card
+      data-order-card
       className={cn(
-        'rounded-2xl bg-card border-border p-0 overflow-hidden flex flex-col transition-all duration-300',
-        isRecent && 'ring-2 ring-primary/40 border-primary/50 shadow-glow-primary animate-in fade-in-50 slide-in-from-top-1'
+        'flex flex-col overflow-hidden rounded-2xl border-border bg-card p-0',
+        // Only paint is transitioned. `transition-all` on a card animates its
+        // own box, which pushes the cards below it around as the list updates,
+        // and the old slide-in replayed on every render that re-marked a card
+        // as new. The highlight now arrives and leaves as a soft ring instead.
+        'transition-[box-shadow,border-color,background-color] duration-300 ease-out',
+        isRecent && 'ring-2 ring-primary/40 border-primary/50 shadow-glow-primary',
       )}
     >
       {/* Header */}
