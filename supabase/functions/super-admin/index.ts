@@ -165,7 +165,9 @@ async function getBusinessOverview(req: Request) {
 
   const trials = tenants.filter((t) => t.subscription_status === "trial").length;
   const paid = tenants.filter((t) => t.subscription_status === "active").length;
-  const canceled = tenants.filter((t) => t.subscription_status === "canceled").length;
+  // The billing side writes "cancelled"; this counted "canceled" and so
+  // always reported zero cancelled restaurants.
+  const canceled = tenants.filter((t) => t.subscription_status === "cancelled").length;
   const pastDue = tenants.filter((t) => t.subscription_status === "past_due").length;
 
   // Contracted MRR: what the tenants on an active plan should be paying.
@@ -542,7 +544,7 @@ async function getPayments(req: Request) {
       refundAmount: +refunded.reduce((s, p) => s + (Number(p.amount) || 0), 0).toFixed(2),
       pendingCount: pending.length,
       renewalCount: renewals.length,
-      cancellations: tenants.filter((t) => t.subscription_status === "canceled").length,
+      cancellations: tenants.filter((t) => t.subscription_status === "cancelled").length,
       trials: tenants.filter((t) => t.subscription_status === "trial").length,
       paid: tenants.filter((t) => t.subscription_status === "active").length,
     },
@@ -1018,11 +1020,16 @@ async function updateTenant(req: Request, tenantId: string, adminId: string) {
     patch.plan = b.plan;
   }
   if (b.subscriptionStatus) {
-    const allowed = ["trial", "active", "past_due", "canceled"];
-    if (!allowed.includes(b.subscriptionStatus)) {
+    // "cancelled" is what the billing side writes and what the plan resolver
+    // reads. The panel used to offer "canceled", which stored a status no other
+    // code knew — and a tenant carrying it lost its access at once instead of
+    // at the end of the period it had paid for.
+    const normalised = b.subscriptionStatus === "canceled" ? "cancelled" : b.subscriptionStatus;
+    const allowed = ["trial", "active", "past_due", "cancelled", "expired", "paused"];
+    if (!allowed.includes(normalised)) {
       return json(req, { error: `Unknown subscription status: ${b.subscriptionStatus}` }, 400);
     }
-    patch.subscription_status = b.subscriptionStatus;
+    patch.subscription_status = normalised;
   }
   if (b.active !== undefined) patch.active = Boolean(b.active);
   if (b.trialEndsAt !== undefined) {

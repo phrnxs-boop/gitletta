@@ -43,6 +43,8 @@ export type EffectivePlan = {
   isRestricted: boolean;
   trialStartedAt: string | null;
   trialEndsAt: string | null;
+  /** How many days the trial period is configured to last. */
+  trialDaysInPeriod: number;
   trialDaysRemaining: number | null;
   subscriptionPlan: PlanId | null;
   subscriptionStartedAt: string | null;
@@ -118,6 +120,50 @@ export const DEFAULT_TRIAL_PLAN = "pro";
 export const FALLBACK_PLAN = "starter";
 
 /**
+ * How long a free trial runs when the catalogue does not say. Only a fallback:
+ * the length of a trial is what the plan is sold with, and that lives in the
+ * `subscription_plans` table (`trial_days`).
+ */
+export const DEFAULT_TRIAL_DAYS = 14;
+
+/**
+ * The trial window a new restaurant is given.
+ *
+ * Read from the catalogue rather than written into the signup code, so the
+ * "configured trial period" is configured in one place.
+ */
+export async function trialWindow(
+  planId: string = DEFAULT_TRIAL_PLAN,
+): Promise<{ startedAt: string; endsAt: string; days: number }> {
+  const plan = (await planRow(planId)) ?? (await planRow(FALLBACK_PLAN));
+  const configured = Number(plan?.trial_days ?? 0);
+  const days = Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_TRIAL_DAYS;
+  const startedAt = new Date();
+  return {
+    startedAt: startedAt.toISOString(),
+    endsAt: new Date(startedAt.getTime() + days * DAY_MS).toISOString(),
+    days,
+  };
+}
+
+/**
+ * The columns every newly created tenant needs to be on a real trial.
+ *
+ * The column default for `subscription_status` is `'trial'`, but the two dates
+ * had no default at all, so a tenant created without them was a trial that had
+ * already ended. Anything that creates a tenant spreads these in.
+ */
+export async function trialFields(planId: string = DEFAULT_TRIAL_PLAN) {
+  const window = await trialWindow(planId);
+  return {
+    subscription_status: "trial",
+    subscription_plan: null,
+    trial_started_at: window.startedAt,
+    trial_ends_at: window.endsAt,
+  };
+}
+
+/**
  * Resolve what a restaurant may do right now.
  *
  * The trial is the one state that needs a clock: it is in force until the
@@ -131,7 +177,7 @@ export async function resolvePlan(tenantId: string): Promise<EffectivePlan> {
   const { data: tenant } = await db
     .from("tenants")
     .select(
-      "id, plan, subscription_status, trial_started_at, trial_ends_at, subscription_plan, subscription_started_at, razorpay_subscription_id, subscription_razorpay_payment_id, current_period_end, cancel_at_period_end",
+      "id, plan, subscription_status, trial_started_at, trial_ends_at, created_at, subscription_plan, subscription_started_at, razorpay_subscription_id, subscription_razorpay_payment_id, current_period_end, cancel_at_period_end",
     )
     .eq("id", tenantId)
     .maybeSingle();
@@ -145,16 +191,33 @@ export async function resolvePlan(tenantId: string): Promise<EffectivePlan> {
   const paidPlan = t?.subscription_plan ? await planRow(t.subscription_plan) : null;
   const fallback = await planRow(FALLBACK_PLAN);
 
-  const trialEndsAt = t?.trial_ends_at ?? null;
-  const trialStartedAt = t?.trial_started_at ?? null;
-  const trialActive =
-    status === "trial" &&
-    trialEndsAt !== null &&
-    new Date(trialEndsAt).getTime() > now;
+  // The trial window. A trial with no end date is one that was never written
+  // down — the signup path created tenants without one for a while, and reading
+  // that as "over" told a brand-new restaurant its free trial had ended before
+  // it had begun. So a missing end date falls back to the full period the
+  // catalogue allows, measured from the start of the trial or, failing that,
+  // from when the account was made. A window that has genuinely passed still
+  // ends: this fills in a clock, it does not remove one.
+  const configuredTrialDays =
+    Number(trialPlan?.trial_days ?? 0) > 0
+      ? Number(trialPlan!.trial_days)
+      : DEFAULT_TRIAL_DAYS;
+  const trialStartMs = t?.trial_started_at
+    ? new Date(t.trial_started_at).getTime()
+    : t?.created_at
+      ? new Date(t.created_at).getTime()
+      : null;
+  const trialEndsMs = t?.trial_ends_at
+    ? new Date(t.trial_ends_at).getTime()
+    : trialStartMs !== null
+      ? trialStartMs + configuredTrialDays * DAY_MS
+      : null;
+
+  const trialActive = status === "trial" && trialEndsMs !== null && trialEndsMs > now;
 
   const trialDaysRemaining =
-    trialActive && trialEndsAt
-      ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - now) / DAY_MS))
+    trialActive && trialEndsMs !== null
+      ? Math.max(0, Math.ceil((trialEndsMs - now) / DAY_MS))
       : null;
 
   // A paid subscription is in force while its period lasts. A cancellation
@@ -199,8 +262,11 @@ export async function resolvePlan(tenantId: string): Promise<EffectivePlan> {
     // The restaurant keeps everything it has; it just cannot do the paid
     // things any more.
     isRestricted: !isPaid && !isTrial,
-    trialStartedAt,
-    trialEndsAt,
+    // The dates the decision was made from — including a window derived from
+    // the catalogue — so the interface shows the same clock the server used.
+    trialStartedAt: trialStartMs !== null ? new Date(trialStartMs).toISOString() : null,
+    trialEndsAt: trialEndsMs !== null ? new Date(trialEndsMs).toISOString() : null,
+    trialDaysInPeriod: configuredTrialDays,
     trialDaysRemaining,
     subscriptionPlan: t?.subscription_plan ?? null,
     subscriptionStartedAt: t?.subscription_started_at ?? null,

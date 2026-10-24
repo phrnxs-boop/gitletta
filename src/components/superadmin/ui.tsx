@@ -135,6 +135,7 @@ export function StatCard({
 const STATUS_TONES: Record<string, Tone> = {
   active: 'emerald',
   trial: 'sky',
+  cancelled: 'rose',
   canceled: 'rose',
   past_due: 'amber',
   succeeded: 'emerald',

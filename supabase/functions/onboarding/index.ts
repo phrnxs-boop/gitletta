@@ -4,6 +4,7 @@ import { guard } from "../_shared/auth.ts";
 import { admin } from "../_shared/db.ts";
 import { MENU_THEME_KEY, normaliseMenuTheme } from "../_shared/menu-theme.ts";
 import { PERMISSION_KEYS } from "../_shared/permissions.ts";
+import { trialFields } from "../_shared/plans.ts";
 import { body, json, preflight } from "../_shared/http.ts";
 import { effectiveDishBasePrice, normalizeStoredPortions } from "../_shared/portions.ts";
 
@@ -119,21 +120,19 @@ Deno.serve(async (req: Request) => {
         slug = `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`;
       }
 
+      // The trial is a full trial, so it carries the trial plan, and it runs
+      // for the plan's configured trial days from the moment the restaurant
+      // was created. The length comes from the catalogue, not from a number
+      // written here — the same helper the registration path uses, so the two
+      // cannot drift apart.
+      const trial = await trialFields();
       const { data: tenant, error: tenantError } = await db
         .from("tenants")
         .insert({
           name: cleanName,
           slug,
-          // The trial is a full trial, so it carries the trial plan, and it
-          // runs for the plan's trial days from the moment the restaurant
-          // was created.
           plan: "pro",
-          subscription_status: "trial",
-          subscription_plan: null,
-          trial_started_at: new Date().toISOString(),
-          trial_ends_at: new Date(
-            Date.now() + 14 * 24 * 60 * 60 * 1000,
-          ).toISOString(),
+          ...trial,
           currency: "USD",
           currency_symbol: "₹",
           active: true,

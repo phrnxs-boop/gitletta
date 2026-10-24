@@ -4,6 +4,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { admin, asUser } from "../_shared/db.ts";
 import { PERMISSION_KEYS } from "../_shared/permissions.ts";
 import { body, json, preflight, subPath } from "../_shared/http.ts";
+import { trialFields } from "../_shared/plans.ts";
 
 /**
  * /functions/v1/auth
@@ -398,12 +399,18 @@ async function register(req: Request): Promise<Response> {
     }
 
     // Create the tenant.
+    // The trial needs its own clock. The column default is the status
+    // ('trial'), but the two dates have no default, so a tenant created
+    // without them was a trial that had already ended — which is what every
+    // account registered while this insert omitted them was told.
+    const trial = await trialFields();
     const { data: tenant, error: tenantError } = await db
       .from("tenants")
       .insert({
         name: cleanRestName,
         slug,
         plan: "pro",
+        ...trial,
         // India-first defaults. The onboarding flow can change these, but a new
         // restaurant must not start out priced in dollars.
         currency: "INR",

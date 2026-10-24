@@ -71,7 +71,7 @@ export default function SuperAdminCrm() {
   }, [load, query])
 
   const statuses = useMemo(
-    () => ['trial', 'active', 'past_due', 'canceled'].filter((s) => rows.some((r) => r.subscriptionStatus === s)),
+    () => ['trial', 'active', 'past_due', 'cancelled', 'expired'].filter((s) => rows.some((r) => r.subscriptionStatus === s)),
     [rows],
   )
   const plans = useMemo(

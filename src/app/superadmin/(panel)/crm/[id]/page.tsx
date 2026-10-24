@@ -38,7 +38,7 @@ type Detail = {
   dailyMetrics: any[]
 }
 
-const STATUSES = ['trial', 'active', 'past_due', 'canceled']
+const STATUSES = ['trial', 'active', 'past_due', 'cancelled', 'expired']
 const PLANS = ['basic', 'pro', 'enterprise']
 
 export default function RestaurantDetail({

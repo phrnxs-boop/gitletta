@@ -18,7 +18,8 @@
     "test:portions": "tsx --env-file=.env.local scripts/test-portions.mts",
     "test:security": "tsx scripts/test-security.mts",
     "test:smoke": "tsx scripts/test-smoke.mts",
-    "test:settings-save": "tsx --env-file=.env.local scripts/verify-settings-save.mts"
+    "test:settings-save": "tsx --env-file=.env.local scripts/verify-settings-save.mts",
+    "test:trial": "tsx --env-file=.env.local scripts/test-trial.mts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
